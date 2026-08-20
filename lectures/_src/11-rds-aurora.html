@@ -1,0 +1,172 @@
+  <p>One distinction carries more exam marks than anything else in this lecture: <strong>Multi-AZ is for availability, read replicas are for performance</strong>. Get that reflexive and most RDS questions collapse to one obvious answer.</p>
+
+  <h2 data-mark="01">What RDS gives you</h2>
+
+  <p>Managed MySQL, PostgreSQL, MariaDB, Oracle, SQL Server and Db2: AWS handles provisioning, OS and engine patching, automated backups, monitoring and failover. You lose SSH access to the host — which is why "we need OS-level access to the database server" means <strong>EC2, not RDS</strong>.</p>
+
+  <ul>
+    <li><strong>Automated backups</strong>: daily snapshot + transaction logs every 5 minutes, retained 1–35 days, enabling <strong>point-in-time recovery to any second</strong> in the window. Deleted with the instance unless you take a final snapshot.</li>
+    <li><strong>Manual snapshots</strong>: kept until you delete them, can be copied cross-Region and shared with other accounts. This is how you do RDS DR.</li>
+    <li><strong>Encryption at rest</strong> via KMS must be chosen <strong>at creation</strong>. To encrypt an existing unencrypted instance: snapshot → copy the snapshot with encryption → restore. In transit: TLS.</li>
+    <li><strong>Storage autoscaling</strong> grows the volume when it fills. <strong>Performance Insights</strong> and Enhanced Monitoring diagnose slow queries.</li>
+    <li><strong>RDS Proxy</strong> pools and shares database connections — the answer for <strong>Lambda exhausting the connection limit</strong>, and it also cuts failover time and can enforce IAM auth.</li>
+    <li><strong>IAM database authentication</strong> issues 15-minute tokens instead of passwords; otherwise store credentials in <strong>Secrets Manager</strong> with automatic rotation.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Lambda<small>thousands of invocations</small></span>
+      <span class="arrow">many connections</span>
+      <span class="node hl">RDS Proxy<small>pools &amp; multiplexes · IAM auth</small></span>
+      <span class="arrow">few pooled connections</span>
+      <span class="node store">RDS / Aurora</span>
+    </div>
+    <figcaption><strong>RDS Proxy sits between the app and the database.</strong> The answer for Lambda exhausting the connection limit; it also shortens failover.</figcaption>
+  </figure>
+
+  <h2 data-mark="02">Multi-AZ vs read replicas</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Multi-AZ</th><th>Read replica</th></tr></thead>
+    <tbody>
+      <tr><td>Purpose</td><td><strong>Availability / DR</strong></td><td><strong>Read scaling</strong></td></tr>
+      <tr><td>Replication</td><td><strong>Synchronous</strong></td><td><strong>Asynchronous</strong> (eventually consistent)</td></tr>
+      <tr><td>Can you read from it?</td><td><strong>No</strong> — the standby is idle (in the classic 2-instance setup)</td><td>Yes, that's the point</td></tr>
+      <tr><td>Failover</td><td><strong>Automatic</strong>, 60–120 s, the DNS endpoint swings over</td><td>Manual promotion to a standalone instance</td></tr>
+      <tr><td>Location</td><td>Another AZ, same Region</td><td>Same AZ, another AZ, <strong>or another Region</strong></td></tr>
+      <tr><td>Count</td><td>1 standby (or 2 readable standbys in Multi-AZ DB cluster mode)</td><td>Up to 5 (15 for Aurora)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group" data-label="Multi-AZ · availability">
+        <div class="flow">
+          <span class="node user">App</span>
+          <span class="arrow">one DNS endpoint</span>
+          <div class="group az" data-label="AZ a"><span class="node hl store">Primary<small>reads + writes</small></span></div>
+          <span class="arrow">sync</span>
+          <div class="group az" data-label="AZ b"><span class="node store dim">Standby<small>idle · auto failover</small></span></div>
+        </div>
+      </div>
+      <div class="group" data-label="Read replica · performance">
+        <div class="flow">
+          <span class="node user">App</span>
+          <span class="arrow">writes</span>
+          <span class="node store">Primary</span>
+          <span class="arrow dashed">async</span>
+          <span class="node hl store">Read replica<small>same AZ, other AZ or other Region</small></span>
+          <span class="arrow back">reads</span>
+          <span class="node user">Reports</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Multi-AZ = one endpoint, synchronous standby you cannot read from.</strong> Read replica = separate endpoint, asynchronous copy you point read traffic at; failover there is manual promotion.</figcaption>
+  </figure>
+
+  <div class="note exam">
+    <span class="label">Read the requirement, pick the feature</span>
+    <p>"Survive an AZ failure with no manual intervention" → <strong>Multi-AZ</strong>. "Reporting queries are slowing down the application" → <strong>read replica</strong>. "Both" → enable both; they compose. "Survive a <em>Region</em> failure" → <strong>cross-Region read replica</strong> (or Aurora Global Database). Any answer offering read replicas as a high-availability solution, or Multi-AZ as a performance solution, is a distractor.</p>
+  </div>
+
+  <p>Failover happens automatically on AZ outage, instance failure, storage failure, or during patching and instance-class changes — which is why Multi-AZ also reduces maintenance downtime. Because the endpoint DNS name stays the same, applications reconnect rather than reconfigure.</p>
+
+  <h2 data-mark="03">Aurora</h2>
+
+  <p>AWS's own MySQL- and PostgreSQL-compatible engine, up to 5× MySQL / 3× PostgreSQL throughput. Its architecture is the thing to understand:</p>
+
+  <ul>
+    <li>Storage is a <strong>shared, distributed volume</strong> that automatically keeps <strong>6 copies across 3 AZs</strong>. It grows in 10 GB steps up to 128 TB and self-heals. Writes survive losing 2 copies; reads survive losing 3.</li>
+    <li>Compute is separate: one <strong>writer</strong> and up to <strong>15 readers</strong>, all reading the same storage — so replicas add no replication lag from copying data and failover is typically <strong>under 30 seconds</strong>.</li>
+    <li><strong>Endpoints</strong>: <em>cluster</em> (always the writer), <em>reader</em> (load-balances across replicas), <em>custom</em> (a named subset of instances). Point the app at the reader endpoint for read traffic — don't hardcode instances.</li>
+    <li><strong>Backtrack</strong> rewinds a cluster in place to a point in time without restoring a snapshot — the "undo a bad migration quickly" answer.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="stack">
+      <div class="flow">
+        <span class="node user">App</span>
+        <span class="arrow">writes</span>
+        <span class="node">Cluster endpoint<small>always the writer</small></span>
+        <span class="node user">App</span>
+        <span class="arrow">reads</span>
+        <span class="node hl">Reader endpoint<small>load-balances replicas</small></span>
+      </div>
+      <span class="arrow"></span>
+      <div class="flow">
+        <span class="node">Writer</span>
+        <span class="node">Reader</span>
+        <span class="node">Reader<small>up to 15 · failover targets</small></span>
+      </div>
+      <span class="arrow both">all read the same volume</span>
+      <div class="group solid" data-label="Shared distributed storage · 6 copies">
+        <div class="group az" data-label="AZ a"><span class="node store">2 copies</span></div>
+        <div class="group az" data-label="AZ b"><span class="node store">2 copies</span></div>
+        <div class="group az" data-label="AZ c"><span class="node store">2 copies</span></div>
+      </div>
+    </div>
+    <figcaption><strong>Compute and storage are separate.</strong> Replicas read the shared volume rather than copying data, so a reader doubles as a failover target and failover is typically under 30 seconds.</figcaption>
+  </figure>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Aurora flavour</th><th>Use when</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Aurora Serverless v2</strong></td><td><strong>Unpredictable or intermittent</strong> load; scales capacity (ACUs) in fine increments in seconds, and down when idle. The cost answer for dev/test and spiky apps.</td></tr>
+      <tr><td><strong>Aurora Global Database</strong></td><td>Up to 5 secondary Regions, replication typically <strong>&lt; 1 second</strong>, cross-Region failover in about a minute. <strong>The multi-Region relational DR answer</strong>, and it gives fast local reads worldwide.</td></tr>
+      <tr><td><strong>Multi-master</strong></td><td>Multiple writers in one Region. Niche; rarely the intended answer.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">Aurora replicas do two jobs</span>
+    <p>An Aurora replica is simultaneously a read-scaling instance <em>and</em> a failover target — no separate standby is needed. That is why "Aurora with replicas in multiple AZs" satisfies both availability and read-scaling requirements in one answer, and why Aurora often beats RDS Multi-AZ + read replicas in a "most resilient and most performant" question.</p>
+  </div>
+
+  <h2 data-mark="04">Neighbours you should recognise</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>Cue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>DMS</strong> (Database Migration Service)</td><td>Migrate to AWS with <strong>minimal downtime</strong>; the source stays live. Pair with <strong>SCT</strong> (Schema Conversion Tool) when the engine changes (Oracle → Aurora PostgreSQL).</td></tr>
+      <tr><td><strong>ElastiCache</strong></td><td>The database is CPU-bound on repeated identical reads — cache in front of it.</td></tr>
+      <tr><td><strong>DocumentDB</strong></td><td>MongoDB-compatible</td></tr>
+      <tr><td><strong>Neptune</strong></td><td>Graph — social networks, fraud rings, recommendations, knowledge graphs</td></tr>
+      <tr><td><strong>Timestream</strong></td><td>Time-series — IoT sensors, metrics</td></tr>
+      <tr><td><strong>Keyspaces</strong></td><td>Managed Apache Cassandra</td></tr>
+      <tr><td><strong>QLDB</strong></td><td>Immutable, cryptographically verifiable ledger</td></tr>
+      <tr><td><strong>RDS Custom</strong></td><td>Managed RDS <em>with</em> OS/database access — for legacy Oracle/SQL Server apps that need it</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="05">Check yourself</h2>
+
+  <details class="check"><summary>Nightly BI reports make the production database slow. Multi-AZ is already on.</summary>
+  <div class="answer">Add a <strong>read replica</strong> and point the reporting tool at it. Multi-AZ's standby cannot serve reads, so it does nothing for this problem.</div></details>
+
+  <details class="check"><summary>A Lambda-based API intermittently fails with "too many connections" against Aurora.</summary>
+  <div class="answer"><strong>RDS Proxy</strong>. Thousands of concurrent Lambda invocations each open a connection; the proxy pools and multiplexes them, and also shortens failover.</div></details>
+
+  <details class="check"><summary>A relational workload must survive the loss of an entire Region with RPO under a second and RTO around a minute.</summary>
+  <div class="answer"><strong>Aurora Global Database</strong>. Cross-Region read replicas on standard RDS have higher lag and slower manual promotion; Multi-AZ doesn't cross Regions at all.</div></details>
+
+  <details class="check"><summary>A dev database is used for two hours a day and idle otherwise. Cut cost without deleting it.</summary>
+  <div class="answer"><strong>Aurora Serverless v2</strong>, which scales capacity down when idle. (For plain RDS, stopping the instance works but it restarts automatically after 7 days.)</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Multi-AZ = synchronous, automatic failover, not readable — <strong>availability</strong>. Read replicas = asynchronous, readable, manual promotion — <strong>performance</strong>.</li>
+      <li>Cross-Region DR for relational data = cross-Region read replica, snapshot copy, or (best) Aurora Global Database.</li>
+      <li>Aurora: 6 copies across 3 AZs, up to 15 replicas that double as failover targets, sub-30-second failover, reader endpoint for load balancing.</li>
+      <li>Aurora Serverless v2 for spiky or intermittent load; Backtrack to undo mistakes without a restore.</li>
+      <li>RDS Proxy solves Lambda connection exhaustion and speeds failover.</li>
+      <li>Encryption must be set at creation — otherwise snapshot, copy encrypted, restore.</li>
+      <li>Need OS access → EC2 or RDS Custom, not standard RDS.</li>
+    </ol>
+  </div>

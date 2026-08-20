@@ -1,0 +1,183 @@
+  <p>Every single action in AWS is an API call, and every API call goes through the same question: <em>is this principal allowed to do this action on this resource under these conditions?</em> IAM is the machine that answers it. Nothing else on the exam is tested this densely.</p>
+
+  <h2 data-mark="01">The four nouns</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Noun</th><th>What it is</th><th>Use it when</th></tr></thead>
+    <tbody>
+      <tr><td><strong>User</strong></td><td>A long-lived identity with a password and/or access keys.</td><td>A human, or legacy tooling that genuinely cannot assume a role. Rare in good designs.</td></tr>
+      <tr><td><strong>Group</strong></td><td>A bucket of users you attach policies to. <em>Cannot be nested. Cannot be a principal.</em></td><td>Organising human permissions.</td></tr>
+      <tr><td><strong>Role</strong></td><td>An identity with permissions but <strong>no credentials</strong>. It is <em>assumed</em>, yielding temporary keys from STS.</td><td>Almost always. EC2, Lambda, ECS tasks, cross-account access, federated humans.</td></tr>
+      <tr><td><strong>Policy</strong></td><td>A JSON document listing Effect / Action / Resource / Condition.</td><td>Attached to identities (identity-based) or to resources (resource-based).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">The default correct answer</span>
+    <p>If a question shows an <strong>EC2 instance, Lambda function or container needing to call an AWS service</strong>, the answer is <strong>an IAM role</strong>. Any option involving access keys in code, in environment variables, in userdata, or in a config file is wrong — every time, with no exceptions. This pattern alone is worth several marks.</p>
+  </div>
+
+  <h2 data-mark="02">Anatomy of a policy</h2>
+
+<pre><code>{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "ReadOneBucketFromOffice",
+    "Effect": "Allow",
+    "Action": ["s3:GetObject", "s3:ListBucket"],
+    "Resource": [
+      "arn:aws:s3:::reports",          // the bucket  → for ListBucket
+      "arn:aws:s3:::reports/*"         // the objects → for GetObject
+    ],
+    "Condition": { "IpAddress": { "aws:SourceIp": "203.0.113.0/24" } }
+  }]
+}</code></pre>
+
+  <div class="note gotcha">
+    <span class="label">Two-ARN gotcha</span>
+    <p>Bucket-level actions (<code>s3:ListBucket</code>, <code>s3:GetBucketLocation</code>) act on <code>arn:aws:s3:::bucket</code>. Object-level actions (<code>GetObject</code>, <code>PutObject</code>) act on <code>arn:aws:s3:::bucket/*</code>. A policy with only the first ARN produces "access denied" on downloads; only the second produces "access denied" on listing. Exam questions are built out of exactly this.</p>
+  </div>
+
+  <p>Useful condition keys to recognise: <code>aws:SourceIp</code>, <code>aws:SourceVpce</code> (came through a specific VPC endpoint), <code>aws:PrincipalOrgID</code> (any account in my Organization), <code>aws:SecureTransport</code> (HTTPS only), <code>aws:MultiFactorAuthPresent</code>, <code>s3:x-amz-server-side-encryption</code> (force encryption on upload).</p>
+
+  <h2 data-mark="02b">Identity-based vs resource-based</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Identity-based</th><th>Resource-based</th></tr></thead>
+    <tbody>
+      <tr><td>Attached to</td><td>User, group, role</td><td>The resource itself: S3 bucket policy, SQS queue policy, SNS topic policy, KMS key policy, Lambda resource policy, VPC endpoint policy</td></tr>
+      <tr><td>Has a <code>Principal</code>?</td><td>No — the identity is implied</td><td><strong>Yes</strong> — it names who is allowed</td></tr>
+      <tr><td>Cross-account</td><td>Needs a role to assume</td><td>Can grant another account directly, <em>without</em> role assumption</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>For cross-account S3 access you need <strong>both sides to agree</strong>: the bucket policy allows the other account's principal, and that principal's identity policy allows the S3 action. Only <em>within one account</em> does an <code>Allow</code> on either side suffice.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group" data-label="Account A">
+        <span class="node hl">Lambda role<small>identity policy: Allow s3:GetObject</small></span>
+      </div>
+      <span class="arrow">GetObject</span>
+      <div class="group" data-label="Account B">
+        <span class="node store">S3 bucket<small>bucket policy: Principal = role in A</small></span>
+      </div>
+    </div>
+    <figcaption><strong>Cross-account needs both sides.</strong> The identity policy in A allows the action and the resource policy in B names the principal — a resource policy alone is enough only within one account.</figcaption>
+  </figure>
+
+  <h2 data-mark="03">Policy evaluation logic</h2>
+
+  <p>Learn this order. It resolves nearly every "why is this denied?" question.</p>
+
+  <div class="decisions">
+    <span class="label">Evaluation, in order</span>
+    <div class="decision"><span class="cue">1. Any explicit <code>Deny</code> anywhere?</span><span class="arrow">→</span><span class="ans">DENY. Full stop. Nothing overrides it.</span></div>
+    <div class="decision"><span class="cue">2. SCP (Organizations) allows it?</span><span class="arrow">→</span><span class="ans">If not permitted by SCP → deny, even for the account root user.</span></div>
+    <div class="decision"><span class="cue">3. Resource-based policy allows it?</span><span class="arrow">→</span><span class="ans">Allow (this alone can be enough same-account).</span></div>
+    <div class="decision"><span class="cue">4. Identity policy / permissions boundary / session policy allow?</span><span class="arrow">→</span><span class="ans">Allow only if <em>every</em> applicable one allows.</span></div>
+    <div class="decision"><span class="cue">5. Nothing said anything</span><span class="arrow">→</span><span class="ans">Implicit DENY. Everything is denied by default.</span></div>
+  </div>
+
+  <figure class="diagram">
+    <div class="stack">
+      <span class="node bad">1. Explicit Deny anywhere?<small>yes → DENY, nothing overrides it</small></span>
+      <span class="arrow">no</span>
+      <span class="node warn">2. SCP permits it?<small>no → deny, even for root</small></span>
+      <span class="arrow">yes</span>
+      <span class="node info">3. Resource-based policy allows?<small>yes → ALLOW (same-account)</small></span>
+      <span class="arrow">no</span>
+      <span class="node info">4. Identity policy + boundary + session all allow?<small>every applicable one must say yes</small></span>
+      <span class="arrow">nothing said anything</span>
+      <span class="node bad">5. Implicit DENY<small>the default</small></span>
+    </div>
+    <figcaption><strong>Deny wins, SCPs filter, silence denies.</strong> Walk this top to bottom for every "why is this denied?" question.</figcaption>
+  </figure>
+
+  <div class="note nuance">
+    <span class="label">SCPs are a filter, not a grant</span>
+    <p>A Service Control Policy attached to an Organizational Unit sets the <strong>maximum</strong> permissions for accounts in it. It never gives anyone access — it only takes it away. An account with <code>AdministratorAccess</code> under an SCP that denies <code>ec2:*</code> outside <code>eu-west-1</code> genuinely cannot launch instances in Frankfurt. SCPs do <em>not</em> apply to the management account.</p>
+  </div>
+
+  <p>Related but distinct: a <strong>permissions boundary</strong> is attached to a single user or role and caps <em>its</em> maximum permissions. Standard use case: let developers create roles, but attach a boundary so they cannot create a role more powerful than themselves (privilege escalation).</p>
+
+  <h2 data-mark="04">Roles and STS</h2>
+
+  <p>A role has two policies, and mixing them up is a common mistake:</p>
+
+  <ul>
+    <li><strong>Trust policy</strong> — <em>who may assume this role.</em> Its <code>Principal</code> is an account, a service (<code>ec2.amazonaws.com</code>), or an identity provider.</li>
+    <li><strong>Permissions policy</strong> — <em>what the role may do</em> once assumed.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Principal<small>account · service · IdP</small></span>
+      <span class="arrow">sts:AssumeRole</span>
+      <span class="node hl">Role<small>trust policy: who may assume</small></span>
+      <span class="arrow">temporary keys · 15 min – 12 h</span>
+      <span class="node">Session<small>permissions policy: what it may do</small></span>
+      <span class="arrow"></span>
+      <span class="node store">AWS service</span>
+    </div>
+    <figcaption><strong>Two policies, two questions.</strong> The trust policy gates who gets in; the permissions policy bounds what the resulting temporary credentials can do.</figcaption>
+  </figure>
+
+  <p><code>sts:AssumeRole</code> returns temporary credentials (15 min – 12 h). Variants worth recognising:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>API</th><th>For</th></tr></thead>
+    <tbody>
+      <tr><td><code>AssumeRole</code></td><td>Cross-account and in-account role switching</td></tr>
+      <tr><td><code>AssumeRoleWithWebIdentity</code></td><td>Google / Facebook / OIDC login — but for apps, <strong>Cognito Identity Pools</strong> is the recommended wrapper</td></tr>
+      <tr><td><code>AssumeRoleWithSAML</code></td><td>Corporate Active Directory / SAML 2.0 IdP federation</td></tr>
+      <tr><td><code>GetSessionToken</code></td><td>MFA-protected temporary credentials for an IAM user</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p><strong>IAM Identity Center</strong> (formerly AWS SSO) is the modern answer whenever a question mentions a workforce logging into many AWS accounts with existing corporate credentials. It fronts Organizations with permission sets and eliminates per-account IAM users.</p>
+
+  <h2 data-mark="05">Cross-account access: the ExternalId trap</h2>
+
+  <p>When you grant a <strong>third party</strong> (a monitoring vendor, an auditor) a role in your account, the trust policy must require an <code>sts:ExternalId</code>. Without it, the vendor could be tricked into using their credentials against your account on someone else's behalf — the <em>confused deputy</em> problem. If an answer option mentions ExternalId in a third-party scenario, it is almost certainly correct.</p>
+
+  <h2 data-mark="06">Root user and account hygiene</h2>
+
+  <ul>
+    <li>The root user can do everything and cannot be restricted by IAM policies (only by SCPs, and not in the management account). Enable MFA, delete its access keys, and never use it day to day.</li>
+    <li>A handful of tasks <em>require</em> root: closing the account, changing the account name/email, changing support plan, restoring an unusable S3 bucket policy, registering as a seller.</li>
+    <li><strong>IAM Access Analyzer</strong> flags resources shared outside your account or Organization, and can generate a least-privilege policy from CloudTrail history.</li>
+    <li><strong>IAM credential report</strong> (account-wide CSV: key age, MFA, last used) vs <strong>Access Advisor</strong> (per-identity: which services were actually used). Both feed permission trimming.</li>
+  </ul>
+
+  <h2 data-mark="07">Check yourself</h2>
+
+  <details class="check"><summary>A Lambda function must read from an S3 bucket in another account. What must be configured?</summary>
+  <div class="answer">Two things. (1) The Lambda's <strong>execution role</strong> gets an identity policy allowing <code>s3:GetObject</code> on that bucket's objects. (2) The bucket's <strong>resource policy</strong> in the other account allows that role ARN. Cross-account needs both sides. If the bucket uses a customer-managed KMS key, the <strong>key policy</strong> must allow the role too — that's the third thing questions like to hide.</div></details>
+
+  <details class="check"><summary>A developer has <code>AdministratorAccess</code> but cannot create an EC2 instance in <code>us-east-1</code>. Why?</summary>
+  <div class="answer">Almost certainly an <strong>SCP</strong> on their Organizational Unit denying that Region, or a <strong>permissions boundary</strong> on their user. An explicit deny at any layer wins over any Allow.</div></details>
+
+  <details class="check"><summary>What's wrong with baking an access key into an EC2 AMI so the app can write to DynamoDB?</summary>
+  <div class="answer">Everything. Keys are long-lived, they travel with every copy of the AMI, they cannot be rotated without a rebuild, and anyone who reaches the instance gets them. Attach an <strong>instance profile / IAM role</strong> — the SDK picks up rotating temporary credentials automatically from the instance metadata service.</div></details>
+
+  <details class="check"><summary>A policy allows <code>s3:GetObject</code> on <code>arn:aws:s3:::logs</code>. Downloads fail. Fix?</summary>
+  <div class="answer">Wrong ARN level. Object actions need <code>arn:aws:s3:::logs/*</code>. Add it (keep the bare bucket ARN too if <code>ListBucket</code> is needed).</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Compute needs AWS access → <strong>IAM role</strong>. Never access keys. This is the highest-yield rule on the exam.</li>
+      <li>Explicit <code>Deny</code> beats everything; absence of an Allow is a deny; SCPs cap but never grant.</li>
+      <li>Resource-based policies carry a <code>Principal</code> and enable cross-account access without assuming a role — but for S3 cross-account you still need the caller's identity policy to allow it.</li>
+      <li>S3 policies need two ARNs: bucket for listing, <code>bucket/*</code> for objects.</li>
+      <li>Trust policy = who can assume. Permissions policy = what they can then do.</li>
+      <li>Third-party cross-account access → require <code>sts:ExternalId</code>. Workforce SSO across many accounts → IAM Identity Center.</li>
+    </ol>
+  </div>

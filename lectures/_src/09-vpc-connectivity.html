@@ -1,0 +1,208 @@
+  <p>Six ways to connect a VPC to something else. Each has an unmistakable cue in the question, so this lecture is mostly about learning the cue rather than the protocol.</p>
+
+  <h2 data-mark="01">The six options at a glance</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Option</th><th>Connects</th><th>Cue in the question</th></tr></thead>
+    <tbody>
+      <tr><td><strong>VPC Peering</strong></td><td>VPC ↔ VPC</td><td>A handful of VPCs, simple, cheapest</td></tr>
+      <tr><td><strong>Transit Gateway</strong></td><td>Many VPCs + VPN + Direct Connect</td><td><strong>"Hundreds of VPCs", "hub and spoke", "simplify a mesh"</strong></td></tr>
+      <tr><td><strong>Site-to-Site VPN</strong></td><td>On-prem ↔ AWS over the internet</td><td>Quick to set up, encrypted, <strong>bandwidth varies with the internet</strong></td></tr>
+      <tr><td><strong>Direct Connect</strong></td><td>On-prem ↔ AWS over private fibre</td><td><strong>"Consistent/predictable latency", "dedicated private connection", "large sustained transfer"</strong>. Takes weeks–months to provision.</td></tr>
+      <tr><td><strong>Gateway endpoint</strong></td><td>VPC → S3 / DynamoDB</td><td><strong>Free.</strong> Private access to just these two services</td></tr>
+      <tr><td><strong>Interface endpoint / PrivateLink</strong></td><td>VPC → any AWS service or a partner/your own service</td><td><strong>"Without traversing the internet"</strong>, exposing your service to other VPCs privately</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="02">Peering and its three limits</h2>
+
+  <p>A one-to-one private link between two VPCs, in any Region and any account. Traffic uses private IPs and never touches the internet. Then the limits — each one is an exam answer:</p>
+
+  <ol>
+    <li><strong>Not transitive.</strong> A↔B and B↔C does <em>not</em> give A↔C. You need a third peering, and n VPCs need n(n−1)/2 connections. This is exactly the pain Transit Gateway solves.</li>
+    <li><strong>CIDRs must not overlap.</strong> No exceptions, no NAT workaround.</li>
+    <li><strong>Route tables must be updated on both sides</strong>, and security groups can reference peer security groups only within the same Region.</li>
+  </ol>
+
+  <h2 data-mark="03">Transit Gateway</h2>
+
+  <p>A Regional hub. Every VPC, VPN and Direct Connect gateway attaches once, and <strong>route tables on the TGW</strong> decide who can reach whom. It supports transitive routing, IP multicast, and cross-Region peering between Transit Gateways.</p>
+
+<pre><code>   before (mesh)                      after (hub)
+  A ── B                              A   B   C   D
+  │ ╲╱ │                               ╲  │   │  ╱
+  │ ╱╲ │        6 peerings              ┌──┴───┴──┐     4 attachments
+  C ── D                                │   TGW   │──── VPN / DX
+                                        └─────────┘</code></pre>
+
+  <p>Its route tables also let you build segmentation — e.g. every spoke can reach a shared-services VPC, but spokes cannot reach each other. "Isolate environments while sharing central services" is a TGW answer.</p>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group bad" data-label="Peering: not transitive">
+        <div class="flow">
+          <span class="node">VPC A</span>
+          <span class="arrow both">peering</span>
+          <span class="node">VPC B</span>
+          <span class="arrow both">peering</span>
+          <span class="node">VPC C</span>
+        </div>
+        <div class="flow">
+          <span class="node">VPC A</span>
+          <span class="arrow x">no route via B</span>
+          <span class="node">VPC C</span>
+        </div>
+      </div>
+      <div class="group good" data-label="Transit Gateway: hub and spoke">
+        <div class="flow">
+          <span class="node">VPC A</span>
+          <span class="node">VPC B</span>
+          <span class="node">VPC C</span>
+          <span class="arrow both">attach</span>
+          <span class="node hl">TGW<small>Regional · route tables</small></span>
+          <span class="arrow both">attach</span>
+          <span class="node">VPN / DX<small>on-prem</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Peering is one-to-one and non-transitive;</strong> the Transit Gateway routes transitively between every attachment, and its route tables decide which spokes may talk to each other.</figcaption>
+  </figure>
+
+  <h2 data-mark="04">Hybrid: VPN and Direct Connect</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Site-to-Site VPN</th><th>Direct Connect</th></tr></thead>
+    <tbody>
+      <tr><td>Path</td><td>Public internet, IPsec encrypted</td><td>Private fibre into an AWS Direct Connect location</td></tr>
+      <tr><td>Setup time</td><td>Minutes</td><td>Weeks to months</td></tr>
+      <tr><td>Bandwidth</td><td>Up to ~1.25 Gbps per tunnel</td><td>1, 10, 100 Gbps dedicated; sub-1 Gbps hosted</td></tr>
+      <tr><td>Consistency</td><td>Best-effort internet</td><td><strong>Consistent, predictable</strong></td></tr>
+      <tr><td>Encryption</td><td>Built in</td><td><strong>Not encrypted by default</strong> — add a VPN over it or use MACsec</td></tr>
+      <tr><td>Cost</td><td>Low, plus data transfer</td><td>Port hours + much lower per-GB egress</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">Three phrasings, three answers</span>
+    <p><strong>"Encrypted connection quickly / temporarily"</strong> → Site-to-Site VPN. <strong>"Consistent low latency, high throughput, mission critical"</strong> → Direct Connect. <strong>"Direct Connect, but it must be highly available / must not be a single point of failure"</strong> → two Direct Connect connections at <em>different</em> locations, or one DX with a <strong>VPN as backup</strong> — the cheaper answer, and usually the intended one.</p>
+  </div>
+
+  <p>Components you should recognise: a <strong>Virtual Private Gateway (VGW)</strong> attaches a VPN/DX to a single VPC; a <strong>Direct Connect Gateway</strong> lets one DX reach VPCs in multiple Regions; <strong>private VIF</strong> reaches VPC private IPs, <strong>public VIF</strong> reaches public AWS endpoints (S3, DynamoDB) over the DX; a <strong>Customer Gateway</strong> represents your on-prem device. VPN gives two tunnels for redundancy — use <strong>BGP</strong> for dynamic failover.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group" data-label="On-premises">
+        <span class="node">Customer Gateway<small>your device</small></span>
+      </div>
+      <div class="group col" data-label="Two paths">
+        <span class="node info">Site-to-Site VPN<small>internet · IPsec · 2 tunnels · BGP</small></span>
+        <span class="node hl">Direct Connect<small>private fibre · unencrypted by default</small></span>
+      </div>
+      <span class="arrow"></span>
+      <span class="node">VGW<small>one VPC</small></span>
+      <span class="arrow"></span>
+      <div class="group" data-label="VPC">
+        <span class="node">Private subnets</span>
+      </div>
+    </div>
+    <figcaption><strong>Direct Connect for consistency, VPN for speed of setup and encryption.</strong> Highly available DX = a second DX at another location or, cheaper, the VPN as backup on the same VGW.</figcaption>
+  </figure>
+
+  <h2 data-mark="05">VPC endpoints</h2>
+
+  <p>By default, an EC2 instance calling <code>s3.eu-west-1.amazonaws.com</code> goes out to a public endpoint — via the IGW or NAT. Endpoints keep that traffic on the AWS network.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Gateway endpoint</th><th>Interface endpoint (PrivateLink)</th></tr></thead>
+    <tbody>
+      <tr><td>Services</td><td><strong>S3 and DynamoDB only</strong></td><td>Almost every AWS service, plus SaaS partners and your own services</td></tr>
+      <tr><td>Mechanism</td><td>A <strong>route table entry</strong> to a prefix list</td><td>An <strong>ENI with a private IP</strong> in your subnet, plus private DNS</td></tr>
+      <tr><td>Cost</td><td><strong>Free</strong></td><td>Per hour per AZ + per GB</td></tr>
+      <tr><td>Security</td><td>Endpoint policy</td><td>Endpoint policy + <strong>security group on the ENI</strong></td></tr>
+      <tr><td>Reachable from on-prem?</td><td><strong>No</strong></td><td><strong>Yes</strong>, over VPN/Direct Connect</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">A frequent trap</span>
+    <p>"On-premises servers must reach S3 privately over Direct Connect." A <strong>gateway</strong> endpoint cannot do this — it is only a route inside the VPC. The answers are an <strong>interface endpoint for S3</strong>, or a <strong>public VIF</strong> on the Direct Connect. Meanwhile, for instances <em>inside</em> the VPC, always prefer the free gateway endpoint.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group" data-label="Gateway endpoint · free">
+        <div class="flow">
+          <div class="group az" data-label="Private subnet"><span class="node">EC2</span></div>
+          <span class="arrow">route table → prefix list</span>
+          <span class="node store hl">S3 / DynamoDB</span>
+        </div>
+        <div class="flow">
+          <span class="node dim">On-prem</span>
+          <span class="arrow x">not reachable</span>
+          <span class="node dim">Gateway endpoint</span>
+        </div>
+      </div>
+      <div class="group" data-label="Interface endpoint · PrivateLink">
+        <div class="flow">
+          <span class="node">On-prem<small>over VPN / DX</small></span>
+          <span class="arrow"></span>
+          <div class="group az" data-label="Your subnet"><span class="node hl">Endpoint ENI<small>private IP · security group</small></span></div>
+          <span class="arrow">private DNS</span>
+          <span class="node">AWS service<small>or a partner's NLB</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Gateway = a route, interface = an ENI.</strong> The route only exists inside the VPC, so on-prem over Direct Connect needs an interface endpoint (or a public VIF); inside the VPC the free gateway endpoint wins for S3 and DynamoDB.</figcaption>
+  </figure>
+
+  <p><strong>PrivateLink</strong> generalises this: you put your service behind an <strong>NLB</strong>, publish it as an endpoint service, and consumers create interface endpoints in their VPCs. No peering, no route table changes, <strong>no CIDR overlap problem</strong>, and traffic is one-directional (consumer → provider). "Expose an internal service to hundreds of customer VPCs" → PrivateLink, not peering.</p>
+
+  <div class="note nuance">
+    <span class="label">Also worth knowing</span>
+    <p><strong>AWS Resource Access Manager (RAM)</strong> shares subnets, Transit Gateways, and Route 53 rules across accounts in an Organization. The <em>shared VPC</em> pattern — one network account owns the VPC and shares subnets with app accounts — is how large organisations avoid VPC sprawl.</p>
+  </div>
+
+  <h2 data-mark="06">Decision list</h2>
+
+  <div class="decisions">
+    <span class="label">Which connection?</span>
+    <div class="decision"><span class="cue">Two or three VPCs, simple, cheap</span><span class="arrow">→</span><span class="ans">VPC Peering</span></div>
+    <div class="decision"><span class="cue">Dozens of VPCs, or a mesh that's become unmanageable</span><span class="arrow">→</span><span class="ans">Transit Gateway</span></div>
+    <div class="decision"><span class="cue">Overlapping CIDRs, or exposing a service to many consumers</span><span class="arrow">→</span><span class="ans">PrivateLink</span></div>
+    <div class="decision"><span class="cue">On-prem, needed this week, encrypted</span><span class="arrow">→</span><span class="ans">Site-to-Site VPN</span></div>
+    <div class="decision"><span class="cue">On-prem, consistent latency, sustained high volume</span><span class="arrow">→</span><span class="ans">Direct Connect (+ VPN backup for HA)</span></div>
+    <div class="decision"><span class="cue">Private access to S3/DynamoDB from inside the VPC</span><span class="arrow">→</span><span class="ans">Gateway endpoint (free)</span></div>
+    <div class="decision"><span class="cue">Private access to any other AWS service, or from on-prem</span><span class="arrow">→</span><span class="ans">Interface endpoint</span></div>
+  </div>
+
+  <h2 data-mark="07">Check yourself</h2>
+
+  <details class="check"><summary>25 VPCs across 4 accounts all need to talk to a shared services VPC, and to on-premises.</summary>
+  <div class="answer"><strong>Transit Gateway</strong>, shared across accounts with <strong>RAM</strong>, with the Site-to-Site VPN or Direct Connect attached to the same TGW. A peering mesh would need 300 connections and still wouldn't be transitive.</div></details>
+
+  <details class="check"><summary>A SaaS vendor must expose their API to your VPC, but their CIDR overlaps yours.</summary>
+  <div class="answer"><strong>PrivateLink</strong> — an interface endpoint in your VPC talks to their NLB-fronted endpoint service. Overlapping CIDRs are irrelevant because nothing is routed between the networks.</div></details>
+
+  <details class="check"><summary>Direct Connect is installed and traffic is flowing. The auditor says data in transit must be encrypted.</summary>
+  <div class="answer">Direct Connect is private but <strong>not encrypted</strong>. Run a <strong>Site-to-Site VPN over the Direct Connect</strong> (or enable MACsec where supported).</div></details>
+
+  <details class="check"><summary>Private-subnet instances must reach S3 without a NAT Gateway, at zero extra cost.</summary>
+  <div class="answer">A <strong>Gateway VPC endpoint for S3</strong>, with its prefix-list route added to the private route tables and, optionally, an endpoint policy restricting which buckets.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Peering is non-transitive and forbids overlapping CIDRs; scale past a few VPCs with Transit Gateway.</li>
+      <li>VPN = fast to build, internet-dependent, encrypted. Direct Connect = consistent, private, slow to provision, unencrypted by default.</li>
+      <li>Highly available Direct Connect = a second DX at another location, or a VPN as backup.</li>
+      <li>Gateway endpoints: S3 and DynamoDB only, free, route-based, not reachable from on-prem.</li>
+      <li>Interface endpoints/PrivateLink: an ENI in your subnet, works for nearly everything, reachable over DX/VPN, chargeable.</li>
+      <li>PrivateLink is the answer whenever CIDRs overlap or you're publishing a service to many consumers.</li>
+    </ol>
+  </div>

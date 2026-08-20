@@ -1,0 +1,195 @@
+  <p>Resilience questions are formulaic once you know the vocabulary. The scenario states a recovery objective, and the objective picks the strategy, and the strategy picks the services. Learn the mapping and these become the fastest questions on the paper.</p>
+
+  <h2 data-mark="01">RTO and RPO</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>RTO — Recovery Time Objective</th><th>RPO — Recovery Point Objective</th></tr></thead>
+    <tbody>
+      <tr><td>Measures</td><td><strong>Downtime</strong> you can tolerate</td><td><strong>Data loss</strong> you can tolerate</td></tr>
+      <tr><td>Reads as</td><td>"How long until we're back?"</td><td>"How much recent work may we lose?"</td></tr>
+      <tr><td>Driven by</td><td>How much infrastructure is already running</td><td>How often you replicate or back up</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+<pre><code>        ← RPO →              incident              ← RTO →
+   ─────┬──────────────────────┬──────────────────────┬─────►
+    last backup /          it breaks             service restored
+     replication
+    (data since here is lost)      (users are down for this long)</code></pre>
+
+  <div class="note exam">
+    <span class="label">The single most useful sentence</span>
+    <p><strong>Low RPO is bought with replication frequency; low RTO is bought with pre-provisioned capacity.</strong> "We can lose at most 5 minutes of data" is an RPO statement → continuous or near-continuous replication. "We must be back within 10 minutes" is an RTO statement → something must already be running.</p>
+  </div>
+
+  <h2 data-mark="02">The four DR strategies</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Strategy</th><th>What's running in the second Region</th><th>RTO / RPO</th><th>Cost</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Backup &amp; restore</strong></td><td>Nothing. Snapshots and data replicated to S3.</td><td>Hours / hours</td><td>Lowest</td></tr>
+      <tr><td><strong>Pilot light</strong></td><td>Only the <strong>data layer</strong> — a replicated database, plus AMIs and templates ready. Compute is off.</td><td>Tens of minutes / minutes</td><td>Low</td></tr>
+      <tr><td><strong>Warm standby</strong></td><td>A <strong>scaled-down but fully working copy</strong> handling no or minimal traffic.</td><td>Minutes / seconds</td><td>Medium</td></tr>
+      <tr><td><strong>Multi-site active-active</strong></td><td>Full production capacity in both, both serving traffic.</td><td><strong>Near zero / near zero</strong></td><td>Highest</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group col" data-label="Backup &amp; restore">
+        <div class="stack">
+          <span class="node store">S3 snapshots<small>replicated</small></span>
+          <span class="node dim">Database<small>off</small></span>
+          <span class="node dim">App servers<small>off</small></span>
+          <span class="node dim">Load balancer<small>off</small></span>
+        </div>
+      </div>
+      <div class="group col" data-label="Pilot light">
+        <div class="stack">
+          <span class="node store hl">Database<small>replicating</small></span>
+          <span class="node dim">App servers<small>AMIs ready, not running</small></span>
+          <span class="node dim">Load balancer<small>off</small></span>
+        </div>
+      </div>
+      <div class="group col" data-label="Warm standby">
+        <div class="stack">
+          <span class="node store">Database<small>replicating</small></span>
+          <span class="node hl">App servers<small>running, scaled down</small></span>
+          <span class="node">Load balancer<small>minimal traffic</small></span>
+        </div>
+      </div>
+      <div class="group col good" data-label="Multi-site active-active">
+        <div class="stack">
+          <span class="node store">Database<small>active-active</small></span>
+          <span class="node hl">App servers<small>full capacity</small></span>
+          <span class="node">Load balancer<small>serving users</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>What is running in the second Region</strong>, left to right in cost order (RTO hours → tens of minutes → minutes → near zero). Pilot light has data only; warm standby has a small but complete running stack.</figcaption>
+  </figure>
+
+  <div class="note gotcha">
+    <span class="label">Pilot light vs warm standby</span>
+    <p>Constantly confused. <strong>Pilot light</strong>: the database replicates but <em>no application servers are running</em> — you must launch them during failover. <strong>Warm standby</strong>: a small but <em>complete and running</em> stack that you scale up. Rule of thumb: if the question says "a scaled-down version of the environment is always running", that's warm standby. If it says "data is replicated and servers are launched from AMIs when needed", that's pilot light.</p>
+  </div>
+
+  <p>The exam usually wants the <strong>cheapest strategy that still meets the stated objectives</strong>. Multi-site is rarely correct unless the requirement is near-zero RTO/RPO or the question explicitly says cost is not a concern.</p>
+
+  <h2 data-mark="03">In-Region resilience first</h2>
+
+  <p>Before reaching for a second Region, most requirements are met inside one:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Layer</th><th>Multi-AZ resilience</th></tr></thead>
+    <tbody>
+      <tr><td>DNS / edge</td><td>Route 53 (global), CloudFront origin groups</td></tr>
+      <tr><td>Load balancing</td><td>ELB across ≥2 AZs, cross-zone load balancing</td></tr>
+      <tr><td>Compute</td><td>Auto Scaling group spanning ≥2 AZs, <code>min ≥ 2</code>, ELB health checks</td></tr>
+      <tr><td>Egress</td><td>One NAT Gateway <strong>per AZ</strong></td></tr>
+      <tr><td>Relational data</td><td>RDS Multi-AZ, or Aurora with replicas in multiple AZs</td></tr>
+      <tr><td>NoSQL / object</td><td>DynamoDB and S3 are already multi-AZ by design</td></tr>
+      <tr><td>Files</td><td>EFS Standard (multi-AZ), not One Zone</td></tr>
+      <tr><td>Cache</td><td>ElastiCache Redis with Multi-AZ automatic failover</td></tr>
+      <tr><td>State</td><td>Stateless instances; sessions in ElastiCache or DynamoDB</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="04">Going multi-Region</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>What</th><th>Cross-Region mechanism</th></tr></thead>
+    <tbody>
+      <tr><td>S3</td><td>Cross-Region Replication (versioning both sides; RTC for a 15-minute SLA)</td></tr>
+      <tr><td>RDS</td><td>Cross-Region read replica, or automated snapshot copy</td></tr>
+      <tr><td>Aurora</td><td><strong>Global Database</strong> — sub-second replication, ~1-minute failover</td></tr>
+      <tr><td>DynamoDB</td><td><strong>Global Tables</strong> — active-active</td></tr>
+      <tr><td>EBS / AMI</td><td>Copy snapshots and AMIs to the target Region (automate with Data Lifecycle Manager or AWS Backup)</td></tr>
+      <tr><td>Routing</td><td>Route 53 failover or latency records with health checks; Global Accelerator for sub-minute, DNS-independent failover</td></tr>
+      <tr><td>Infrastructure</td><td>CloudFormation StackSets to stand the stack up identically elsewhere</td></tr>
+      <tr><td>Orchestration</td><td>Route 53 Application Recovery Controller — readiness checks and routing controls</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Users</span>
+      <span class="arrow"></span>
+      <span class="node hl">Route 53<small>failover records + health checks</small></span>
+      <span class="arrow"></span>
+      <div class="group" data-label="Region A (primary)">
+        <div class="group az" data-label="AZ 1"><span class="node">ELB / ASG</span><span class="node store">RDS Multi-AZ</span></div>
+        <div class="group az" data-label="AZ 2"><span class="node">ELB / ASG</span><span class="node store dim">standby</span></div>
+      </div>
+      <span class="arrow dashed">CRR · Global DB · Global Tables · snapshot copies</span>
+      <div class="group" data-label="Region B (secondary)">
+        <span class="node dim">Stack from StackSets</span>
+        <span class="node store">Replica</span>
+      </div>
+    </div>
+    <figcaption><strong>Two different questions.</strong> An AZ failure is absorbed inside Region A by Multi-AZ; only a Region failure needs cross-Region replication plus Route 53 (or Global Accelerator for sub-minute, DNS-independent failover) to shift users to Region B.</figcaption>
+  </figure>
+
+  <h2 data-mark="05">Designing so failure doesn't matter</h2>
+
+  <ul>
+    <li><strong>Stateless compute.</strong> Any instance can serve any request; instances are cattle, not pets.</li>
+    <li><strong>Loose coupling.</strong> A queue between components means a failure downstream becomes a backlog, not an outage.</li>
+    <li><strong>Graceful degradation.</strong> Serve cached or reduced functionality rather than an error.</li>
+    <li><strong>Idempotency and retries with exponential backoff and jitter.</strong> AWS SDKs do this; the exam expects the words.</li>
+    <li><strong>Health checks that test the real dependency chain</strong>, so a broken instance is removed rather than kept.</li>
+    <li><strong>Automate recovery</strong> — ASG replacement, Multi-AZ failover, Config remediation. If the answer requires a human to notice, it is usually the weaker option.</li>
+    <li><strong>Test it.</strong> AWS Fault Injection Service runs controlled chaos experiments; game days prove the runbook.</li>
+  </ul>
+
+  <div class="note nuance">
+    <span class="label">Backups are not DR</span>
+    <p>A backup that has never been restored is a hypothesis. AWS Backup gives central policy, cross-Region and cross-account copies, and <strong>Backup Vault Lock</strong> for immutability — which is also the answer to "protect backups from a malicious administrator or ransomware".</p>
+  </div>
+
+  <h2 data-mark="06">Reading a resilience question in ten seconds</h2>
+
+  <div class="decisions">
+    <span class="label">Requirement → answer</span>
+    <div class="decision"><span class="cue">"Survive an AZ failure"</span><span class="arrow">→</span><span class="ans">Multi-AZ within one Region. Not a second Region.</span></div>
+    <div class="decision"><span class="cue">"Survive a Region failure"</span><span class="arrow">→</span><span class="ans">Second Region + cross-Region replication + Route 53 failover</span></div>
+    <div class="decision"><span class="cue">"RTO hours, RPO hours, cheapest"</span><span class="arrow">→</span><span class="ans">Backup and restore</span></div>
+    <div class="decision"><span class="cue">"RTO ~30 min, minimal ongoing cost"</span><span class="arrow">→</span><span class="ans">Pilot light</span></div>
+    <div class="decision"><span class="cue">"RTO minutes, and cost still matters"</span><span class="arrow">→</span><span class="ans">Warm standby</span></div>
+    <div class="decision"><span class="cue">"Near-zero RTO and RPO, serve users in both Regions"</span><span class="arrow">→</span><span class="ans">Active-active (Aurora Global DB / DynamoDB Global Tables)</span></div>
+    <div class="decision"><span class="cue">"No manual intervention"</span><span class="arrow">→</span><span class="ans">Prefer whichever option fails over automatically</span></div>
+  </div>
+
+  <h2 data-mark="07">Check yourself</h2>
+
+  <details class="check"><summary>RPO 15 minutes, RTO 4 hours, budget tight. Which strategy?</summary>
+  <div class="answer"><strong>Pilot light</strong>: a cross-Region database replica (or frequent snapshot copies) satisfies the 15-minute RPO, while launching compute from AMIs during the incident easily fits inside a 4-hour RTO — with almost no idle spend. Warm standby would meet it too, but costs more than required.</div></details>
+
+  <details class="check"><summary>An app runs in one AZ with a single NAT Gateway and <code>min=1</code>. Name the failure modes.</summary>
+  <div class="answer">Three: the ASG cannot survive losing the one instance without downtime; the single NAT Gateway is a zonal single point of failure for all egress; and the whole stack dies with its AZ. Fix: subnets and ASG across ≥2 AZs, <code>min=2</code>, one NAT Gateway per AZ, RDS Multi-AZ.</div></details>
+
+  <details class="check"><summary>Failover between Regions must take seconds, and clients cache DNS aggressively.</summary>
+  <div class="answer"><strong>Global Accelerator</strong>. Its two anycast IPs never change, so failover happens in the network within seconds and does not depend on client DNS caching or TTLs.</div></details>
+
+  <details class="check"><summary>Ransomware encrypted production and then deleted the backups. What should have been in place?</summary>
+  <div class="answer">Immutable, isolated backups: <strong>AWS Backup with Vault Lock</strong>, copies in a <strong>separate account</strong> and Region, plus <strong>S3 Object Lock</strong> in compliance mode and MFA delete for object data.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>RPO = data loss, bought with replication frequency. RTO = downtime, bought with running capacity.</li>
+      <li>Four strategies in cost order: backup &amp; restore → pilot light → warm standby → multi-site active-active. Choose the cheapest that meets the numbers.</li>
+      <li>Pilot light replicates data only; warm standby keeps a small full stack running.</li>
+      <li>"AZ failure" is an in-Region problem — Multi-AZ, ≥2 AZs, one NAT per AZ, min 2 instances.</li>
+      <li>Cross-Region: S3 CRR, Aurora Global Database, DynamoDB Global Tables, snapshot copies, StackSets, Route 53 failover.</li>
+      <li>Prefer automatic recovery over anything needing a human, and make backups immutable and cross-account.</li>
+    </ol>
+  </div>

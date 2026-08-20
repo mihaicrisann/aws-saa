@@ -1,0 +1,160 @@
+  <p>Three services get confused with each other constantly, and the exam knows it: <strong>CloudWatch watches performance, CloudTrail records who did what, Config records how things are configured</strong>. Fix that sentence in your head and this domain gets easy.</p>
+
+  <h2 data-mark="01">The three, side by side</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>CloudWatch</th><th>CloudTrail</th><th>AWS Config</th></tr></thead>
+    <tbody>
+      <tr><td>Answers</td><td><strong>"Is it healthy? How busy?"</strong></td><td><strong>"Who called which API, when, from where?"</strong></td><td><strong>"What does this resource's configuration look like, and has it drifted?"</strong></td></tr>
+      <tr><td>Data</td><td>Metrics, logs, alarms, dashboards, events</td><td>API call audit log</td><td>Configuration snapshots + compliance rules over time</td></tr>
+      <tr><td>Typical question</td><td>"Alert when CPU &gt; 80%"</td><td>"Who deleted the bucket?"</td><td>"Ensure no security group allows 0.0.0.0/0 on port 22, and remediate"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="02">CloudWatch</h2>
+
+  <ul>
+    <li><strong>Metrics</strong> at 5-minute granularity by default; <strong>detailed monitoring</strong> gives 1 minute (chargeable). <strong>Custom metrics</strong> can go to 1-second high resolution.</li>
+    <li><strong>Memory and disk usage are not default EC2 metrics</strong> — the hypervisor can't see inside the guest. You must install the <strong>CloudWatch agent</strong>. This is a favourite question.</li>
+    <li><strong>Logs</strong>: log groups with retention (default: never expire — set one, or the bill grows forever). <strong>Logs Insights</strong> queries them with a purpose-built query language. <strong>Metric filters</strong> turn a log pattern into a metric you can alarm on (e.g. count of "ERROR" or of root logins).</li>
+    <li><strong>Alarms</strong> have states OK / ALARM / INSUFFICIENT_DATA and act on SNS, Auto Scaling, or EC2 actions (stop/terminate/reboot/recover). <strong>Composite alarms</strong> combine several to cut noise.</li>
+    <li><strong>Synthetics canaries</strong> script user journeys from outside to catch problems before users report them. <strong>RUM</strong> collects real user telemetry. <strong>Container Insights</strong> / <strong>Lambda Insights</strong> for those runtimes.</li>
+    <li><strong>EventBridge</strong> (formerly CloudWatch Events) carries the event stream side of this.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group col" data-label="Sources">
+        <span class="node">EC2<small>CPU by default · agent for memory/disk</small></span>
+        <span class="node">Application logs</span>
+      </div>
+      <span class="arrow"></span>
+      <div class="group col" data-label="CloudWatch">
+        <span class="node">Metrics<small>5 min · detailed 1 min</small></span>
+        <div class="flow"><span class="node">Logs<small>set a retention</small></span><span class="arrow">metric filter</span><span class="node">Metric</span></div>
+        <span class="node hl">Alarm<small>OK / ALARM / INSUFFICIENT_DATA</small></span>
+      </div>
+      <span class="arrow">action</span>
+      <div class="group col" data-label="Alarm actions">
+        <span class="node">SNS<small>notify</small></span>
+        <span class="node">Auto Scaling</span>
+        <span class="node">EC2 action<small>stop / terminate / reboot / recover</small></span>
+      </div>
+    </div>
+    <figcaption><strong>Metrics and logs both end in an alarm;</strong> a metric filter is how a log pattern becomes something you can alarm on. Memory and disk only appear once the CloudWatch agent is installed.</figcaption>
+  </figure>
+
+  <h2 data-mark="03">CloudTrail</h2>
+
+  <ul>
+    <li><strong>On by default</strong>, keeping 90 days of <strong>management events</strong> in Event History. For longer retention or analysis you create a <strong>trail</strong> delivering to <strong>S3</strong> (and optionally CloudWatch Logs).</li>
+    <li><strong>Management events</strong> = control-plane operations (create/delete/modify). <strong>Data events</strong> = high-volume object-level operations (<code>s3:GetObject</code>, <code>lambda:Invoke</code>) — <strong>off by default</strong> and chargeable. "We need to know who read that S3 object" → enable data events.</li>
+    <li>An <strong>organization trail</strong> captures every account centrally. Enable <strong>log file validation</strong> and lock the destination bucket down (Object Lock, MFA delete) so the audit trail is tamper-evident — a standard compliance answer.</li>
+    <li><strong>CloudTrail Insights</strong> detects unusual API activity patterns.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Every API call<small>console, CLI, SDK</small></span>
+      <span class="arrow"></span>
+      <span class="node hl">CloudTrail<small>management events on by default · data events opt-in</small></span>
+      <span class="arrow">90 days</span>
+      <span class="node">Event History</span>
+      <span class="arrow">trail · longer retention</span>
+      <span class="node store">S3 bucket<small>log file validation · Object Lock</small></span>
+      <span class="arrow dashed">optional</span>
+      <span class="node">CloudWatch Logs<small>metric filter → alarm</small></span>
+    </div>
+    <figcaption><strong>Event History alone keeps 90 days;</strong> a trail into a locked-down S3 bucket is the tamper-evident, long-term audit answer, and Athena queries it.</figcaption>
+  </figure>
+
+  <div class="note gotcha">
+    <span class="label">The classic three-way question</span>
+    <p>"An S3 bucket was made public last Tuesday. We need to know <em>who</em> did it, be alerted <em>next time</em> it happens, and <em>automatically fix</em> it." → <strong>CloudTrail</strong> tells you who. <strong>Config</strong> with the <code>s3-bucket-public-read-prohibited</code> rule detects and, with a <strong>remediation action</strong> (an SSM Automation document), fixes it. <strong>EventBridge + SNS</strong> alerts. All three, each doing its own job.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node bad">Bucket made public</span>
+      <span class="arrow"></span>
+      <div class="group col" data-label="Each service does one job">
+        <div class="flow"><span class="node">CloudTrail</span><span class="arrow"></span><span class="node user">Who did it</span></div>
+        <div class="flow"><span class="node">EventBridge</span><span class="arrow"></span><span class="node">SNS<small>alert next time</small></span></div>
+        <div class="flow"><span class="node hl">Config rule<small>s3-bucket-public-read-prohibited</small></span><span class="arrow">remediation action</span><span class="node good">SSM Automation<small>fixes it</small></span></div>
+      </div>
+    </div>
+    <figcaption><strong>Who → CloudTrail. Alert → EventBridge + SNS. Detect and auto-fix → Config with a remediation action.</strong> Answers offering one service for all three are distractors.</figcaption>
+  </figure>
+
+  <h2 data-mark="04">AWS Config</h2>
+
+  <p>Records the configuration of every supported resource over time, so you can ask "what did this security group look like on 3 March?" and "which resources violate our rules right now?". Managed rules cover most common checks; custom rules run a Lambda. <strong>Conformance packs</strong> bundle rules; <strong>aggregators</strong> roll compliance up across accounts and Regions; <strong>remediation actions</strong> fix violations automatically.</p>
+
+  <h2 data-mark="05">Systems Manager</h2>
+
+  <p>A grab-bag of operations tooling, and several of its pieces are exam answers in their own right:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Capability</th><th>Cue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Session Manager</strong></td><td>Shell into instances <strong>with no bastion, no open port 22, no SSH keys</strong>, fully audited</td></tr>
+      <tr><td><strong>Patch Manager</strong></td><td>"Automate OS patching across the fleet on a schedule"</td></tr>
+      <tr><td><strong>Run Command</strong></td><td>"Execute a command across hundreds of instances"</td></tr>
+      <tr><td><strong>Parameter Store</strong></td><td>Configuration values and secrets. <strong>Free</strong> standard tier; SecureString via KMS. <em>No automatic rotation</em> — that's Secrets Manager.</td></tr>
+      <tr><td><strong>State Manager / Automation</strong></td><td>Keep instances in a desired state; run runbooks (also used by Config remediation)</td></tr>
+      <tr><td><strong>Inventory / Fleet Manager</strong></td><td>What software is installed where</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="06">Multi-account governance</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Organizations</strong></td><td>Multiple accounts under one management account: consolidated billing (volume discounts, shared RIs/Savings Plans), Organizational Units, and <strong>SCPs</strong> as permission guardrails.</td></tr>
+      <tr><td><strong>Control Tower</strong></td><td>Sets up a well-architected multi-account landing zone with guardrails and an Account Factory. Cue: <strong>"quickly set up a secure multi-account environment"</strong>.</td></tr>
+      <tr><td><strong>IAM Identity Center</strong></td><td>Single sign-on to all accounts with permission sets, backed by an existing IdP or its own directory.</td></tr>
+      <tr><td><strong>Service Catalog</strong></td><td>A curated menu of approved CloudFormation products developers may launch.</td></tr>
+      <tr><td><strong>Trusted Advisor</strong></td><td>Checks across cost, performance, security, fault tolerance, limits. Full checks need Business/Enterprise support.</td></tr>
+      <tr><td><strong>AWS Health Dashboard</strong></td><td>Events affecting <em>your</em> resources specifically.</td></tr>
+      <tr><td><strong>CloudFormation</strong></td><td>Infrastructure as code; <strong>StackSets</strong> deploy a stack across many accounts and Regions. Drift detection reports manual changes.</td></tr>
+      <tr><td><strong>AWS Backup</strong></td><td>Centralised, policy-driven backup across EBS, RDS, DynamoDB, EFS, FSx, S3 — with cross-Region and cross-account copy and <strong>Backup Vault Lock</strong> for immutability.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">Two easy marks</span>
+    <p><strong>"Centrally manage and enforce backup policies across accounts"</strong> → AWS Backup. <strong>"Prevent any account in the organisation from using a Region or disabling CloudTrail"</strong> → an SCP, not an IAM policy — IAM policies live inside one account and an administrator there could simply remove them.</p>
+  </div>
+
+  <h2 data-mark="07">Check yourself</h2>
+
+  <details class="check"><summary>You need an alarm on EC2 memory utilisation. It isn't in the metric list.</summary>
+  <div class="answer">Memory is a guest-OS metric. Install the <strong>CloudWatch agent</strong> on the instances to publish memory and disk as custom metrics, then alarm on those.</div></details>
+
+  <details class="check"><summary>Someone terminated a production instance. Find out who, and be alerted next time.</summary>
+  <div class="answer"><strong>CloudTrail</strong> event history (or the trail in S3, queried with Athena) shows the identity, time and source IP. For alerting, an <strong>EventBridge</strong> rule on the <code>TerminateInstances</code> event → SNS. A CloudWatch Logs <strong>metric filter</strong> + alarm on the CloudTrail log group is the equivalent older answer.</div></details>
+
+  <details class="check"><summary>Auditors require that every EBS volume in every account is encrypted, continuously, with automatic fixes.</summary>
+  <div class="answer"><strong>AWS Config</strong> rule <code>encrypted-volumes</code>, deployed org-wide via a <strong>conformance pack</strong> and an <strong>aggregator</strong>, with a <strong>remediation action</strong>. Add an <strong>SCP</strong> denying the creation of unencrypted volumes so it cannot recur.</div></details>
+
+  <details class="check"><summary>Store a database password with automatic 30-day rotation.</summary>
+  <div class="answer"><strong>Secrets Manager</strong> — it has built-in rotation with Lambda and native RDS integration. Parameter Store SecureString is free but does not rotate on its own.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>CloudWatch = performance and logs. CloudTrail = who called what API. Config = configuration state and compliance over time.</li>
+      <li>EC2 memory and disk need the CloudWatch agent; CloudTrail data events need enabling explicitly.</li>
+      <li>Config rules + remediation actions is the "detect and auto-fix misconfiguration" answer.</li>
+      <li>Session Manager replaces bastions; Parameter Store is free config, Secrets Manager rotates.</li>
+      <li>SCPs are org-wide guardrails that a local administrator cannot remove; IAM policies are not.</li>
+      <li>Control Tower for a new multi-account landing zone; AWS Backup for central backup policy.</li>
+    </ol>
+  </div>

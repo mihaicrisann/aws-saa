@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decoupling: queues, topics, events · AWS SAA</title>
+<meta name="description" content="SQS, SNS, EventBridge, Step Functions and Amazon MQ. 'Decouple' is exam code for a specific short list of answers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+</head>
+<body>
+<div class="progress-rail"><i></i></div>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs">
+      <span class="num">14</span>
+      <span class="dot">/</span>
+      <span>Integration &amp; ops</span>
+      <span class="dot">·</span>
+      <span>16 min read</span>
+      <span class="dot">·</span>
+      <a href="index.html">all lectures</a>
+    </div>
+    <h1>Decoupling: queues, topics, events</h1>
+    <p class="standfirst">SQS, SNS, EventBridge, Step Functions and Amazon MQ. 'Decouple' is exam code for a specific short list of answers.</p>
+    <div class="meta-strip">
+      <span class="chip on">Design Resilient Architectures</span>
+      <span class="chip on">Design High-Performing Architectures</span>
+      <span class="chip">SQS</span>
+      <span class="chip">SNS</span>
+      <span class="chip">EventBridge</span>
+      <span class="chip">Step Functions</span>
+    </div>
+  </header>
+
+<p>When a question says <strong>"decouple"</strong>, <strong>"the downstream system can't keep up"</strong>, or <strong>"messages must not be lost when a component fails"</strong>, it has narrowed the answer to four services. Knowing which of the four is the whole game.</p>
+
+  <h2 data-mark="01" id="the-four-shapes">The four shapes</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>Shape</th><th>Cue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>SQS</strong></td><td>Queue — one message, one consumer, pulled</td><td><strong>"Buffer", "absorb spikes", "process each job once", "worker fleet"</strong></td></tr>
+      <tr><td><strong>SNS</strong></td><td>Topic — one message, many subscribers, pushed</td><td><strong>"Fan out", "notify multiple systems", "send an email/SMS alert"</strong></td></tr>
+      <tr><td><strong>EventBridge</strong></td><td>Event bus — routed by content-based rules</td><td><strong>"React to AWS service events", "SaaS integration", "route by event content", "schedule (cron)"</strong></td></tr>
+      <tr><td><strong>Step Functions</strong></td><td>State machine — ordered, stateful workflow</td><td><strong>"Multi-step", "orchestrate", "retries and branching", "human approval"</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="02" id="sqs-in-detail">SQS in detail</h2>
+
+  <ul>
+    <li><strong>Standard queues</strong>: near-unlimited throughput, <strong>at-least-once</strong> delivery, <strong>best-effort ordering</strong>. Your consumer must be <strong>idempotent</strong> — that word in a question means "standard queue is acceptable".</li>
+    <li><strong>FIFO queues</strong>: exactly-once processing and strict ordering within a <em>message group</em>, up to 300 msg/s (3,000 batched, higher with high-throughput mode). Name must end in <code>.fifo</code>. Choose only when ordering or de-duplication is explicitly required — it is slower and more constrained.</li>
+    <li><strong>Visibility timeout</strong> (default 30 s, max 12 h): after a consumer receives a message it is hidden. If the consumer doesn't delete it in time, it reappears and may be processed twice. <strong>"Messages are being processed more than once"</strong> → increase the visibility timeout (or extend it in-flight).</li>
+    <li><strong>Dead Letter Queue</strong>: after <code>maxReceiveCount</code> failed attempts, the message moves aside for inspection instead of blocking the queue forever. Always the right answer for "poison messages".</li>
+    <li><strong>Long polling</strong> (<code>ReceiveMessageWaitTimeSeconds</code> up to 20 s) reduces empty responses and cost versus short polling.</li>
+    <li><strong>Retention</strong> 1 minute – 14 days (default 4 days). <strong>Delay queues</strong> postpone delivery up to 15 minutes.</li>
+    <li>Message size 256 KB; the <strong>Extended Client Library</strong> stores larger payloads in S3 and passes a pointer.</li>
+    <li>Encryption with KMS; access via <strong>queue policies</strong> (resource-based).</li>
+  </ul>
+
+  <div class="note exam">
+    <span class="label">The signature SQS pattern</span>
+    <p>Producers → <strong>SQS</strong> → Auto Scaling group of workers, scaled on the CloudWatch metric <strong><code>ApproximateNumberOfMessagesVisible</code></strong> (ideally as a backlog-per-instance target-tracking policy). This single diagram answers "handle unpredictable spikes without losing requests and without over-provisioning" — which appears in some form on almost every exam.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Producers<small>50× spike</small></span>
+      <span class="arrow">send</span>
+      <span class="node hl store">SQS queue<small>visibility timeout · retention up to 14 d</small></span>
+      <span class="arrow">long poll</span>
+      <div class="group" data-label="Auto Scaling group">
+        <span class="node">Workers<small>idempotent · scale on ApproximateNumberOfMessagesVisible</small></span>
+      </div>
+      <span class="arrow x">after maxReceiveCount</span>
+      <span class="node bad store">Dead Letter Queue<small>poison messages</small></span>
+    </div>
+    <figcaption><strong>The queue absorbs the spike; workers scale on queue depth, not CPU.</strong> Messages that keep failing move to the DLQ instead of blocking the queue.</figcaption>
+  </figure>
+
+  <h2 data-mark="03" id="sns-and-fan-out">SNS and fan-out</h2>
+
+  <p>Publish once to a topic; every subscriber gets a copy. Subscribers: SQS queues, Lambda, HTTP/S endpoints, email, SMS, mobile push, and Data Firehose. <strong>Message filtering</strong> policies let each subscriber receive only the messages it cares about. <strong>FIFO topics</strong> pair with FIFO queues for ordered fan-out.</p>
+
+<pre><code>          ┌──► SQS ──► image resizing workers
+Upload ──► SNS ──► SQS ──► virus scanning workers
+          └──► Lambda ──► write metadata to DynamoDB</code></pre>
+
+  <div class="note nuance">
+    <span class="label">Why SNS → SQS, not SNS → Lambda directly?</span>
+    <p>The <strong>fan-out pattern</strong> puts a queue between the topic and each consumer so that (a) messages are durably buffered if a consumer is down, (b) each consumer scales and retries independently, and (c) you can replay. If an option offers "SNS to multiple SQS queues" for a multi-consumer scenario with reliability requirements, it is usually the intended answer.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">S3 upload</span>
+      <span class="arrow">publish once</span>
+      <span class="node hl">SNS topic<small>message filtering per subscriber</small></span>
+      <span class="arrow">copy to each</span>
+      <div class="group col" data-label="Subscribers">
+        <div class="flow"><span class="node store">SQS</span><span class="arrow"></span><span class="node">Resizing workers</span></div>
+        <div class="flow"><span class="node store">SQS</span><span class="arrow"></span><span class="node">Virus scanning workers</span></div>
+        <div class="flow"><span class="node dim">Lambda<small>direct · no buffer</small></span><span class="arrow"></span><span class="node store">DynamoDB</span></div>
+      </div>
+    </div>
+    <figcaption><strong>Fan-out: a queue per consumer makes each one durable, independently scaled and retryable.</strong> "SNS to multiple SQS queues" is the reliable multi-consumer answer.</figcaption>
+  </figure>
+
+  <h2 data-mark="04" id="eventbridge">EventBridge</h2>
+
+  <p>A bus rather than a queue. Its distinguishing capabilities:</p>
+
+  <ul>
+    <li><strong>Native AWS service events</strong> — EC2 state changes, S3 events, CodePipeline stages, Health events. "When an EC2 instance terminates, do X" is EventBridge.</li>
+    <li><strong>Content-based rules</strong> that match on any field of the JSON event, routing to up to 5 targets each.</li>
+    <li><strong>Scheduler</strong> — cron and rate expressions. Whenever a question says "run something every night at 2 a.m.", EventBridge Scheduler is the modern answer.</li>
+    <li><strong>Partner event sources</strong> (Datadog, Zendesk, Shopify…) and custom buses per application.</li>
+    <li><strong>Schema registry</strong> and <strong>archive + replay</strong> of past events.</li>
+    <li><strong>Pipes</strong> for point-to-point source → filter → enrich → target integrations.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group col" data-label="Sources">
+        <span class="node">AWS services<small>EC2 state change, S3, Health</small></span>
+        <span class="node">Partner SaaS<small>Datadog, Zendesk…</small></span>
+        <span class="node">Scheduler<small>cron / rate</small></span>
+        <span class="node">Custom app events</span>
+      </div>
+      <span class="arrow">JSON events</span>
+      <span class="node hl">Event bus<small>content-based rules · archive &amp; replay</small></span>
+      <span class="arrow">up to 5 targets per rule</span>
+      <div class="group col" data-label="Targets">
+        <span class="node">Lambda</span>
+        <span class="node store">SQS</span>
+        <span class="node">Step Functions</span>
+      </div>
+    </div>
+    <figcaption><strong>EventBridge routes by event content, not by queue.</strong> "React to an AWS service event", "SaaS integration" or "run on a schedule" all land here.</figcaption>
+  </figure>
+
+  <h2 data-mark="05" id="step-functions-and-amazon-mq">Step Functions and Amazon MQ</h2>
+
+  <p><strong>Step Functions</strong> coordinates services into a workflow defined as JSON states: Task, Choice, Parallel, Map, Wait, Retry/Catch. It keeps the state, so you don't hand-roll orchestration inside Lambdas. <em>Standard</em> workflows run up to a year with exactly-once execution and full history; <em>Express</em> workflows run up to 5 minutes at very high volume with at-least-once semantics. Use it for order processing, ETL orchestration, human-approval steps, and anything that needs to run longer than a single Lambda.</p>
+
+  <p><strong>Amazon MQ</strong> is managed ActiveMQ/RabbitMQ. It exists for one exam purpose: a <strong>migrating application that already speaks a standard protocol</strong> — JMS, AMQP, MQTT, STOMP, OpenWire. Cue: "lift-and-shift without rewriting the messaging code". A greenfield design should use SQS/SNS instead.</p>
+
+  <h2 data-mark="06" id="decision-list">Decision list</h2>
+
+  <div class="decisions">
+    <span class="label">Which integration service?</span>
+    <div class="decision"><span class="cue">Buffer work so spikes don't overwhelm the backend</span><span class="arrow">→</span><span class="ans">SQS</span></div>
+    <div class="decision"><span class="cue">Strict ordering or no duplicates</span><span class="arrow">→</span><span class="ans">SQS FIFO</span></div>
+    <div class="decision"><span class="cue">One event, several independent systems must react</span><span class="arrow">→</span><span class="ans">SNS fan-out to SQS queues</span></div>
+    <div class="decision"><span class="cue">React to an AWS service event, or route by event content</span><span class="arrow">→</span><span class="ans">EventBridge</span></div>
+    <div class="decision"><span class="cue">Run something on a schedule</span><span class="arrow">→</span><span class="ans">EventBridge Scheduler</span></div>
+    <div class="decision"><span class="cue">Multi-step process with retries, branching, waits</span><span class="arrow">→</span><span class="ans">Step Functions</span></div>
+    <div class="decision"><span class="cue">Existing app speaks JMS / AMQP / MQTT</span><span class="arrow">→</span><span class="ans">Amazon MQ</span></div>
+    <div class="decision"><span class="cue">Replay, ordering, and multiple consumers over a real-time firehose</span><span class="arrow">→</span><span class="ans">Kinesis Data Streams</span></div>
+  </div>
+
+  <h2 data-mark="07" id="check-yourself">Check yourself</h2>
+
+  <details class="check"><summary>An order service occasionally gets 50× normal traffic and the payment backend falls over. No order may be lost.</summary>
+  <div class="answer">Put <strong>SQS</strong> between them. The queue absorbs the spike; the payment workers run in an Auto Scaling group scaled on queue depth and drain the backlog at their own pace.</div></details>
+
+  <details class="check"><summary>The same messages are being processed twice by workers whose jobs take about 90 seconds.</summary>
+  <div class="answer">The <strong>visibility timeout</strong> (default 30 s) is shorter than the processing time, so the message reappears mid-job. Raise it above the worst-case duration, or call <code>ChangeMessageVisibility</code> as the job runs. Make the consumer idempotent regardless.</div></details>
+
+  <details class="check"><summary>A few malformed messages keep failing and are blocking the queue.</summary>
+  <div class="answer">Attach a <strong>Dead Letter Queue</strong> with a <code>maxReceiveCount</code> of, say, 3. Failing messages move aside for investigation and the queue keeps flowing.</div></details>
+
+  <details class="check"><summary>When a file lands in S3, three separate teams' systems must each process it, independently and reliably.</summary>
+  <div class="answer">S3 event → <strong>SNS topic</strong> → three <strong>SQS queues</strong>, one per team, each with its own consumers. (Routing via EventBridge to three targets is also valid; the queues are what make it reliable when a consumer is down.)</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>SQS buffers and levels load; SNS fans out; EventBridge routes and schedules; Step Functions orchestrates.</li>
+      <li>Standard SQS = at-least-once and unordered, so make consumers idempotent. FIFO only when ordering or de-duplication is stated.</li>
+      <li>Duplicate processing → visibility timeout too short. Poison messages → dead letter queue.</li>
+      <li>Scale workers on <code>ApproximateNumberOfMessagesVisible</code>, not CPU.</li>
+      <li>SNS → SQS fan-out is the durable multi-consumer pattern.</li>
+      <li>Amazon MQ exists for migrations of apps already speaking JMS/AMQP/MQTT.</li>
+    </ol>
+  </div>
+
+  <nav class="lec-nav">
+    <a class="prev" href="13-caching-analytics.html">← Caching and analytics</a>
+    <a class="next" href="15-observability.html">Observability and governance →</a>
+  </nav>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

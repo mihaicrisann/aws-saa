@@ -1,0 +1,7 @@
+node_modules/
+app/dist/
+app/node_modules/
+.DS_Store
+*.local
+notes/progress*.json
+*.tsbuildinfo

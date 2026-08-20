@@ -1,0 +1,162 @@
+  <p>A managed key-value and document database with single-digit millisecond latency at any scale, no servers, and no capacity planning if you don't want it. The exam tests three things: <strong>when to choose it</strong>, <strong>how keys work</strong>, and <strong>which capacity mode</strong>.</p>
+
+  <h2 data-mark="01">Keys and items</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Concept</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Partition key (PK)</strong></td><td>Hashed to choose a physical partition. Alone, it must be unique.</td></tr>
+      <tr><td><strong>Sort key (SK)</strong></td><td>Optional second half of a composite key. Items with the same PK are stored together, ordered by SK — which is what makes <code>Query</code> fast.</td></tr>
+      <tr><td><strong>Item</strong></td><td>A row. Max <strong>400 KB</strong> — larger payloads go to S3 with a pointer stored here.</td></tr>
+      <tr><td><strong>Attribute</strong></td><td>A field. Schemaless apart from the key.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">Hot partitions</span>
+    <p>Throughput is spread across partitions by the partition key. A <strong>low-cardinality key</strong> (<code>status = "active"</code>, or today's date) concentrates all traffic on one partition and causes throttling even though the table's provisioned capacity looks fine. The fix is a <strong>high-cardinality key</strong> — user id, order id, or a key with a random suffix (write sharding). Any question describing throttling on part of a table is about this.</p>
+  </div>
+
+  <p><strong>Query</strong> fetches items by partition key (optionally narrowed by sort key) — fast and cheap. <strong>Scan</strong> reads the entire table then filters — slow and expensive, and always the wrong answer when a Query or an index would do.</p>
+
+  <h2 data-mark="02">Capacity modes</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>On-demand</th><th>Provisioned</th></tr></thead>
+    <tbody>
+      <tr><td>Billing</td><td>Per request</td><td>Per RCU/WCU per hour</td></tr>
+      <tr><td>Choose when</td><td><strong>Unpredictable / spiky / brand-new</strong> workloads, or you don't want to think about it</td><td><strong>Steady, predictable</strong> traffic — considerably cheaper, and eligible for reserved capacity</td></tr>
+      <tr><td>Scaling</td><td>Instant, automatic</td><td>Auto scaling adjusts within a min/max band</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Capacity unit arithmetic, in case it's asked: <strong>1 RCU</strong> = one strongly consistent read of up to 4 KB per second, or two eventually consistent reads. <strong>1 WCU</strong> = one write of up to 1 KB per second. Reads are <strong>eventually consistent by default</strong>; ask for strong consistency and you pay double.</p>
+
+  <h2 data-mark="03">Indexes</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>GSI — Global Secondary Index</th><th>LSI — Local Secondary Index</th></tr></thead>
+    <tbody>
+      <tr><td>Key</td><td>Any attribute as PK and SK</td><td><strong>Same PK</strong>, different sort key</td></tr>
+      <tr><td>When creatable</td><td><strong>Any time</strong></td><td><strong>Only at table creation</strong> — this alone decides many questions</td></tr>
+      <tr><td>Capacity</td><td>Its own RCU/WCU</td><td>Shares the table's</td></tr>
+      <tr><td>Consistency</td><td>Eventually consistent only</td><td>Can be strongly consistent</td></tr>
+      <tr><td>Limit</td><td>20 per table</td><td>5 per table, 10 GB per partition key</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">The GSI throttling trap</span>
+    <p>A GSI has its own provisioned capacity. If the GSI is under-provisioned, <strong>writes to the base table are throttled</strong> — because DynamoDB must write the index entry too. "Writes started failing after we added an index" is this, every time.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group" data-label="Base table · PK userId, SK orderDate">
+        <div class="stack">
+          <span class="node store hl">Table<small>own RCU/WCU</small></span>
+          <span class="arrow">Query by userId</span>
+          <span class="node user">App</span>
+        </div>
+      </div>
+      <div class="group" data-label="GSI · PK email">
+        <div class="stack">
+          <span class="node store">Index<small>own RCU/WCU · any time</small></span>
+          <span class="arrow dashed">eventually consistent</span>
+          <span class="node user">Query by email</span>
+        </div>
+      </div>
+      <div class="group" data-label="LSI · same PK, other SK">
+        <div class="stack">
+          <span class="node store">Index<small>shares table capacity · creation only</small></span>
+          <span class="arrow">can be strongly consistent</span>
+          <span class="node user">Query by userId + status</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>A GSI is a separate table with its own key and capacity;</strong> an LSI is a second sort order under the same partition key, fixed at creation. Under-provision the GSI and base-table writes throttle.</figcaption>
+  </figure>
+
+  <h2 data-mark="04">The feature list that answers questions</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feature</th><th>Cue in the question</th></tr></thead>
+    <tbody>
+      <tr><td><strong>DAX</strong></td><td>"Microsecond" reads, or a read-heavy hot dataset. An in-memory cache <em>specific to DynamoDB</em>, requiring no application logic change. (ElastiCache would require you to write cache code.)</td></tr>
+      <tr><td><strong>DynamoDB Streams</strong></td><td>"React to every change", "trigger a Lambda on insert/update", replicate elsewhere. 24-hour ordered log of item changes.</td></tr>
+      <tr><td><strong>Global Tables</strong></td><td>"Multi-Region, active-active, low latency worldwide". Multi-active replication; built on Streams; last-writer-wins.</td></tr>
+      <tr><td><strong>TTL</strong></td><td>"Automatically delete expired sessions/records". A timestamp attribute; deletion is free and asynchronous.</td></tr>
+      <tr><td><strong>PITR</strong></td><td>Point-in-time restore to any second in the last 35 days.</td></tr>
+      <tr><td><strong>On-demand backup</strong></td><td>Full backups with no performance impact; integrates with AWS Backup.</td></tr>
+      <tr><td><strong>Transactions</strong></td><td>All-or-nothing across up to 100 items / multiple tables (ACID).</td></tr>
+      <tr><td><strong>Conditional writes / optimistic locking</strong></td><td>"Prevent two users overwriting each other."</td></tr>
+      <tr><td><strong>Fine-grained access control</strong></td><td>IAM condition <code>dynamodb:LeadingKeys</code> restricts a user to their own rows.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="stack">
+      <div class="flow">
+        <span class="node user">App<small>DynamoDB SDK</small></span>
+        <span class="arrow">microsecond reads</span>
+        <span class="node hl">DAX<small>write-through cache · no code change</small></span>
+        <span class="arrow"></span>
+        <span class="node store">DynamoDB table</span>
+        <span class="arrow dashed">every item change</span>
+        <span class="node">Streams<small>24 h ordered log</small></span>
+        <span class="arrow">trigger</span>
+        <span class="node">Lambda</span>
+      </div>
+      <span class="arrow dashed">built on Streams</span>
+      <div class="group info" data-label="Global Tables · multi-active">
+        <div class="group az" data-label="Region A"><span class="node store">Replica<small>reads + writes</small></span></div>
+        <span class="arrow both">last-writer-wins</span>
+        <div class="group az" data-label="Region B"><span class="node store">Replica<small>reads + writes</small></span></div>
+      </div>
+    </div>
+    <figcaption><strong>DAX in front for microsecond reads, Streams behind to react to changes,</strong> and Global Tables replicating multi-Region active-active over those Streams.</figcaption>
+  </figure>
+
+  <h2 data-mark="05">Choosing DynamoDB over a relational database</h2>
+
+  <div class="decisions">
+    <span class="label">SQL or NoSQL?</span>
+    <div class="decision"><span class="cue">Complex joins, transactions across many tables, ad-hoc reporting queries</span><span class="arrow">→</span><span class="ans">RDS / Aurora</span></div>
+    <div class="decision"><span class="cue">Known access patterns, key-based lookups, massive scale, unpredictable spikes</span><span class="arrow">→</span><span class="ans">DynamoDB</span></div>
+    <div class="decision"><span class="cue">Session state, user profiles, shopping carts, IoT device state, leaderboards</span><span class="arrow">→</span><span class="ans">DynamoDB (the classic exam scenarios)</span></div>
+    <div class="decision"><span class="cue">"Serverless", "no capacity planning", "single-digit ms at any scale"</span><span class="arrow">→</span><span class="ans">DynamoDB — this is its marketing vocabulary and the exam uses it</span></div>
+  </div>
+
+  <h2 data-mark="06">Check yourself</h2>
+
+  <details class="check"><summary>A table is throttled although consumed capacity is well below provisioned.</summary>
+  <div class="answer">A <strong>hot partition</strong> — the partition key has too few distinct values, so one partition absorbs the traffic. Redesign to a higher-cardinality key, or shard writes with a random suffix. Alternatively an under-provisioned <strong>GSI</strong> is throttling the base table's writes.</div></details>
+
+  <details class="check"><summary>Reads must drop from milliseconds to microseconds with no application rewrite.</summary>
+  <div class="answer"><strong>DAX</strong> — a DynamoDB-native, write-through cache cluster that the DynamoDB SDK talks to transparently.</div></details>
+
+  <details class="check"><summary>The team needs to query on <code>email</code>, but the table's key is <code>userId</code>, and the table is already live in production.</summary>
+  <div class="answer">Create a <strong>GSI</strong> with <code>email</code> as the partition key. An LSI is impossible — LSIs can only be created with the table.</div></details>
+
+  <details class="check"><summary>Users in three continents need low-latency reads and writes on the same data.</summary>
+  <div class="answer"><strong>DynamoDB Global Tables</strong> — multi-Region, multi-active replication with last-writer-wins conflict resolution.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>High-cardinality partition keys, always. Hot partitions are the number one DynamoDB question.</li>
+      <li>Query, don't Scan.</li>
+      <li>On-demand for unpredictable, provisioned (+ auto scaling) for steady and cheaper.</li>
+      <li>GSI: any key, any time, own capacity, eventually consistent. LSI: same PK, creation time only, shares capacity.</li>
+      <li>DAX for microsecond reads; Streams to react to changes; Global Tables for multi-Region active-active; TTL to expire data for free.</li>
+      <li>Items cap at 400 KB — anything bigger lives in S3 with a pointer in the table.</li>
+    </ol>
+  </div>

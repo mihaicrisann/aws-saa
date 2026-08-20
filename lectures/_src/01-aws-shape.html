@@ -1,0 +1,204 @@
+  <p>AWS is not one computer somewhere. It is a set of <strong>independent geographic units</strong> that you deliberately spread work across. Almost every "which design is more resilient / cheaper / faster" question on the exam is really asking whether you understand this layout — so learn it once, properly, and stop guessing.</p>
+
+  <h2 data-mark="01">Region → AZ → data centre</h2>
+
+  <p>Three nested levels, and the exam cares about the boundary between each.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Level</th><th>What it is</th><th>Failure boundary</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Region</strong><br><code>eu-west-1</code></td><td>A geographic area (Ireland, Frankfurt, N. Virginia…) containing 3+ AZs. Independent from every other Region.</td><td>A Region-wide outage is rare but possible. Surviving it requires a <em>second Region</em>.</td></tr>
+      <tr><td><strong>Availability Zone</strong><br><code>eu-west-1a</code></td><td>One or more physical data centres with independent power, cooling and networking, kilometres apart but linked by low-latency (&lt;1–2 ms) private fibre.</td><td>An AZ can fail whole. Surviving it requires resources in <em>2+ AZs in the same Region</em>.</td></tr>
+      <tr><td><strong>Edge / PoP</strong><br>600+ worldwide</td><td>Small sites that cache and terminate connections close to users. Used by CloudFront, Route 53, Global Accelerator, WAF, Shield.</td><td>Not for running your workload — for shortening the distance to it.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">The bit people miss</span>
+    <p>AZ letters are <strong>scrambled per account</strong>. My <code>eu-west-1a</code> and your <code>eu-west-1a</code> are probably different physical zones — AWS does this so everyone doesn't pile into "a". If you genuinely need to name the same physical zone across accounts, use the <strong>AZ ID</strong> (<code>euw1-az2</code>), which is stable.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group" data-label="Region eu-west-1">
+        <div class="group az" data-label="AZ eu-west-1a"><span class="node">Data centre(s)<small>own power · cooling · network</small></span></div>
+        <span class="arrow both">&lt;1–2 ms fibre</span>
+        <div class="group az" data-label="AZ eu-west-1b"><span class="node">Data centre(s)<small>kilometres apart</small></span></div>
+        <span class="arrow both">&lt;1–2 ms fibre</span>
+        <div class="group az" data-label="AZ eu-west-1c"><span class="node">Data centre(s)<small>3+ AZs per Region</small></span></div>
+      </div>
+      <span class="arrow dashed">cache · terminate</span>
+      <span class="node dim">Edge / PoP<small>CloudFront · Route 53 · WAF</small></span>
+    </div>
+    <figcaption><strong>Three nested failure boundaries.</strong> Survive an AZ → 2+ AZs in one Region; survive a Region → a second Region. Edge sites shorten the distance to the workload, they never run it.</figcaption>
+  </figure>
+
+  <h2 data-mark="02">Scope: the table worth memorising</h2>
+
+  <p>Every service sits at exactly one scope. Getting this wrong is how you pick a wrong answer that "looks" right.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Global</th><th>Regional</th><th>Zonal (AZ-bound)</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>IAM, Route 53, CloudFront, WAF (for CloudFront), Organizations, Billing, S3 bucket <em>namespace</em></td>
+        <td>S3 buckets (data lives in one Region), DynamoDB, SQS, SNS, Lambda, VPC, ELB, KMS keys, most managed services</td>
+        <td>EC2 instances, EBS volumes, subnets, RDS instances (a single DB instance lives in one AZ), NAT Gateway</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group col" data-label="Global">
+        <span class="node">IAM</span>
+        <span class="node">Route 53</span>
+        <span class="node">CloudFront</span>
+      </div>
+      <div class="group col" data-label="Regional">
+        <span class="node store">S3 bucket data</span>
+        <span class="node store">DynamoDB</span>
+        <span class="node">Lambda · SQS · VPC</span>
+      </div>
+      <div class="group az col" data-label="Zonal (one AZ)">
+        <span class="node hl">EC2 instance</span>
+        <span class="node hl store">EBS volume</span>
+        <span class="node">Subnet · NAT GW</span>
+      </div>
+    </div>
+    <figcaption><strong>Every service has exactly one scope.</strong> A zonal resource dies with its AZ — an EBS volume never follows an instance to another AZ; you go through a Regional snapshot instead.</figcaption>
+  </figure>
+
+  <div class="note gotcha">
+    <span class="label">Classic trap</span>
+    <p>An <strong>EBS volume can only attach to an instance in its own AZ</strong>. If a question moves an instance to another AZ, the volume does not follow — you snapshot it (snapshots are Regional, stored in S3) and create a new volume from the snapshot in the target AZ. Same trick appears for "copy an AMI to another Region".</p>
+  </div>
+
+  <h2 data-mark="03">Shared responsibility</h2>
+
+  <p>AWS secures <strong>of</strong> the cloud; you secure <strong>in</strong> the cloud. The line moves depending on how managed the service is, and the exam uses that movement as a distractor.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service style</th><th>AWS handles</th><th>You handle</th></tr></thead>
+    <tbody>
+      <tr><td><strong>IaaS</strong> — EC2, EBS, VPC</td><td>Hardware, hypervisor, physical security, network fabric</td><td>Guest OS + patching, firewall rules (SG/NACL), app code, encryption choices, IAM</td></tr>
+      <tr><td><strong>PaaS</strong> — RDS, ECS on Fargate, EMR</td><td>OS and DB engine patching, underlying host</td><td>Schema, users/passwords, network placement, backup retention settings, IAM, encryption toggle</td></tr>
+      <tr><td><strong>SaaS-ish</strong> — S3, DynamoDB, Lambda</td><td>Everything under the API, durability, availability</td><td><em>Only</em>: your data, who can reach it (IAM/policies), classification, and encryption settings</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Two things are <strong>always yours</strong>, no matter how managed the service: <strong>IAM permissions</strong> and <strong>your data</strong>. If an answer option says AWS is responsible for configuring your security groups or rotating your database credentials, it is wrong.</p>
+
+  <h2 data-mark="04">Durability vs availability</h2>
+
+  <p>The exam uses these words precisely, so you should too.</p>
+
+  <ul>
+    <li><strong>Durability</strong> — will the data still exist? S3's famous <em>11 nines</em> (99.999999999%) is a durability figure: it survives losing multiple facilities because objects are replicated across ≥3 AZs.</li>
+    <li><strong>Availability</strong> — can you reach it right now? S3 Standard targets 99.99% availability. Lower tiers like <strong>S3 One Zone-IA</strong> keep the same durability <em>within one AZ</em> but drop availability to 99.5%, because losing that AZ loses access — and if the AZ is destroyed, the data too.</li>
+  </ul>
+
+  <div class="note exam">
+    <span class="label">Exam tip</span>
+    <p>"Must survive the loss of an Availability Zone" → spread across AZs. "Must survive the loss of a Region" → cross-Region replication, a second Region, or a global service. "Must never lose the data" → durability wording (replication, backups, versioning). Match the vocabulary and half the answers eliminate themselves.</p>
+  </div>
+
+  <h2 data-mark="05">Well-Architected: the six pillars</h2>
+
+  <p>You will not be asked to recite these, but the exam is <em>graded</em> along them — the four exam domains are essentially four of these pillars.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Pillar</th><th>The question it asks</th></tr></thead>
+    <tbody>
+      <tr><td>Operational excellence</td><td>Can we run, observe and improve this? (small reversible changes, automate)</td></tr>
+      <tr><td><strong>Security</strong></td><td>Least privilege, encryption everywhere, traceability — <em>exam domain 1, 30%</em></td></tr>
+      <tr><td><strong>Reliability</strong></td><td>Does it recover automatically? — <em>exam domain 2, 26%</em></td></tr>
+      <tr><td><strong>Performance efficiency</strong></td><td>Right resource, right size, go serverless where you can — <em>exam domain 3, 24%</em></td></tr>
+      <tr><td><strong>Cost optimisation</strong></td><td>Pay only for what you use, pick the cheapest thing that meets the requirement — <em>exam domain 4, 20%</em></td></tr>
+      <tr><td>Sustainability</td><td>Minimise the resources consumed to do the job</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="06">The default design pattern</h2>
+
+  <p>Hold this picture in your head. A large fraction of exam scenarios are a variation of it, and knowing the baseline tells you instantly what a question is changing.</p>
+
+<pre><code>            Route 53  (DNS)
+                │
+           CloudFront  (cache static, terminate TLS at the edge)
+                │
+   ┌────────────┴────────────┐  VPC, one Region
+   │   Public subnet AZ-a    │   Public subnet AZ-b
+   │       [ ALB ]───────────┼───────[ ALB ]        ← internet-facing
+   ├─────────────────────────┼──────────────────────┤
+   │   Private subnet AZ-a   │   Private subnet AZ-b
+   │   [ EC2 / ECS ] ← Auto Scaling group spans both AZs
+   ├─────────────────────────┼──────────────────────┤
+   │   Private subnet AZ-a   │   Private subnet AZ-b
+   │   [ RDS primary ]  ⇄ sync ⇄  [ RDS standby ]   ← Multi-AZ
+   └─────────────────────────┴──────────────────────┘
+                │
+            S3 (objects), DynamoDB (sessions/state)</code></pre>
+
+  <div class="decisions">
+    <span class="label">Reading the picture</span>
+    <div class="decision"><span class="cue">Anything internet-facing</span><span class="arrow">→</span><span class="ans">Public subnet: ALB, NAT Gateway. Nothing else.</span></div>
+    <div class="decision"><span class="cue">Compute and databases</span><span class="arrow">→</span><span class="ans">Private subnets, always. Reached only via the ALB.</span></div>
+    <div class="decision"><span class="cue">Every tier drawn twice</span><span class="arrow">→</span><span class="ans">Two AZs minimum. That is what "highly available" means here.</span></div>
+    <div class="decision"><span class="cue">State pushed sideways</span><span class="arrow">→</span><span class="ans">S3 / DynamoDB / ElastiCache, so instances stay disposable.</span></div>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Users</span>
+      <span class="arrow">DNS</span>
+      <span class="node">Route 53</span>
+      <span class="arrow"></span>
+      <span class="node">CloudFront<small>cache static · TLS at edge</small></span>
+      <span class="arrow"></span>
+      <div class="group" data-label="VPC · one Region · two AZs">
+        <div class="group az" data-label="Public subnets AZ-a + AZ-b"><span class="node hl">ALB<small>internet-facing</small></span></div>
+        <span class="arrow"></span>
+        <div class="group az" data-label="Private subnets AZ-a + AZ-b"><span class="node">EC2 / ECS<small>ASG spans both AZs</small></span></div>
+        <span class="arrow"></span>
+        <div class="group az" data-label="Private subnets AZ-a + AZ-b"><span class="node store">RDS primary<small>⇄ sync ⇄ standby (Multi-AZ)</small></span></div>
+      </div>
+      <span class="arrow dashed">state</span>
+      <span class="node store">S3 · DynamoDB<small>objects · sessions</small></span>
+    </div>
+    <figcaption><strong>The baseline every scenario mutates.</strong> Only the ALB is public; every tier exists in two AZs; state sits outside the instances so they stay disposable.</figcaption>
+  </figure>
+
+  <h2 data-mark="07">Check yourself</h2>
+
+  <details class="check"><summary>An application must keep serving traffic if one data centre burns down. What is the minimum architecture?</summary>
+  <div class="answer">Resources in <strong>at least two Availability Zones in one Region</strong>, behind a load balancer, with the database in Multi-AZ. A second Region is not required and would be the more expensive wrong answer if the requirement only says "data centre" or "Availability Zone".</div></details>
+
+  <details class="check"><summary>Why can't you attach an EBS volume in <code>eu-west-1a</code> to an instance in <code>eu-west-1b</code>?</summary>
+  <div class="answer">EBS is a <strong>zonal</strong> service — the volume lives on storage hardware inside one AZ. To move it: take a snapshot (Regional, backed by S3), then create a new volume from that snapshot in the target AZ.</div></details>
+
+  <details class="check"><summary>A customer stores build artefacts they can regenerate in an hour. Cost matters more than availability. Which S3 class, and what is the risk?</summary>
+  <div class="answer"><strong>S3 One Zone-IA</strong> — same 11-nines durability but only within a single AZ, at ~20% less than Standard-IA. The risk: if that AZ is lost, so is the data. Acceptable precisely because it is reproducible.</div></details>
+
+  <details class="check"><summary>Who patches the operating system of an RDS instance? Who rotates its master password?</summary>
+  <div class="answer">AWS patches the OS and DB engine (it is a managed service). <strong>You</strong> own the credentials — rotate them yourself, ideally via Secrets Manager. Data and identity are always yours.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Region = independent geography; AZ = independent data centre(s); edge = caching close to users. Failure requirements map directly onto these three.</li>
+      <li>Know each service's scope. Global (IAM, Route 53, CloudFront), Regional (S3, DynamoDB, Lambda), Zonal (EC2, EBS, subnets).</li>
+      <li>AZ letters differ per account; AZ IDs do not.</li>
+      <li>You always own your data and your IAM permissions, whatever the service.</li>
+      <li>Durability = "does it still exist"; availability = "can I reach it". S3 One Zone-IA is the classic place they diverge.</li>
+      <li>Memorise the two-AZ ALB → ASG → Multi-AZ RDS baseline. Most questions are a mutation of it.</li>
+    </ol>
+  </div>

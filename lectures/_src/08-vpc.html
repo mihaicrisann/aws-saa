@@ -1,0 +1,212 @@
+  <p>A VPC is a private, software-defined network you own inside a Region. Networking questions feel hard only until the picture clicks; after that they are mechanical. Build the picture here.</p>
+
+  <h2 data-mark="01">CIDR: the only maths you need</h2>
+
+  <p>A CIDR block is an address plus how many bits are fixed. <code>10.0.0.0/16</code> fixes the first 16 bits, leaving 16 bits for hosts.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Block</th><th>Addresses</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><code>/16</code></td><td>65,536</td><td>Largest VPC allowed</td></tr>
+      <tr><td><code>/20</code></td><td>4,096</td><td>Comfortable subnet</td></tr>
+      <tr><td><code>/24</code></td><td>256</td><td>Common subnet size</td></tr>
+      <tr><td><code>/28</code></td><td>16</td><td>Smallest subnet allowed</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>AWS reserves <strong>5 addresses in every subnet</strong>: network address, VPC router, DNS, future use, broadcast. A <code>/24</code> therefore gives you 251 usable IPs. VPC CIDRs must come from private ranges (<code>10.0.0.0/8</code>, <code>172.16.0.0/12</code>, <code>192.168.0.0/16</code>) and — critically — <strong>must not overlap</strong> with any network you intend to peer or connect to. Overlapping CIDRs is the single most common reason a peering answer is wrong.</p>
+
+  <h2 data-mark="02">Subnets: public vs private</h2>
+
+  <p>A subnet lives in <strong>exactly one AZ</strong>. There is no "public" checkbox — a subnet is public only because of its <strong>route table</strong>:</p>
+
+<pre><code>Public subnet route table          Private subnet route table
+  10.0.0.0/16 → local                10.0.0.0/16 → local
+  0.0.0.0/0   → igw-xxxx             0.0.0.0/0   → nat-xxxx</code></pre>
+
+  <p>The <code>local</code> route is implicit, cannot be removed, and is why <strong>every subnet in a VPC can reach every other subnet by default</strong> — subnets are not an isolation boundary. Security groups and NACLs are.</p>
+
+  <p>An instance in a public subnet also needs a <strong>public IPv4 or Elastic IP</strong> to be reachable. Public subnet + no public IP = no internet, in either direction.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Internet</span>
+      <span class="arrow both"></span>
+      <span class="node">IGW<small>one per VPC</small></span>
+      <span class="arrow both">0.0.0.0/0 → igw</span>
+      <div class="group" data-label="VPC 10.0.0.0/16">
+        <div class="group az" data-label="Public subnet">
+          <span class="node hl">NAT Gateway<small>Elastic IP</small></span>
+        </div>
+        <span class="arrow back">0.0.0.0/0 → nat</span>
+        <div class="group az" data-label="Private subnet">
+          <span class="node">EC2<small>no public IP</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>The route table makes the subnet.</strong> Public = <code>0.0.0.0/0 → IGW</code> plus a public IP on the instance; private = <code>0.0.0.0/0 → NAT Gateway</code>, which sits in the public subnet and only lets traffic out.</figcaption>
+  </figure>
+
+  <h2 data-mark="03">Gateways</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Gateway</th><th>Direction</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Internet Gateway (IGW)</strong></td><td>In and out</td><td>One per VPC, horizontally scaled, free, no bottleneck. Also performs the NAT between the private IP and the public IP.</td></tr>
+      <tr><td><strong>NAT Gateway</strong></td><td><strong>Outbound only</strong></td><td>Managed, scales to 100 Gbps. Lives in a <strong>public</strong> subnet with an Elastic IP; private subnets route <code>0.0.0.0/0</code> to it. <strong>Zonal</strong> — deploy one per AZ for resilience, or an AZ failure kills egress for that AZ. Charged hourly <em>and</em> per GB processed.</td></tr>
+      <tr><td><strong>NAT Instance</strong></td><td>Outbound only</td><td>Legacy self-managed EC2 alternative. Needs <strong>source/destination check disabled</strong>. Cheaper at tiny scale, but you own its HA.</td></tr>
+      <tr><td><strong>Egress-only IGW</strong></td><td>Outbound only, <strong>IPv6</strong></td><td>The IPv6 equivalent of a NAT Gateway. IPv6 addresses are all public, so this is how you keep them one-way.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">The NAT Gateway bill</span>
+    <p>NAT Gateways are a top-three surprise cost in real accounts and a favourite exam target. If private instances only talk to <strong>S3 and DynamoDB</strong>, add a free <strong>Gateway VPC endpoint</strong> and the traffic bypasses the NAT entirely. For other AWS services, an <strong>Interface endpoint</strong> (PrivateLink) is usually cheaper than NAT processing charges at volume.</p>
+  </div>
+
+  <h2 data-mark="04">Security groups vs NACLs</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Security group</th><th>Network ACL</th></tr></thead>
+    <tbody>
+      <tr><td>Attached to</td><td>ENI (instance-level)</td><td>Subnet</td></tr>
+      <tr><td>State</td><td><strong>Stateful</strong> — a reply to allowed inbound traffic is automatically allowed out</td><td><strong>Stateless</strong> — you must allow the return traffic explicitly, usually on <strong>ephemeral ports 1024–65535</strong></td></tr>
+      <tr><td>Rules</td><td><strong>Allow only.</strong> No deny. All rules evaluated together.</td><td>Allow <em>and</em> <strong>deny</strong>, evaluated in <strong>numbered order</strong>, first match wins</td></tr>
+      <tr><td>Default</td><td>Deny all inbound, allow all outbound</td><td>Default NACL allows everything; a <em>custom</em> NACL denies everything until you add rules</td></tr>
+      <tr><td>Can reference</td><td><strong>Another security group</strong> — the key trick</td><td>CIDR ranges only</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">The two rules that answer most questions</span>
+    <p><strong>Need to block a specific malicious IP?</strong> Only a NACL can deny — security groups have no deny. <strong>Need "the web tier may reach the database tier"?</strong> Set the DB security group's inbound rule to allow port 3306 <em>from the web tier's security group</em>, not from a CIDR. That rule keeps working as instances come and go, and it is the answer to almost every tier-to-tier question.</p>
+  </div>
+
+  <p>Stateless bites in one specific way: if a NACL allows inbound 443 but not outbound 1024–65535, the request arrives and the response is dropped. "Connections hang / time out one way" is the NACL signature.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Client</span>
+      <span class="arrow">443</span>
+      <div class="group" data-label="Subnet">
+        <span class="node warn">NACL<small>stateless · ordered · allow &amp; deny</small></span>
+        <span class="arrow"></span>
+        <div class="group az" data-label="Instance / ENI">
+          <span class="node hl">Security group<small>stateful · allow only</small></span>
+          <span class="arrow"></span>
+          <span class="node">EC2</span>
+        </div>
+      </div>
+    </div>
+    <div class="flow">
+      <span class="node user">Client</span>
+      <span class="arrow x">reply dropped</span>
+      <span class="node warn">NACL<small>no outbound 1024–65535 rule</small></span>
+      <span class="arrow back">reply</span>
+      <span class="node">EC2</span>
+    </div>
+    <figcaption><strong>Two layers, two behaviours.</strong> The NACL sits at the subnet edge and needs the return traffic on ephemeral ports allowed explicitly; the security group sits on the ENI and lets replies out by itself. Only the NACL can deny.</figcaption>
+  </figure>
+
+  <h2 data-mark="05">DNS and IP addressing</h2>
+
+  <ul>
+    <li>Two VPC attributes: <code>enableDnsSupport</code> (the Amazon DNS resolver at <code>VPC base + 2</code>) and <code>enableDnsHostnames</code> (instances get public DNS names). Both must be on for private hosted zones and for many endpoint scenarios to resolve.</li>
+    <li><strong>Route 53 Resolver endpoints</strong> — <em>inbound</em> lets on-premises resolve AWS private names; <em>outbound</em> plus forwarding rules lets AWS resolve on-premises names. This pair appears in hybrid DNS questions.</li>
+    <li><strong>Elastic IP</strong>: a static public IPv4 you own. There is a charge for every public IPv4 address now, including in-use ones, which is why the exam increasingly prefers designs with fewer public IPs (NAT, ALB, IPv6).</li>
+    <li>You can add secondary CIDR blocks to a VPC when you run out of space.</li>
+  </ul>
+
+  <h2 data-mark="06">Visibility and troubleshooting</h2>
+
+  <ul>
+    <li><strong>VPC Flow Logs</strong> record accepted/rejected connection metadata (not payloads) per VPC, subnet or ENI, to CloudWatch Logs, S3, or Kinesis Firehose. The answer to "which traffic was rejected and why" and to intrusion investigations.</li>
+    <li><strong>Traffic Mirroring</strong> copies actual packets to an appliance for deep inspection.</li>
+    <li><strong>Reachability Analyzer</strong> traces a path between two resources and names the exact hop that blocks it. <strong>Network Access Analyzer</strong> proves unintended access paths don't exist.</li>
+    <li><strong>Network Firewall</strong> is managed stateful IDS/IPS filtering at the VPC edge — beyond what SGs and NACLs can express.</li>
+  </ul>
+
+  <div class="note nuance">
+    <span class="label">Debug order</span>
+    <p>When traffic doesn't flow, check in this order: <strong>route table</strong> → <strong>NACL (both directions)</strong> → <strong>security group</strong> → is there a public IP / is the target listening. Reachability Analyzer automates exactly this walk.</p>
+  </div>
+
+  <h2 data-mark="07">A correct three-tier VPC</h2>
+
+<pre><code>VPC 10.0.0.0/16, Region eu-west-1
+
+  AZ-a                          AZ-b
+  ─────────────────────────     ─────────────────────────
+  10.0.0.0/24   public          10.0.1.0/24   public
+    ALB node, NAT GW (EIP)        ALB node, NAT GW (EIP)
+      route 0.0.0.0/0 → IGW         route 0.0.0.0/0 → IGW
+
+  10.0.10.0/24  private app     10.0.11.0/24  private app
+    EC2 / ECS                     EC2 / ECS
+      route 0.0.0.0/0 → NAT-a       route 0.0.0.0/0 → NAT-b
+
+  10.0.20.0/24  private data    10.0.21.0/24  private data
+    RDS primary                   RDS standby
+      no 0.0.0.0/0 route at all
+
+  Gateway endpoints: S3, DynamoDB   (free, keeps that traffic off NAT)
+  SGs:  alb-sg  ← 0.0.0.0/0:443
+        app-sg  ← alb-sg:8080
+        db-sg   ← app-sg:5432</code></pre>
+
+  <p>Note the <strong>two NAT Gateways</strong> — one per AZ, each referenced by that AZ's private route table. A single NAT Gateway is a single point of failure and a cross-AZ data charge, and spotting that is a classic exam mark.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Internet</span>
+      <span class="arrow"></span>
+      <span class="node">IGW</span>
+      <span class="arrow"></span>
+      <div class="group" data-label="VPC 10.0.0.0/16">
+        <div class="group col" data-label="AZ-a">
+          <div class="group az" data-label="10.0.0.0/24 public"><span class="node">ALB node</span> <span class="node hl">NAT GW<small>EIP</small></span></div>
+          <div class="group az" data-label="10.0.10.0/24 private app"><span class="node">EC2 / ECS<small>0.0.0.0/0 → NAT-a</small></span></div>
+          <div class="group az" data-label="10.0.20.0/24 private data"><span class="node store">RDS primary<small>no 0.0.0.0/0 route</small></span></div>
+        </div>
+        <div class="group col" data-label="AZ-b">
+          <div class="group az" data-label="10.0.1.0/24 public"><span class="node">ALB node</span> <span class="node hl">NAT GW<small>EIP</small></span></div>
+          <div class="group az" data-label="10.0.11.0/24 private app"><span class="node">EC2 / ECS<small>0.0.0.0/0 → NAT-b</small></span></div>
+          <div class="group az" data-label="10.0.21.0/24 private data"><span class="node store">RDS standby<small>no 0.0.0.0/0 route</small></span></div>
+        </div>
+        <span class="node good">Gateway endpoints<small>S3 · DynamoDB · free</small></span>
+      </div>
+    </div>
+    <figcaption><strong>One NAT Gateway per AZ.</strong> Each private route table points at its own AZ's NAT; a single NAT is a single point of failure and a cross-AZ data charge. The data tier has no internet route at all.</figcaption>
+  </figure>
+
+  <h2 data-mark="08">Check yourself</h2>
+
+  <details class="check"><summary>Instances in a private subnet cannot reach the internet to download patches. Everything else works.</summary>
+  <div class="answer">The private subnet's route table has no <code>0.0.0.0/0 → NAT Gateway</code> entry, or the NAT Gateway is not in a public subnet with its own <code>0.0.0.0/0 → IGW</code> route and an Elastic IP.</div></details>
+
+  <details class="check"><summary>How do you block one abusive IP address from reaching your instances?</summary>
+  <div class="answer">A <strong>NACL deny rule</strong> with a low rule number on the subnet. Security groups cannot express deny. (At layer 7 in front of an ALB or CloudFront, AWS WAF is the better tool.)</div></details>
+
+  <details class="check"><summary>A web server can reach the database but the database's replies never arrive, and the NACL was recently customised.</summary>
+  <div class="answer">NACLs are <strong>stateless</strong>. The outbound rule must allow the <strong>ephemeral port range 1024–65535</strong> back to the client. Security groups wouldn't cause this because they are stateful.</div></details>
+
+  <details class="check"><summary>The NAT Gateway bill is large; the instances only ever talk to S3.</summary>
+  <div class="answer">Add a <strong>Gateway VPC endpoint for S3</strong> and add its route to the private route tables. Gateway endpoints are free and keep the traffic on the AWS network entirely.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>A subnet is public only if its route table points <code>0.0.0.0/0</code> at an Internet Gateway. There is no other definition.</li>
+      <li>NAT Gateway is zonal, outbound-only, lives in a public subnet, costs per hour and per GB — one per AZ.</li>
+      <li>Security groups: stateful, allow-only, and can reference other security groups. NACLs: stateless, ordered, and the only way to deny.</li>
+      <li>"Traffic works one way then hangs" → stateless NACL missing ephemeral ports.</li>
+      <li>Never overlap CIDRs with anything you might peer to.</li>
+      <li>Gateway endpoints for S3/DynamoDB are free and cut NAT cost; Flow Logs and Reachability Analyzer are the diagnostic answers.</li>
+    </ol>
+  </div>

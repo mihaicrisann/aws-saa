@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3, properly · AWS SAA</title>
+<meta name="description" content="Storage classes, lifecycle, versioning, encryption, access control, and performance. Expect S3 in a fifth of your questions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+</head>
+<body>
+<div class="progress-rail"><i></i></div>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs">
+      <span class="num">06</span>
+      <span class="dot">/</span>
+      <span>Storage</span>
+      <span class="dot">·</span>
+      <span>22 min read</span>
+      <span class="dot">·</span>
+      <a href="index.html">all lectures</a>
+    </div>
+    <h1>S3, properly</h1>
+    <p class="standfirst">Storage classes, lifecycle, versioning, encryption, access control, and performance. Expect S3 in a fifth of your questions.</p>
+    <div class="meta-strip">
+      <span class="chip on">Design Cost-Optimized Architectures</span>
+      <span class="chip on">Design Secure Architectures</span>
+      <span class="chip on">Design High-Performing Architectures</span>
+      <span class="chip">S3</span>
+      <span class="chip">Glacier</span>
+      <span class="chip">Lifecycle</span>
+      <span class="chip">Bucket policy</span>
+    </div>
+  </header>
+
+<p>S3 is object storage: flat, effectively infinite, reached over HTTPS by key. It shows up in roughly a fifth of exam questions and in all four domains, so this is the longest lecture here. The four things worth genuinely knowing: <strong>storage classes</strong>, <strong>lifecycle</strong>, <strong>access control</strong>, and <strong>encryption</strong>.</p>
+
+  <h2 data-mark="01" id="the-model">The model</h2>
+
+  <ul>
+    <li><strong>Buckets</strong> have globally unique names and live in <em>one Region</em>. Objects up to 5 TB.</li>
+    <li>There are no real folders. <code>reports/2026/q1.csv</code> is one flat key that happens to contain slashes; the console fakes directories using the <em>prefix</em>.</li>
+    <li>Writes are <strong>strongly consistent</strong> — read-after-write for PUTs, LISTs and DELETEs. (Old exam material claiming eventual consistency is out of date; ignore any answer that hinges on it.)</li>
+    <li>Uploads over 100 MB should use <strong>multipart upload</strong> (mandatory above 5 GB): parallel parts, resumable, faster. Add a lifecycle rule to abort incomplete multipart uploads — otherwise you pay for orphaned parts forever.</li>
+  </ul>
+
+  <h2 data-mark="02" id="storage-classes">Storage classes</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Class</th><th>Retrieval</th><th>Min duration</th><th>Use it for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Standard</strong></td><td>ms</td><td>—</td><td>Hot data, ≥3 AZs, 99.99% availability</td></tr>
+      <tr><td><strong>Intelligent-Tiering</strong></td><td>ms</td><td>—</td><td><strong>Unknown or changing access patterns.</strong> Small monitoring fee per object; moves data between tiers automatically with no retrieval charges. The safe answer when the question says access patterns are unpredictable.</td></tr>
+      <tr><td><strong>Standard-IA</strong></td><td>ms</td><td>30 days</td><td>Infrequent but needs instant access; retrieval fee per GB</td></tr>
+      <tr><td><strong>One Zone-IA</strong></td><td>ms</td><td>30 days</td><td>Same, but single AZ and ~20% cheaper — only for <strong>reproducible</strong> data</td></tr>
+      <tr><td><strong>Glacier Instant Retrieval</strong></td><td>ms</td><td>90 days</td><td>Archive you might still need instantly — medical images, media assets</td></tr>
+      <tr><td><strong>Glacier Flexible Retrieval</strong></td><td>1–5 min (expedited) · 3–5 h (standard) · 5–12 h (bulk, free)</td><td>90 days</td><td>Ordinary archive where hours are fine</td></tr>
+      <tr><td><strong>Glacier Deep Archive</strong></td><td>12 h (standard) · 48 h (bulk)</td><td>180 days</td><td><strong>Cheapest storage on AWS.</strong> 7–10-year compliance retention</td></tr>
+      <tr><td><strong>Express One Zone</strong></td><td>single-digit ms</td><td>1 h</td><td>Very high-request-rate, latency-sensitive data in one AZ</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">How class questions are actually decided</span>
+    <p>Read for two facts: <strong>how fast must it come back</strong>, and <strong>do we know the access pattern</strong>. "Milliseconds" kills every Glacier tier except Instant Retrieval. "Unpredictable / unknown access" → Intelligent-Tiering. "Regulatory retention for 7 years, retrieval within 12 hours acceptable" → Deep Archive. "Can be regenerated" unlocks One Zone-IA. Minimum-duration charges are why moving objects to IA after 3 days is a wrong answer.</p>
+  </div>
+
+  <h2 data-mark="03" id="lifecycle-rules">Lifecycle rules</h2>
+
+  <p>Rules apply to a prefix or tag and do two kinds of thing: <strong>transition</strong> (change class) and <strong>expiration</strong> (delete). They can act on current versions, on noncurrent versions, on delete markers, and on incomplete multipart uploads.</p>
+
+<pre><code>logs/   day 0    Standard
+        day 30   → Standard-IA
+        day 90   → Glacier Flexible Retrieval
+        day 365  → Glacier Deep Archive
+        day 2555 → expire (delete)
+
+noncurrent versions: → Glacier after 30d, delete after 90d
+incomplete multipart uploads: abort after 7d</code></pre>
+
+  <div class="note gotcha">
+    <span class="label">Transitions only go downhill</span>
+    <p>Lifecycle can move objects to colder classes, never back up. To restore something from Glacier you issue a <strong>restore</strong> request, which makes a temporary copy available for N days. Also: you cannot transition to a class before its minimum duration would make sense, and objects smaller than 128 KB are not transitioned to IA by default because it would cost more.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="stack">
+      <span class="node">Standard<small>day 0</small></span>
+      <span class="arrow">day 30</span>
+      <span class="node">Standard-IA<small>30-day minimum</small></span>
+      <span class="arrow">day 90</span>
+      <span class="node">Glacier Flexible Retrieval<small>90-day minimum</small></span>
+      <span class="arrow">day 365</span>
+      <span class="node store">Glacier Deep Archive<small>180-day minimum</small></span>
+      <span class="arrow">day 2555</span>
+      <span class="node dim">Expire<small>delete</small></span>
+    </div>
+    <figcaption><strong>Transitions only go downhill.</strong> Each step must respect the target class's minimum duration; getting an object back out of Glacier is a restore request, not a transition.</figcaption>
+  </figure>
+
+  <h2 data-mark="04" id="versioning-locking-replication">Versioning, locking, replication</h2>
+
+  <ul>
+    <li><strong>Versioning</strong> is per bucket, and once enabled can only be suspended, never removed. Deleting an object writes a <strong>delete marker</strong>; the old versions remain (and you keep paying for them — pair with a noncurrent-version lifecycle rule).</li>
+    <li><strong>MFA Delete</strong> requires MFA to permanently delete a version or suspend versioning. Only the bucket owner (root) can enable it.</li>
+    <li><strong>S3 Object Lock</strong> = WORM. <em>Governance</em> mode: special permission can override. <em>Compliance</em> mode: <strong>nobody, including root, can delete until the retention expires</strong> — the answer for "regulatory requirement that data cannot be altered or deleted". <em>Legal hold</em> is an indefinite lock with no date.</li>
+    <li><strong>Replication</strong> (CRR across Regions, SRR within one) needs versioning on both buckets and an IAM role. It is asynchronous, replicates only <em>new</em> objects unless you run <strong>S3 Batch Replication</strong> for existing ones, and does not chain (A→B→C does not propagate A to C). <strong>RTC</strong> gives a 15-minute replication SLA.</li>
+  </ul>
+
+  <p>Uses: CRR for cross-Region DR, lower latency for a distant office, and compliance separation. SRR for aggregating logs into one bucket or replicating prod into a test account.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group" data-label="Region A">
+        <span class="node store hl">Source bucket<small>versioning on</small></span>
+      </div>
+      <span class="arrow dashed">async · IAM role</span>
+      <div class="group" data-label="Region B">
+        <span class="node store">Destination bucket<small>versioning on</small></span>
+      </div>
+      <span class="arrow x">no chaining</span>
+      <div class="group" data-label="Region C">
+        <span class="node store dim">Third bucket</span>
+      </div>
+    </div>
+    <figcaption><strong>Cross-Region Replication.</strong> Versioning on both sides, asynchronous, only new objects (Batch Replication for existing ones), and A→B does not propagate on to C.</figcaption>
+  </figure>
+
+  <h2 data-mark="05" id="access-control">Access control</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Mechanism</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Block Public Access</strong></td><td>On by default at account and bucket level. Overrides everything else. The first thing to check in "why is my bucket not public" and the fix for "prevent accidental exposure".</td></tr>
+      <tr><td><strong>Bucket policy</strong></td><td>The main tool. Resource-based, supports cross-account, conditions like <code>aws:SourceVpce</code>, <code>aws:PrincipalOrgID</code>, <code>aws:SecureTransport</code>, <code>s3:x-amz-server-side-encryption</code>.</td></tr>
+      <tr><td><strong>IAM policies</strong></td><td>Per-identity permissions. Same-account access needs an Allow on one side; cross-account needs both.</td></tr>
+      <tr><td><strong>Presigned URLs</strong></td><td>Time-limited link giving one person temporary GET or PUT rights, using your credentials. The answer for "let a user download a private file without giving them AWS credentials".</td></tr>
+      <tr><td><strong>Access Points</strong></td><td>Named endpoints each with their own policy — how you avoid one 20 KB bucket policy for 50 teams. <strong>Object Lambda Access Points</strong> transform data on the way out (redact PII, resize).</td></tr>
+      <tr><td><strong>ACLs</strong></td><td>Legacy. Disabled by default now (Bucket Owner Enforced). Do not pick unless the question is explicitly about legacy per-object ownership.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">The static-website distinction</span>
+    <p>Two ways to serve a static site. <strong>S3 website endpoint + public bucket</strong>: simple, HTTP only, needs Block Public Access off. <strong>CloudFront + private bucket + Origin Access Control (OAC)</strong>: HTTPS, custom domain, caching, WAF, and the bucket stays fully private. The exam wants OAC every time security or HTTPS is mentioned. OAC replaces the older OAI.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group bad" data-label="S3 website endpoint">
+        <div class="flow">
+          <span class="node user">Users</span>
+          <span class="arrow">HTTP only</span>
+          <span class="node store warn">Public bucket<small>Block Public Access off</small></span>
+        </div>
+      </div>
+      <div class="group good" data-label="CloudFront + OAC">
+        <div class="flow">
+          <span class="node user">Users</span>
+          <span class="arrow">HTTPS · custom domain</span>
+          <span class="node hl">CloudFront<small>caching · WAF</small></span>
+          <span class="arrow">OAC</span>
+          <span class="node store">Private bucket<small>Block Public Access on</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Private bucket + CloudFront + OAC</strong> is the answer whenever HTTPS or security is mentioned; only CloudFront can read the bucket, and it stays fully private.</figcaption>
+  </figure>
+
+  <h2 data-mark="06" id="encryption">Encryption</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Option</th><th>Key managed by</th><th>Pick when</th></tr></thead>
+    <tbody>
+      <tr><td><strong>SSE-S3</strong> (AES-256)</td><td>AWS, invisible</td><td>Default; encryption required but no key control needed. Applied automatically to all new objects.</td></tr>
+      <tr><td><strong>SSE-KMS</strong></td><td>AWS KMS key you control</td><td><strong>Audit trail of key usage (CloudTrail), key rotation, key policies.</strong> Costs KMS API calls — use <strong>S3 Bucket Keys</strong> to cut them by up to 99%.</td></tr>
+      <tr><td><strong>DSSE-KMS</strong></td><td>KMS, applied twice</td><td>Rare regulatory double-encryption requirements.</td></tr>
+      <tr><td><strong>SSE-C</strong></td><td>You, sent with each request</td><td>You must hold the keys outside AWS. HTTPS mandatory; AWS stores nothing.</td></tr>
+      <tr><td><strong>Client-side</strong></td><td>You, before upload</td><td>AWS must never see plaintext.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Enforce it with a bucket policy that denies <code>s3:PutObject</code> unless <code>s3:x-amz-server-side-encryption</code> equals the required value, and deny anything where <code>aws:SecureTransport</code> is false to force HTTPS.</p>
+
+  <h2 data-mark="07" id="performance-and-cost-levers">Performance and cost levers</h2>
+
+  <ul>
+    <li>S3 scales to <strong>3,500 PUT/COPY/POST/DELETE and 5,500 GET/HEAD per second <em>per prefix</em></strong>. More throughput → spread keys across more prefixes. (Random hash prefixes are no longer required, but multiple prefixes still parallelise.)</li>
+    <li><strong>Transfer Acceleration</strong> routes uploads over the AWS backbone via an edge location — the answer for "users worldwide upload large files to one bucket, slowly".</li>
+    <li><strong>Byte-range fetches</strong> parallelise big downloads or grab just a file header.</li>
+    <li><strong>S3 Select</strong> retrieves a subset of an object with SQL, cutting transfer. For querying <em>across</em> many objects, that's <strong>Athena</strong>.</li>
+    <li><strong>Requester Pays</strong> shifts data transfer cost to the downloader — for sharing large datasets.</li>
+    <li><strong>Storage Lens</strong> (org-wide analytics) and <strong>Storage Class Analysis</strong> (which objects to transition) are the "how do we find savings" answers.</li>
+    <li><strong>S3 Batch Operations</strong> runs an action (copy, tag, restore, invoke Lambda) over billions of objects from a manifest.</li>
+    <li>Data <strong>into</strong> S3 is free; data <strong>out to the internet</strong> is the expensive direction. Serving through CloudFront is cheaper than serving from S3 directly.</li>
+  </ul>
+
+  <div class="note exam">
+    <span class="label">Event-driven S3</span>
+    <p><strong>S3 Event Notifications</strong> fire on object created/removed/restored and target <strong>Lambda, SQS or SNS</strong>. For richer filtering and more targets, route them through <strong>EventBridge</strong> instead. This is the backbone of "process each uploaded file" scenarios.</p>
+  </div>
+
+  <h2 data-mark="08" id="check-yourself">Check yourself</h2>
+
+  <details class="check"><summary>Regulator: financial records must be retained 7 years and must be impossible to delete, even by an administrator.</summary>
+  <div class="answer">Versioning + <strong>S3 Object Lock in Compliance mode</strong> with a 7-year retention period, on objects stored in <strong>Glacier Deep Archive</strong> for cost. Governance mode would be wrong — it can be overridden by a privileged user.</div></details>
+
+  <details class="check"><summary>Access patterns for a new data set are completely unknown. Minimise cost without risking latency.</summary>
+  <div class="answer"><strong>S3 Intelligent-Tiering</strong>. It moves objects between frequent/infrequent/archive tiers automatically, with no retrieval fees and millisecond access in the instant tiers. Guessing Standard-IA risks retrieval charges on data that turns out to be hot.</div></details>
+
+  <details class="check"><summary>You must let a customer upload one file directly to a private bucket, and they have no AWS account.</summary>
+  <div class="answer">Generate a <strong>presigned PUT URL</strong> with a short expiry. No bucket policy change, no public access, no credentials handed out.</div></details>
+
+  <details class="check"><summary>A static site must be HTTPS on a custom domain, and the bucket must not be public.</summary>
+  <div class="answer"><strong>CloudFront</strong> in front of the bucket with <strong>Origin Access Control</strong>, an <strong>ACM certificate in us-east-1</strong>, and Route 53 alias records. Block Public Access stays fully on.</div></details>
+
+  <details class="check"><summary>Why might moving log files to Standard-IA after 3 days increase the bill?</summary>
+  <div class="answer">Standard-IA has a <strong>30-day minimum billable duration</strong> (and a per-GB retrieval fee, and a 128 KB minimum billable size). Objects deleted before 30 days are still charged for 30. Transition at day 30 or use Intelligent-Tiering.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Class choice = required retrieval speed × known-ness of the access pattern. Unknown → Intelligent-Tiering.</li>
+      <li>Minimum durations (IA 30d, Glacier 90d, Deep Archive 180d) are what make otherwise-tempting lifecycle answers wrong.</li>
+      <li>Object Lock Compliance mode is the only true "nobody can delete this" answer.</li>
+      <li>Cross-Region Replication needs versioning both sides, is async, and does not backfill existing objects without Batch Replication.</li>
+      <li>Private bucket + CloudFront + OAC is the standard secure delivery answer; presigned URLs handle one-off access.</li>
+      <li>SSE-KMS when you need key control and an audit trail; add S3 Bucket Keys to control the cost.</li>
+      <li>3,500 writes / 5,500 reads per second per prefix; Transfer Acceleration for distant uploads; CloudFront to cut egress cost.</li>
+    </ol>
+  </div>
+
+  <nav class="lec-nav">
+    <a class="prev" href="05-serverless.html">← Serverless and containers</a>
+    <a class="next" href="07-block-and-file.html">Block and file storage →</a>
+  </nav>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

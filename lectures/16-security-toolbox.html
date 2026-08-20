@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The security toolbox · AWS SAA</title>
+<meta name="description" content="KMS and envelope encryption, Secrets Manager vs Parameter Store, ACM, WAF, Shield, GuardDuty, Inspector, Macie, and Cognito.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+</head>
+<body>
+<div class="progress-rail"><i></i></div>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs">
+      <span class="num">16</span>
+      <span class="dot">/</span>
+      <span>Integration &amp; ops</span>
+      <span class="dot">·</span>
+      <span>20 min read</span>
+      <span class="dot">·</span>
+      <a href="index.html">all lectures</a>
+    </div>
+    <h1>The security toolbox</h1>
+    <p class="standfirst">KMS and envelope encryption, Secrets Manager vs Parameter Store, ACM, WAF, Shield, GuardDuty, Inspector, Macie, and Cognito.</p>
+    <div class="meta-strip">
+      <span class="chip on">Design Secure Architectures</span>
+      <span class="chip">KMS</span>
+      <span class="chip">Secrets Manager</span>
+      <span class="chip">WAF</span>
+      <span class="chip">Shield</span>
+      <span class="chip">GuardDuty</span>
+      <span class="chip">Cognito</span>
+    </div>
+  </header>
+
+<p>Domain 1 is 30% of the exam — the largest slice. Most of it is IAM (lecture 02) and VPC security (lecture 08). This lecture covers the rest: keys, secrets, certificates, perimeter defence, threat detection, and end-user identity.</p>
+
+  <h2 data-mark="01" id="kms-and-envelope-encryption">KMS and envelope encryption</h2>
+
+  <p>KMS holds <strong>KMS keys</strong> (formerly CMKs) inside FIPS 140-2 validated hardware. The private key material never leaves. Because KMS only encrypts payloads up to 4 KB, everything real uses <strong>envelope encryption</strong>:</p>
+
+<pre><code>1. Ask KMS for a data key           → you get {plaintext key, encrypted key}
+2. Encrypt your file locally with the plaintext key   (fast, any size)
+3. Throw away the plaintext key; store the encrypted key beside the file
+4. To decrypt: send the encrypted key to KMS (Decrypt), get the
+   plaintext key back, decrypt the file locally</code></pre>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node">Your app</span>
+      <span class="arrow">GenerateDataKey</span>
+      <span class="node hl">KMS key<small>never leaves KMS</small></span>
+      <span class="arrow back">plaintext + encrypted key</span>
+      <span class="node">Encrypt locally<small>any size, fast</small></span>
+      <span class="arrow"></span>
+      <span class="node store">File + encrypted data key<small>plaintext key discarded</small></span>
+    </div>
+    <div class="flow">
+      <span class="node store">Encrypted data key</span>
+      <span class="arrow">Decrypt</span>
+      <span class="node hl">KMS key</span>
+      <span class="arrow back">plaintext key</span>
+      <span class="node">Decrypt locally</span>
+    </div>
+    <figcaption><strong>Envelope encryption.</strong> KMS only ever encrypts the small data key (≤ 4 KB); the payload is encrypted locally with that key, and the encrypted key travels beside the data.</figcaption>
+  </figure>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Key type</th><th>Rotation</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>AWS managed</strong> (<code>aws/s3</code>)</td><td>Automatic, yearly</td><td>Free. No control over the key policy.</td></tr>
+      <tr><td><strong>Customer managed</strong></td><td>Optional automatic yearly, or on demand</td><td>You write the <strong>key policy</strong>, can disable, schedule deletion (7–30 day waiting period), and audit every use in CloudTrail. Choose this whenever the question mentions control, rotation, or audit.</td></tr>
+      <tr><td><strong>Imported material</strong></td><td>Manual only</td><td>"Bring your own key" compliance requirements.</td></tr>
+      <tr><td><strong>CloudHSM</strong></td><td>You manage entirely</td><td>Single-tenant, FIPS 140-2 <strong>Level 3</strong> hardware, AWS has no access. The answer only when the requirement says dedicated hardware or that AWS must not be able to access keys.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">Key policies are not optional</span>
+    <p>A KMS key's <strong>key policy</strong> is the primary access control — unlike most services, an IAM policy alone is not enough unless the key policy delegates to IAM. This is why cross-account access to an encrypted S3 object needs <em>three</em> permissions: the bucket policy, the caller's IAM policy, <em>and</em> the KMS key policy. Also note <strong>KMS keys are Regional</strong> — copying an encrypted snapshot or AMI to another Region re-encrypts it with a key in the destination Region (multi-Region keys exist for the cases where you need the same key both places).</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Cross-account role</span>
+      <span class="arrow">GetObject</span>
+      <div class="group" data-label="Must all allow">
+        <span class="node">IAM policy<small>caller's account</small></span>
+        <span class="node">Bucket policy<small>bucket's account</small></span>
+        <span class="node hl">KMS key policy<small>kms:Decrypt</small></span>
+      </div>
+      <span class="arrow"></span>
+      <span class="node store">SSE-KMS object</span>
+    </div>
+    <figcaption><strong>Three gates for a KMS-encrypted S3 object.</strong> Bucket policy and IAM policy pass, yet access is denied — the key policy is the one people forget.</figcaption>
+  </figure>
+
+  <h2 data-mark="02" id="secrets-parameters-certificates">Secrets, parameters, certificates</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Secrets Manager</th><th>SSM Parameter Store</th></tr></thead>
+    <tbody>
+      <tr><td>Cost</td><td>Per secret per month</td><td><strong>Free</strong> (standard tier)</td></tr>
+      <tr><td>Rotation</td><td><strong>Built in</strong>, with native RDS/Redshift/DocumentDB integration</td><td>None built in</td></tr>
+      <tr><td>Cross-account / replication</td><td>Yes</td><td>Limited</td></tr>
+      <tr><td>Pick when</td><td>Database credentials, API keys that must rotate automatically</td><td>Config values, non-rotating secrets, cost-sensitive cases</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p><strong>ACM</strong> issues free public TLS certificates that <strong>auto-renew</strong>, usable on ELB, CloudFront, API Gateway and App Runner — but <strong>not installable on EC2</strong>. Remember: a certificate for <strong>CloudFront must be in us-east-1</strong>. ACM Private CA issues internal certificates.</p>
+
+  <h2 data-mark="03" id="perimeter-waf-shield-firewall-manager">Perimeter: WAF, Shield, Firewall Manager</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>Protects against</th><th>Attaches to</th></tr></thead>
+    <tbody>
+      <tr><td><strong>AWS WAF</strong></td><td>Layer 7: SQL injection, XSS, bad bots, rate-based flooding, geo-blocking. Managed rule groups cover OWASP Top 10.</td><td>CloudFront, ALB, API Gateway, AppSync, Cognito</td></tr>
+      <tr><td><strong>Shield Standard</strong></td><td>Common layer 3/4 DDoS. <strong>Free and automatic</strong> for everyone.</td><td>Everything</td></tr>
+      <tr><td><strong>Shield Advanced</strong></td><td>Large/sophisticated DDoS, with the <strong>DDoS Response Team</strong> and <strong>cost protection</strong> against scaling charges caused by an attack. $3,000/month.</td><td>CloudFront, Route 53, ELB, Global Accelerator, EIPs</td></tr>
+      <tr><td><strong>Firewall Manager</strong></td><td>Centrally applying WAF rules, Shield Advanced, security groups and Network Firewall policies <strong>across an entire Organization</strong>.</td><td>Org-wide</td></tr>
+      <tr><td><strong>Network Firewall</strong></td><td>Stateful IDS/IPS and domain filtering at the VPC level.</td><td>VPC</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Internet</span>
+      <span class="arrow"></span>
+      <div class="group" data-label="Edge">
+        <span class="node hl">Shield Standard<small>layer 3/4 · automatic</small></span>
+        <span class="node hl">WAF<small>layer 7 rules</small></span>
+        <span class="node">CloudFront / Route 53</span>
+      </div>
+      <span class="arrow"></span>
+      <div class="group" data-label="VPC">
+        <span class="node hl">WAF<small>on ALB / API Gateway</small></span>
+        <span class="arrow"></span>
+        <span class="node">Network Firewall<small>stateful IDS/IPS</small></span>
+        <span class="arrow"></span>
+        <span class="node">App</span>
+      </div>
+    </div>
+    <div class="flow">
+      <span class="node info">Firewall Manager<small>pushes WAF / Shield Advanced / SG policies</small></span>
+      <span class="arrow dashed">org-wide</span>
+      <span class="node dim">Account A</span>
+      <span class="node dim">Account B</span>
+      <span class="node dim">Account …</span>
+    </div>
+    <figcaption><strong>Where each perimeter service sits.</strong> Shield handles volumetric DDoS in front of everything, WAF inspects HTTP at CloudFront/ALB/API Gateway, Network Firewall filters inside the VPC, and Firewall Manager only distributes those policies across an Organization.</figcaption>
+  </figure>
+
+  <div class="note exam">
+    <span class="label">Reading DDoS questions</span>
+    <p>"Protect against SQL injection" → <strong>WAF</strong>. "Protect against a large volumetric DDoS with expert support and billing protection" → <strong>Shield Advanced</strong>. "Apply the same WAF rules to 40 accounts automatically" → <strong>Firewall Manager</strong>. Shield Standard needs no action and is never something you "enable".</p>
+  </div>
+
+  <h2 data-mark="04" id="threat-detection">Threat detection</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>One-line identity</th></tr></thead>
+    <tbody>
+      <tr><td><strong>GuardDuty</strong></td><td>Continuous <strong>threat detection</strong> from CloudTrail, VPC Flow Logs and DNS logs. Finds crypto-mining, compromised credentials, port scans, communication with known-bad IPs. Agentless, one click. Cue: <strong>"detect malicious or unauthorised behaviour"</strong>.</td></tr>
+      <tr><td><strong>Inspector</strong></td><td><strong>Vulnerability scanning</strong> of EC2, ECR images and Lambda — unpatched CVEs and unintended network exposure. Cue: <strong>"scan for software vulnerabilities"</strong>.</td></tr>
+      <tr><td><strong>Macie</strong></td><td>Uses ML to find <strong>sensitive data (PII)</strong> in S3. Cue: <strong>"discover personally identifiable information"</strong>.</td></tr>
+      <tr><td><strong>Security Hub</strong></td><td><strong>Aggregates</strong> findings from GuardDuty, Inspector, Macie, Config and partners into one place, scored against standards (CIS, PCI DSS). Cue: <strong>"single pane of glass"</strong>.</td></tr>
+      <tr><td><strong>Detective</strong></td><td>Investigates a finding — builds the graph of what happened and when.</td></tr>
+      <tr><td><strong>Audit Manager</strong></td><td>Collects evidence continuously for compliance audits.</td></tr>
+      <tr><td><strong>Artifact</strong></td><td>Downloads AWS's own compliance reports (SOC, ISO, PCI).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Those four cue words — <em>threat</em> → GuardDuty, <em>vulnerability</em> → Inspector, <em>PII</em> → Macie, <em>aggregate</em> → Security Hub — are worth memorising verbatim. They are asked almost word-for-word.</p>
+
+  <h2 data-mark="05" id="cognito">Cognito</h2>
+
+  <ul>
+    <li><strong>User Pools</strong> = a user directory. Sign-up, sign-in, MFA, password policies, social and SAML/OIDC federation. Issues JWTs, and integrates natively with API Gateway and ALB for authentication. Cue: <strong>"authenticate application users"</strong>.</li>
+    <li><strong>Identity Pools</strong> = exchanges an identity (from a user pool, Google, Facebook, SAML, or unauthenticated guest) for <strong>temporary AWS credentials</strong>, so a mobile app can talk directly to S3 or DynamoDB with fine-grained per-user permissions.</li>
+  </ul>
+
+  <div class="note nuance">
+    <span class="label">Cognito vs IAM Identity Center</span>
+    <p><strong>Cognito</strong> is for your <em>application's end users</em> — the customers of the app you build. <strong>IAM Identity Center</strong> is for your <em>workforce</em> signing into AWS accounts. Questions are unambiguous once you spot which population is being described.</p>
+  </div>
+
+  <h2 data-mark="06" id="encryption-everywhere-in-one-glance">Encryption everywhere, in one glance</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Where</th><th>How</th></tr></thead>
+    <tbody>
+      <tr><td>S3</td><td>SSE-S3 default, SSE-KMS for control and audit, bucket policy to enforce; <code>aws:SecureTransport</code> to force HTTPS</td></tr>
+      <tr><td>EBS / RDS / EFS / FSx</td><td>KMS at creation. Existing unencrypted resources: snapshot → copy encrypted → restore</td></tr>
+      <tr><td>DynamoDB</td><td>Encrypted at rest by default</td></tr>
+      <tr><td>In transit</td><td>TLS everywhere; ACM certificates on ELB/CloudFront/API Gateway; VPN over Direct Connect</td></tr>
+      <tr><td>Secrets</td><td>Secrets Manager (rotating) or Parameter Store SecureString</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="07" id="check-yourself">Check yourself</h2>
+
+  <details class="check"><summary>Compliance requires keys in dedicated single-tenant hardware that AWS cannot access.</summary>
+  <div class="answer"><strong>CloudHSM</strong>. Standard KMS is multi-tenant and AWS operates it; even customer-managed KMS keys don't satisfy a "AWS must have no access" clause.</div></details>
+
+  <details class="check"><summary>An account is mining cryptocurrency after a credential leak. Which service would have flagged it?</summary>
+  <div class="answer"><strong>GuardDuty</strong> — it detects crypto-mining, anomalous API calls and traffic to known-bad destinations from CloudTrail, Flow Logs and DNS logs, with no agents.</div></details>
+
+  <details class="check"><summary>A mobile app must let users log in with Google and then upload directly to their own S3 prefix.</summary>
+  <div class="answer"><strong>Cognito Identity Pool</strong> federating Google, handing back temporary AWS credentials scoped by an IAM role whose policy uses <code>${cognito-identity.amazonaws.com:sub}</code> in the S3 prefix — each user reaches only their own folder.</div></details>
+
+  <details class="check"><summary>A cross-account role can read the bucket policy-wise, but <code>GetObject</code> still returns access denied on KMS-encrypted objects.</summary>
+  <div class="answer">The <strong>KMS key policy</strong> must also allow that role to <code>kms:Decrypt</code>. Encrypted S3 objects need bucket policy + IAM policy + key policy to all agree.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Envelope encryption: KMS protects the small data key, the data key protects the large payload.</li>
+      <li>Customer-managed KMS keys for control, rotation and CloudTrail auditing; CloudHSM only for dedicated single-tenant hardware requirements. Key policies are mandatory, and keys are Regional.</li>
+      <li>Secrets Manager rotates; Parameter Store is free. ACM is free, auto-renewing, and must be in us-east-1 for CloudFront.</li>
+      <li>WAF = layer 7 rules; Shield Advanced = big DDoS + response team + cost protection; Firewall Manager = apply either org-wide.</li>
+      <li>GuardDuty (threats), Inspector (vulnerabilities), Macie (PII), Security Hub (aggregation). Memorise the four cue words.</li>
+      <li>Cognito for app users; IAM Identity Center for your workforce.</li>
+    </ol>
+  </div>
+
+  <nav class="lec-nav">
+    <a class="prev" href="15-observability.html">← Observability and governance</a>
+    <a class="next" href="17-resilience-dr.html">Resilience and disaster recovery →</a>
+  </nav>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

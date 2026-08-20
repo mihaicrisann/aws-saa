@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EC2 and what it costs · AWS SAA</title>
+<meta name="description" content="Instance families, the five purchasing models, placement groups, and instance metadata. Most cost questions on the exam live here.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+</head>
+<body>
+<div class="progress-rail"><i></i></div>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs">
+      <span class="num">03</span>
+      <span class="dot">/</span>
+      <span>Compute</span>
+      <span class="dot">·</span>
+      <span>16 min read</span>
+      <span class="dot">·</span>
+      <a href="index.html">all lectures</a>
+    </div>
+    <h1>EC2 and what it costs</h1>
+    <p class="standfirst">Instance families, the five purchasing models, placement groups, and instance metadata. Most cost questions on the exam live here.</p>
+    <div class="meta-strip">
+      <span class="chip on">Design Cost-Optimized Architectures</span>
+      <span class="chip on">Design High-Performing Architectures</span>
+      <span class="chip">EC2</span>
+      <span class="chip">Savings Plans</span>
+      <span class="chip">Spot</span>
+      <span class="chip">Placement groups</span>
+    </div>
+  </header>
+
+<p>EC2 is a virtual machine you rent by the second. The exam rarely asks you to configure one — it asks you to <strong>pick the right size, the right family, and above all the right billing model</strong>. Purchasing options are the single densest source of cost-domain questions.</p>
+
+  <h2 data-mark="01" id="instance-families">Instance families</h2>
+
+  <p>You do not need the full catalogue. You need the first letter and what it optimises for.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Letter</th><th>Class</th><th>Reach for it when</th></tr></thead>
+    <tbody>
+      <tr><td><code>t</code></td><td>Burstable general purpose</td><td>Low, spiky baseline — dev boxes, small sites. Earns CPU credits when idle, spends them when busy. <strong>Unlimited mode</strong> lets it burst past its credits for a surcharge.</td></tr>
+      <tr><td><code>m</code></td><td>General purpose</td><td>Balanced CPU:memory. The safe default for app servers.</td></tr>
+      <tr><td><code>c</code></td><td>Compute optimised</td><td>Batch, encoding, HPC, game servers, high request-rate web tiers.</td></tr>
+      <tr><td><code>r</code>, <code>x</code>, <code>z</code></td><td>Memory optimised</td><td>In-memory caches, large relational DBs, SAP HANA (<code>x</code> = highest RAM per vCPU).</td></tr>
+      <tr><td><code>i</code>, <code>d</code>, <code>im</code></td><td>Storage optimised</td><td>Very high local IOPS — NoSQL, data warehouses, distributed file systems. Comes with <strong>instance store</strong>.</td></tr>
+      <tr><td><code>p</code>, <code>g</code>, <code>inf</code>, <code>trn</code></td><td>Accelerated</td><td>GPU / ML training and inference.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Suffixes worth recognising: <code>g</code> = Graviton (ARM, ~20% better price/performance — the answer to "reduce cost without losing performance" when the workload can be recompiled), <code>n</code> = enhanced network bandwidth, <code>d</code> = local NVMe attached, <code>a</code> = AMD.</p>
+
+  <h2 data-mark="02" id="the-five-purchasing-models">The five purchasing models</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Discount</th><th>Commitment</th><th>The cue in the question</th></tr></thead>
+    <tbody>
+      <tr><td><strong>On-Demand</strong></td><td>—</td><td>None</td><td>Short, unpredictable, cannot be interrupted, first-time workload</td></tr>
+      <tr><td><strong>Savings Plans</strong></td><td>up to 72%</td><td>$/hour for 1 or 3 years</td><td>"Steady usage but we may change instance types / move to Fargate or Lambda". <em>Compute</em> SP is flexible across family, size, Region, and even Lambda/Fargate. <em>EC2 Instance</em> SP is cheaper but locks a family+Region.</td></tr>
+      <tr><td><strong>Reserved Instances</strong></td><td>up to 72%</td><td>1 or 3 years, specific config</td><td>Steady-state and unchanging. <em>Standard</em> RI = biggest discount, can be sold on the Marketplace. <em>Convertible</em> RI = can exchange for another family, smaller discount.</td></tr>
+      <tr><td><strong>Spot</strong></td><td>up to 90%</td><td>None — 2-minute interruption notice</td><td><strong>Fault-tolerant, stateless, interruptible, flexible start/end</strong>: batch, CI, rendering, big-data workers</td></tr>
+      <tr><td><strong>Dedicated Host</strong></td><td>—</td><td>Reserve a physical server</td><td><strong>Bring-your-own-licence bound to sockets/cores</strong>, or a compliance rule naming physical hardware visibility</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">Dedicated Host vs Dedicated Instance</span>
+    <p>Both give you single-tenant hardware. <strong>Dedicated Instance</strong> = isolated hardware, but AWS controls placement and you get no visibility of sockets/cores. <strong>Dedicated Host</strong> = you get the actual physical server, see its sockets and cores, and control instance placement — which is what per-socket/per-core BYOL licensing (Windows Server, Oracle, SQL Server) requires. If a question says "existing licences tied to physical cores", the answer is Dedicated Host.</p>
+  </div>
+
+  <div class="note exam">
+    <span class="label">Savings Plans vs RIs, decided fast</span>
+    <p>Modern exam wording favours <strong>Savings Plans</strong> — they cover the same discount range with more flexibility, and Compute Savings Plans extend to Fargate and Lambda. Pick RIs only when the question stresses an unchanging instance type, or explicitly needs <strong>capacity reservation</strong> in a specific AZ (which a zonal RI gives and Savings Plans do not).</p>
+  </div>
+
+  <h2 data-mark="03" id="spot-properly">Spot, properly</h2>
+
+  <ul>
+    <li>You are interrupted when capacity is needed elsewhere, with a <strong>2-minute warning</strong> in instance metadata / an EventBridge event.</li>
+    <li><strong>Spot Fleet / EC2 Fleet</strong> requests capacity across many instance types and AZs, which is how you make Spot reliable. Strategy <code>capacity-optimized</code> minimises interruption; <code>lowest-price</code> minimises cost.</li>
+    <li><strong>Spot blocks</strong> are gone. If a question needs a guaranteed uninterrupted window, Spot is wrong.</li>
+    <li>Standard pattern: an Auto Scaling group with a <strong>mixed instances policy</strong> — a base of On-Demand for the floor, Spot for the burst.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group" data-label="Auto Scaling group · mixed instances policy">
+        <div class="group az" data-label="Floor"><span class="node">On-Demand<small>never interrupted</small></span></div>
+        <div class="group az" data-label="Burst"><span class="node hl">Spot<small>up to 90% off · 2-min warning</small></span><span class="node hl">Spot<small>many types + AZs</small></span></div>
+      </div>
+      <span class="arrow back dashed">interruption</span>
+      <span class="node dim">EventBridge / metadata<small>2-minute notice</small></span>
+    </div>
+    <figcaption><strong>Spot is made reliable by diversity, not by luck.</strong> On-Demand holds the floor, Spot across many instance types and AZs takes the burst; the app must tolerate a 2-minute eviction.</figcaption>
+  </figure>
+
+  <h2 data-mark="04" id="placement-groups">Placement groups</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Type</th><th>Layout</th><th>Buys you</th><th>Costs you</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Cluster</strong></td><td>Packed into one rack, one AZ</td><td>Lowest latency, 10 Gbps+ between nodes — HPC, tightly-coupled compute</td><td>All eggs one basket: a rack failure takes everything</td></tr>
+      <tr><td><strong>Spread</strong></td><td>Distinct hardware, can span AZs. Max 7 instances per AZ</td><td>Maximum isolation — small numbers of critical instances</td><td>Hard 7-per-AZ limit</td></tr>
+      <tr><td><strong>Partition</strong></td><td>Groups of racks ("partitions"), each on separate hardware</td><td>Large distributed systems that understand racks — HDFS, Cassandra, Kafka</td><td>More complex; app must be partition-aware</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group col" data-label="Cluster">
+        <div class="group az" data-label="One rack · one AZ"><span class="node hl">EC2</span><span class="node hl">EC2</span><span class="node hl">EC2</span></div>
+        <span class="node dim">lowest latency<small>rack failure takes all</small></span>
+      </div>
+      <div class="group col" data-label="Spread">
+        <div class="group az" data-label="AZ-a"><span class="node">EC2</span><span class="node">EC2</span></div>
+        <div class="group az" data-label="AZ-b"><span class="node">EC2</span></div>
+        <span class="node dim">max isolation<small>max 7 per AZ</small></span>
+      </div>
+      <div class="group col" data-label="Partition">
+        <div class="group az" data-label="Partition 1"><span class="node">EC2</span><span class="node">EC2</span></div>
+        <div class="group az" data-label="Partition 2"><span class="node">EC2</span><span class="node">EC2</span></div>
+        <span class="node dim">rack-aware apps<small>HDFS · Cassandra · Kafka</small></span>
+      </div>
+    </div>
+    <figcaption><strong>Placement trades latency against blast radius.</strong> Cluster packs for speed, spread separates a few critical instances (7/AZ), partition groups racks for distributed systems.</figcaption>
+  </figure>
+
+  <h2 data-mark="05" id="metadata-user-data-amis">Metadata, user data, AMIs</h2>
+
+  <ul>
+    <li><strong>User data</strong> runs once at first boot as root — bootstrapping. Bake stable parts into a <strong>golden AMI</strong> instead when the question complains about slow scale-out.</li>
+    <li><strong>Instance metadata</strong> at <code>http://169.254.169.254/latest/meta-data/</code> gives instance id, AZ, and (via the attached role) rotating credentials. Always prefer <strong>IMDSv2</strong> (session token required) — it is the mitigation for SSRF attacks that read credentials from metadata.</li>
+    <li><strong>AMIs are Regional.</strong> To launch in another Region you copy the AMI there. Encrypted AMIs need the target Region's KMS key.</li>
+    <li><strong>EC2 Image Builder</strong> automates building, patching and testing golden AMIs on a schedule.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node hl">EC2 instance<small>app / SDK</small></span>
+      <span class="arrow">IMDSv2 · session token</span>
+      <span class="node">169.254.169.254<small>instance metadata</small></span>
+      <span class="arrow back">rotating temp credentials</span>
+      <span class="node">Instance role<small>attached via instance profile</small></span>
+    </div>
+    <figcaption><strong>Credentials come from the role via metadata, never from files.</strong> IMDSv2's token requirement is what blocks SSRF attacks from reading them.</figcaption>
+  </figure>
+
+  <div class="note nuance">
+    <span class="label">Stop vs hibernate vs terminate</span>
+    <p><strong>Stop</strong>: RAM is lost, EBS root persists, you stop paying for compute (still pay for EBS). Public IPv4 changes unless it's an Elastic IP. <strong>Hibernate</strong>: RAM is written to the encrypted root EBS volume and restored on start — fast warm-up for long-loading apps; root volume must be encrypted and large enough for RAM. <strong>Terminate</strong>: root volume deleted by default (<code>DeleteOnTermination</code>), extra volumes retained by default.</p>
+  </div>
+
+  <h2 data-mark="06" id="connecting-without-ssh">Connecting without SSH</h2>
+
+  <p>Modern exam answers avoid opening port 22 to the world:</p>
+
+  <div class="decisions">
+    <span class="label">Access patterns</span>
+    <div class="decision"><span class="cue">Shell into a private instance, no bastion, no open ports</span><span class="arrow">→</span><span class="ans">AWS Systems Manager <strong>Session Manager</strong> (needs the SSM agent + an instance role)</span></div>
+    <div class="decision"><span class="cue">Browser-based SSH from the console</span><span class="arrow">→</span><span class="ans">EC2 Instance Connect (public instances; pushes an ephemeral key)</span></div>
+    <div class="decision"><span class="cue">Run one command across 500 instances</span><span class="arrow">→</span><span class="ans">SSM Run Command</span></div>
+    <div class="decision"><span class="cue">Audit every shell session</span><span class="arrow">→</span><span class="ans">Session Manager logging to S3 / CloudWatch Logs</span></div>
+  </div>
+
+  <h2 data-mark="07" id="check-yourself">Check yourself</h2>
+
+  <details class="check"><summary>A nightly video transcoding job takes 4 hours, is fully checkpointed, and can restart. Cheapest option?</summary>
+  <div class="answer"><strong>Spot Instances</strong>, ideally via an EC2 Fleet across several instance types with the <code>capacity-optimized</code> strategy. Interruptible + fault-tolerant + flexible timing is the exact Spot signature.</div></details>
+
+  <details class="check"><summary>Steady 24/7 fleet, but the team plans to migrate some services to Fargate this year. Which commitment?</summary>
+  <div class="answer"><strong>Compute Savings Plan</strong> — it applies across EC2 family/size/Region <em>and</em> Fargate and Lambda, so the discount survives the migration. An EC2 Instance Savings Plan or a Standard RI would strand the commitment.</div></details>
+
+  <details class="check"><summary>Oracle licences are counted per physical CPU socket. What do you launch on?</summary>
+  <div class="answer"><strong>Dedicated Hosts</strong> — the only option exposing physical sockets and cores and letting you control placement, which is what socket-based BYOL requires.</div></details>
+
+  <details class="check"><summary>Scale-out takes 8 minutes because user data installs a long dependency chain. Fix?</summary>
+  <div class="answer">Bake the dependencies into a <strong>golden AMI</strong> (built with EC2 Image Builder), leaving user data to do only per-instance configuration. Boot drops to well under a minute. Optionally add ASG warm pools.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Family by first letter: t burstable, m balanced, c compute, r/x memory, i storage, p/g GPU. Graviton (<code>g</code>) is the cheap-and-fast answer.</li>
+      <li>Interruptible + stateless + flexible timing → <strong>Spot</strong>. Steady + maybe changing → <strong>Compute Savings Plan</strong>. Socket-bound licences → <strong>Dedicated Host</strong>.</li>
+      <li>Cluster = low latency, spread = isolation (7/AZ), partition = rack-aware distributed systems.</li>
+      <li>Slow scale-out from user data → golden AMI.</li>
+      <li>Private shell access → Session Manager, not a bastion with port 22 open.</li>
+      <li>Enforce IMDSv2; AMIs and EBS snapshots are Regional and must be copied to be used elsewhere.</li>
+    </ol>
+  </div>
+
+  <nav class="lec-nav">
+    <a class="prev" href="02-iam.html">← IAM: who may do what</a>
+    <a class="next" href="04-elb-asg.html">Load balancing and auto scaling →</a>
+  </nav>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

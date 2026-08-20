@@ -1,0 +1,41 @@
+[tools]
+node = "23.11.1"
+
+[env]
+_.path = ["./node_modules/.bin", "./app/node_modules/.bin"]
+
+[tasks.setup]
+description = "install deps, playwright chromium, build lectures"
+run = "npm run setup"
+
+[tasks.dev]
+alias = "d"
+description = "vite dev server"
+run = "npm --prefix app run dev"
+
+[tasks.build]
+description = "build lectures + app"
+run = "npm run build"
+
+[tasks.preview]
+description = "build then serve the built app"
+run = ["npm run build", "npm --prefix app run preview"]
+
+[tasks.lectures]
+description = "regenerate lectures/*.html from _src"
+run = "node lectures/_assets/build.mjs"
+
+[tasks.check]
+description = "validate content/*.json"
+run = "node scripts/check-content.mjs"
+
+[tasks.lint]
+run = "npm --prefix app run lint"
+
+[tasks."test:ui"]
+description = "browser smoke test"
+run = "node scripts/smoke.mjs"
+
+[tasks.test]
+description = "check + smoke test"
+depends = ["check", "test:ui"]

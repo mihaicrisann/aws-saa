@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caching and analytics · AWS SAA</title>
+<meta name="description" content="ElastiCache Redis vs Memcached, Redshift, Athena, Glue, Kinesis, EMR, OpenSearch. Mostly a service-recognition exercise — learn the cues.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+</head>
+<body>
+<div class="progress-rail"><i></i></div>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs">
+      <span class="num">13</span>
+      <span class="dot">/</span>
+      <span>Data</span>
+      <span class="dot">·</span>
+      <span>18 min read</span>
+      <span class="dot">·</span>
+      <a href="index.html">all lectures</a>
+    </div>
+    <h1>Caching and analytics</h1>
+    <p class="standfirst">ElastiCache Redis vs Memcached, Redshift, Athena, Glue, Kinesis, EMR, OpenSearch. Mostly a service-recognition exercise — learn the cues.</p>
+    <div class="meta-strip">
+      <span class="chip on">Design High-Performing Architectures</span>
+      <span class="chip on">Design Cost-Optimized Architectures</span>
+      <span class="chip">ElastiCache</span>
+      <span class="chip">Redshift</span>
+      <span class="chip">Athena</span>
+      <span class="chip">Kinesis</span>
+      <span class="chip">Glue</span>
+    </div>
+  </header>
+
+<p>This lecture is mostly service recognition. You will rarely be asked to design a data pipeline in depth — you will be asked which of four services fits a one-line description. Learn the cue words.</p>
+
+  <h2 data-mark="01" id="elasticache">ElastiCache</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Redis / Valkey</th><th>Memcached</th></tr></thead>
+    <tbody>
+      <tr><td>Data structures</td><td>Lists, sets, sorted sets, hashes, streams, geospatial</td><td>Plain key-value strings</td></tr>
+      <tr><td>Persistence</td><td><strong>Yes</strong> — snapshots and AOF</td><td>No</td></tr>
+      <tr><td>Replication / HA</td><td><strong>Read replicas + Multi-AZ automatic failover</strong></td><td>None — nodes are independent</td></tr>
+      <tr><td>Scaling</td><td>Cluster mode shards across nodes</td><td>Pure horizontal, sharded by the client</td></tr>
+      <tr><td>Pick when</td><td><strong>Almost always</strong> — leaderboards, sessions, pub/sub, queues, anything needing durability or HA</td><td>Simple, large, cheap, disposable object cache; multi-threaded</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">The tiebreaker</span>
+    <p>If the question mentions <strong>persistence, replication, high availability, sorted sets, or pub/sub</strong> → <strong>Redis</strong>. If it stresses a <strong>simple, multi-threaded, horizontally-scaled cache where losing data is fine</strong> → Memcached. In doubt, Redis.</p>
+  </div>
+
+  <p>Caching strategies worth naming: <strong>lazy loading</strong> (cache-aside — read miss fetches from the DB and populates; cache may be stale, but only requested data is cached) and <strong>write-through</strong> (every write updates the cache — always fresh, but caches data nobody reads). TTLs bound staleness in both.</p>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group" data-label="Lazy loading (cache-aside)">
+        <div class="stack">
+          <span class="node user">App</span>
+          <span class="arrow">1 · read</span>
+          <span class="node hl">ElastiCache<small>miss? go to DB, then populate</small></span>
+          <span class="arrow dashed">2 · on miss</span>
+          <span class="node store">Database</span>
+        </div>
+      </div>
+      <div class="group" data-label="Write-through">
+        <div class="stack">
+          <span class="node user">App</span>
+          <span class="arrow">every write</span>
+          <span class="node store">Database</span>
+          <span class="arrow">also written</span>
+          <span class="node hl">ElastiCache<small>always fresh · may hold unread data</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Cache-aside caches only what is requested and can be stale;</strong> write-through is always fresh but caches everything. A TTL bounds staleness in both.</figcaption>
+  </figure>
+
+  <h2 data-mark="02" id="analytics-the-recognition-table">Analytics: the recognition table</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>It is</th><th>Cue words</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Athena</strong></td><td>Serverless SQL directly over S3. Pay per TB scanned.</td><td><strong>"Query data in S3 without loading it anywhere", "ad-hoc", "no infrastructure"</strong>. Cut cost by converting to <strong>Parquet/ORC</strong>, compressing and partitioning.</td></tr>
+      <tr><td><strong>Redshift</strong></td><td>Petabyte-scale columnar data warehouse; clusters (or Serverless).</td><td><strong>"Data warehouse", "complex joins over years of data", "OLAP", "BI dashboards"</strong>. <em>Spectrum</em> queries S3 without loading.</td></tr>
+      <tr><td><strong>Glue</strong></td><td>Serverless ETL plus the <strong>Data Catalog</strong> (a central schema registry) and crawlers.</td><td><strong>"ETL", "discover schema", "transform before loading"</strong></td></tr>
+      <tr><td><strong>Kinesis Data Streams</strong></td><td>Real-time streaming with shards and retention (1–365 days); multiple consumers replay the same data.</td><td><strong>"Real-time", "sub-second", "custom processing", "multiple consumers"</strong></td></tr>
+      <tr><td><strong>Data Firehose</strong></td><td>Fully managed <strong>delivery</strong> to S3, Redshift, OpenSearch, Splunk. Near-real-time (buffered ~60 s), no shard management, can transform via Lambda.</td><td><strong>"Simplest way to load streaming data into S3", "no administration"</strong></td></tr>
+      <tr><td><strong>Managed Service for Apache Flink</strong></td><td>SQL/Flink over streams.</td><td>"Analyse the stream in real time", windowed aggregations</td></tr>
+      <tr><td><strong>MSK</strong></td><td>Managed Apache Kafka.</td><td>The word <strong>Kafka</strong>, or migrating an existing Kafka estate</td></tr>
+      <tr><td><strong>EMR</strong></td><td>Managed Hadoop / Spark / Hive / Presto clusters.</td><td><strong>"Spark", "Hadoop", "big data processing framework"</strong>. Great with Spot for task nodes.</td></tr>
+      <tr><td><strong>OpenSearch Service</strong></td><td>Search and log analytics with dashboards.</td><td><strong>"Full-text search", "log analytics", "search across documents"</strong></td></tr>
+      <tr><td><strong>QuickSight</strong></td><td>Serverless BI dashboards with the SPICE in-memory engine.</td><td><strong>"Visualise", "dashboards for business users"</strong></td></tr>
+      <tr><td><strong>Lake Formation</strong></td><td>Builds and governs a data lake on S3 with fine-grained (column/row) permissions.</td><td>"Central data lake with granular access control"</td></tr>
+      <tr><td><strong>Data Exchange</strong></td><td>Subscribe to third-party datasets.</td><td>"Third-party data"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node store">S3<small>Parquet · compressed · partitioned</small></span>
+      <span class="arrow dashed">crawler discovers schema</span>
+      <span class="node">Glue Data Catalog<small>central schema registry</small></span>
+      <span class="arrow">table definitions</span>
+      <div class="group col" data-label="Query in place · nothing loaded">
+        <span class="node hl">Athena<small>serverless SQL · pay per TB scanned</small></span>
+        <span class="node">Redshift Spectrum</span>
+      </div>
+      <span class="arrow"></span>
+      <span class="node user">QuickSight</span>
+    </div>
+    <figcaption><strong>Athena queries S3 directly using the Glue Data Catalog for schema.</strong> Because it bills per TB scanned, Parquet/ORC plus partitioning is the cost answer.</figcaption>
+  </figure>
+
+  <h2 data-mark="03" id="kinesis-data-streams-vs-firehose">Kinesis Data Streams vs Firehose</h2>
+
+  <p>This pair is asked constantly, so be precise:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>Data Streams</th><th>Data Firehose</th></tr></thead>
+    <tbody>
+      <tr><td>Latency</td><td><strong>Real time</strong> (~200 ms)</td><td>Near real time (60 s buffer minimum)</td></tr>
+      <tr><td>Storage / replay</td><td>Retains 1–365 days, <strong>replayable</strong></td><td>No storage — it delivers and forgets</td></tr>
+      <tr><td>Management</td><td>You size shards (or use on-demand)</td><td>Fully managed, auto-scales</td></tr>
+      <tr><td>Consumers</td><td>Many, independent</td><td>One destination</td></tr>
+      <tr><td>Answer to</td><td>"Multiple applications process the same stream", "custom real-time logic"</td><td>"Just get this stream into S3/Redshift with the least effort"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group" data-label="Kinesis Data Streams">
+        <div class="flow">
+          <span class="node user">Producers</span>
+          <span class="arrow">~200 ms</span>
+          <span class="node hl store">Shards<small>retained 1–365 days · replayable</small></span>
+          <span class="arrow"></span>
+          <div class="group col" data-label="Independent consumers">
+            <span class="node">Managed Flink</span>
+            <span class="node">Lambda / custom app</span>
+            <span class="node">Firehose</span>
+          </div>
+        </div>
+      </div>
+      <div class="group" data-label="Data Firehose">
+        <div class="flow">
+          <span class="node user">Producers</span>
+          <span class="arrow">buffer ~60 s</span>
+          <span class="node hl">Firehose<small>no shards · optional Lambda transform</small></span>
+          <span class="arrow">delivers, keeps nothing</span>
+          <span class="node store">S3 / Redshift / OpenSearch / Splunk<small>one destination</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Streams stores an ordered, replayable log for many consumers;</strong> Firehose is a managed delivery pipe to one destination. "Least effort into S3" → Firehose; "replay, sub-second, multiple consumers" → Streams.</figcaption>
+  </figure>
+
+  <div class="note nuance">
+    <span class="label">Kinesis vs SQS</span>
+    <p>Both move messages, and the exam offers them as alternatives. <strong>SQS</strong> = a work queue: one consumer group, message deleted after processing, no ordering guarantee (unless FIFO), no replay. <strong>Kinesis</strong> = an ordered log: ordered within a shard, retained and replayable, and many independent consumers read the same records. "Replay", "ordering", "multiple consumers", "real-time analytics" → Kinesis. "Decouple and process each job once" → SQS.</p>
+  </div>
+
+  <h2 data-mark="04" id="a-typical-pipeline">A typical pipeline</h2>
+
+<pre><code>  IoT devices / clickstream / app logs
+        │
+   Kinesis Data Streams          ← real-time, replayable, multi-consumer
+        ├──► Managed Flink ──► real-time alerts / dashboards
+        └──► Data Firehose ──► S3 (raw, Parquet, partitioned by date)
+                                   │
+                    Glue crawler → Data Catalog
+                                   │
+                     ┌─────────────┴─────────────┐
+                  Athena                      Redshift
+              (ad-hoc SQL, pay             (heavy joins, BI,
+               per TB scanned)              concurrent users)
+                     └─────────────┬─────────────┘
+                               QuickSight</code></pre>
+
+  <h2 data-mark="05" id="check-yourself">Check yourself</h2>
+
+  <details class="check"><summary>Analysts want to run occasional SQL over 5 TB of JSON logs already in S3. Minimal setup, minimal cost.</summary>
+  <div class="answer"><strong>Athena</strong> (with a <strong>Glue</strong> crawler to build the catalog). Then cut the bill by converting to <strong>Parquet</strong> and partitioning — Athena charges per TB scanned, and columnar + partitioned often reduces that by 90%+. Redshift would mean provisioning a cluster for occasional queries.</div></details>
+
+  <details class="check"><summary>The simplest way to get a streaming feed into S3 with no shard management.</summary>
+  <div class="answer"><strong>Data Firehose</strong>. Choose Data Streams only if you need sub-second latency, replay, or multiple independent consumers.</div></details>
+
+  <details class="check"><summary>A database is at 100% CPU serving the same product-catalogue query thousands of times a second.</summary>
+  <div class="answer">Put <strong>ElastiCache for Redis</strong> in front with a lazy-loading (cache-aside) strategy and a sensible TTL. Add read replicas if writes remain the bottleneck.</div></details>
+
+  <details class="check"><summary>Users must search across millions of documents by free text, with a dashboard over the results.</summary>
+  <div class="answer"><strong>Amazon OpenSearch Service</strong> — full-text search plus built-in dashboards. Athena and Redshift do SQL, not relevance-ranked text search.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Redis unless the question specifically wants a simple, disposable, multi-threaded cache.</li>
+      <li>Athena = SQL on S3, pay per scan; Parquet + partitioning is the cost answer. Redshift = warehouse for heavy repeated analytics.</li>
+      <li>Glue = ETL + the Data Catalog that Athena and Redshift Spectrum read.</li>
+      <li>Kinesis Data Streams = real time, replay, many consumers. Firehose = managed delivery, near real time, one destination.</li>
+      <li>Kafka → MSK. Spark/Hadoop → EMR. Full-text search → OpenSearch. Dashboards → QuickSight.</li>
+      <li>Replay/ordering/multiple consumers → Kinesis. Process-once work queue → SQS.</li>
+    </ol>
+  </div>
+
+  <nav class="lec-nav">
+    <a class="prev" href="12-dynamodb.html">← DynamoDB</a>
+    <a class="next" href="14-decoupling.html">Decoupling: queues, topics, events →</a>
+  </nav>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

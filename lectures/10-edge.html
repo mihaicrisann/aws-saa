@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The edge: DNS, CDN, anycast · AWS SAA</title>
+<meta name="description" content="Route 53 routing policies, CloudFront behaviours and origin protection, and when Global Accelerator beats a CDN.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+</head>
+<body>
+<div class="progress-rail"><i></i></div>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs">
+      <span class="num">10</span>
+      <span class="dot">/</span>
+      <span>Networking</span>
+      <span class="dot">·</span>
+      <span>16 min read</span>
+      <span class="dot">·</span>
+      <a href="index.html">all lectures</a>
+    </div>
+    <h1>The edge: DNS, CDN, anycast</h1>
+    <p class="standfirst">Route 53 routing policies, CloudFront behaviours and origin protection, and when Global Accelerator beats a CDN.</p>
+    <div class="meta-strip">
+      <span class="chip on">Design High-Performing Architectures</span>
+      <span class="chip on">Design Resilient Architectures</span>
+      <span class="chip">Route 53</span>
+      <span class="chip">CloudFront</span>
+      <span class="chip">OAC</span>
+      <span class="chip">Global Accelerator</span>
+    </div>
+  </header>
+
+<p>Three services live between your users and your Region: <strong>Route 53</strong> decides which address they get, <strong>CloudFront</strong> caches content near them, and <strong>Global Accelerator</strong> shortens the network path. They are frequently offered as alternatives to each other, so the distinction matters.</p>
+
+  <h2 data-mark="01" id="route-53-record-types">Route 53 record types</h2>
+
+  <ul>
+    <li><strong>A / AAAA</strong> — name to IPv4 / IPv6.</li>
+    <li><strong>CNAME</strong> — name to another name. <strong>Cannot be used at the zone apex</strong> (<code>example.com</code>), only on subdomains.</li>
+    <li><strong>Alias</strong> — a Route 53 extension pointing at an AWS resource (ALB, CloudFront, S3 website, API Gateway, another record). <strong>Works at the apex</strong>, resolves to the resource's current IPs automatically, and <strong>queries are free</strong>. Whenever a question has <code>example.com</code> pointing at an ALB or CloudFront, the answer is an <strong>alias record</strong>, never a CNAME.</li>
+    <li><strong>TTL</strong> controls how long resolvers cache. Long TTL = cheaper and faster, slower failover. Alias records to AWS resources use the target's TTL.</li>
+  </ul>
+
+  <h2 data-mark="02" id="routing-policies">Routing policies</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Policy</th><th>Behaviour</th><th>Cue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Simple</strong></td><td>One record, no health checks</td><td>Single resource</td></tr>
+      <tr><td><strong>Weighted</strong></td><td>Split traffic by numeric weight</td><td><strong>Canary / blue-green / A-B testing</strong>, gradual migration. Weight 0 disables a target.</td></tr>
+      <tr><td><strong>Latency-based</strong></td><td>Sends to the Region with the lowest measured latency <em>for that user</em></td><td><strong>"Best performance for global users"</strong></td></tr>
+      <tr><td><strong>Failover</strong></td><td>Primary while healthy, else secondary</td><td><strong>Active-passive DR</strong></td></tr>
+      <tr><td><strong>Geolocation</strong></td><td>By the user's country/continent</td><td><strong>Compliance, data residency, language</strong> — "EU users must be served from Frankfurt"</td></tr>
+      <tr><td><strong>Geoproximity</strong></td><td>By distance, with a bias dial to shift the boundary</td><td>Shifting load between Regions by geography</td></tr>
+      <tr><td><strong>Multivalue answer</strong></td><td>Up to 8 healthy records returned at random</td><td>Cheap client-side spreading — <em>not</em> a load balancer</td></tr>
+      <tr><td><strong>IP-based</strong></td><td>By the client's IP CIDR</td><td>ISP-specific routing</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">Latency vs geolocation</span>
+    <p>They sound similar and answer different questions. <strong>Latency-based</strong> optimises <em>speed</em> — a user in Poland may be sent to Ireland if that's faster. <strong>Geolocation</strong> enforces <em>where traffic must go</em> regardless of speed — the answer whenever the requirement mentions regulation, residency, licensing or language.</p>
+  </div>
+
+  <p><strong>Health checks</strong> monitor an endpoint, another health check (calculated), or a CloudWatch alarm. Combine with failover records for automatic DNS-level DR. Note DNS failover is only as fast as the TTL, so lower it (60 s) when a question demands quick failover.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">User</span>
+      <span class="arrow">example.com?</span>
+      <span class="node hl">Route 53<small>alias record · health checks</small></span>
+      <span class="arrow">DNS answer</span>
+      <div class="group col" data-label="Routing policy picks">
+        <span class="node good">Primary Region<small>healthy</small></span>
+        <span class="node dim">Secondary Region<small>failover · TTL applies</small></span>
+      </div>
+    </div>
+    <figcaption><strong>Route 53 chooses the address, nothing more.</strong> The routing policy decides which Region the answer names; because resolvers cache it, DNS-level failover is only as fast as the TTL.</figcaption>
+  </figure>
+
+  <p><strong>Hosted zones</strong>: public (internet-resolvable) and private (resolves only inside associated VPCs — this is how internal names like <code>db.internal</code> work). Route 53 is also a domain registrar, and <strong>Route 53 Application Recovery Controller</strong> is the heavyweight answer for readiness checks and routing controls in multi-Region DR.</p>
+
+  <h2 data-mark="03" id="cloudfront">CloudFront</h2>
+
+  <p>A CDN with 600+ edge locations. Caches responses, terminates TLS at the edge, and shortens the TCP/TLS handshake even for content it cannot cache.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Concept</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Origin</strong></td><td>S3 bucket, ALB, EC2, API Gateway, or any HTTP server — including on-premises</td></tr>
+      <tr><td><strong>Behaviour</strong></td><td>Path pattern → origin + caching + policies. <code>/api/*</code> to the ALB with caching off; <code>/*</code> to S3 with a long TTL</td></tr>
+      <tr><td><strong>Cache policy</strong></td><td>Which headers/cookies/query strings form the cache key. Fewer keys = higher hit ratio</td></tr>
+      <tr><td><strong>Origin Access Control (OAC)</strong></td><td>Lets CloudFront read a <strong>private</strong> S3 bucket. Replaces the older OAI. Always the right answer for securing an S3 origin</td></tr>
+      <tr><td><strong>Invalidation</strong></td><td>Purges cached objects early. Costly at scale — <strong>versioned filenames</strong> (<code>app.4f2a.js</code>) are the better answer</td></tr>
+      <tr><td><strong>Signed URLs / cookies</strong></td><td>Time-limited access to private content. <em>URL</em> = one file; <em>cookie</em> = many files (a whole video library)</td></tr>
+      <tr><td><strong>Price classes</strong></td><td>Limit which edge locations are used to cut cost, at the expense of distant users</td></tr>
+      <tr><td><strong>Origin groups</strong></td><td>Automatic failover to a secondary origin on error — origin-level HA</td></tr>
+      <tr><td><strong>Geo restriction</strong></td><td>Allow/deny countries at the edge</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">S3 presigned URL vs CloudFront signed URL</span>
+    <p>Both grant temporary access to private content. <strong>S3 presigned</strong>: simple, per-object, no CDN, served from the bucket's Region. <strong>CloudFront signed</strong>: cached and served from the edge, supports cookies for whole sets of files, and lets the bucket stay entirely private behind OAC. If the scenario involves media delivery to a global audience, pick CloudFront.</p>
+  </div>
+
+  <p>CloudFront also cuts cost: egress through CloudFront is cheaper than straight S3/EC2 egress, and cache hits never touch the origin. It integrates with <strong>WAF</strong> and <strong>Shield</strong>, which is the standard DDoS/L7 protection posture.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Users<small>worldwide</small></span>
+      <span class="arrow">HTTPS</span>
+      <span class="node hl">CloudFront edge<small>TLS · cache · WAF · Shield</small></span>
+      <span class="arrow">/* · cache hit</span>
+      <span class="node store">Private S3 bucket<small>OAC</small></span>
+    </div>
+    <div class="flow">
+      <span class="node dim">CloudFront edge</span>
+      <span class="arrow dashed">/api/* · caching off</span>
+      <span class="node">ALB<small>or any HTTP origin</small></span>
+      <span class="arrow dashed">origin group failover</span>
+      <span class="node dim">Secondary origin</span>
+    </div>
+    <figcaption><strong>Behaviours split one distribution by path.</strong> Static files come from the private bucket via OAC and stay at the edge; API paths pass through to the ALB uncached, and origin groups fail over to a secondary origin.</figcaption>
+  </figure>
+
+  <h2 data-mark="04" id="global-accelerator">Global Accelerator</h2>
+
+  <p>Gives you <strong>two static anycast IP addresses</strong> advertised worldwide. User traffic enters the AWS backbone at the nearest edge and is routed privately to the healthiest endpoint (ALB, NLB, EC2, Elastic IP) in whichever Region you configure. It does <strong>not cache</strong>.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>CloudFront</th><th>Global Accelerator</th></tr></thead>
+    <tbody>
+      <tr><td>Protocols</td><td>HTTP/HTTPS only</td><td><strong>Any TCP or UDP</strong> — gaming, VoIP, IoT, MQTT</td></tr>
+      <tr><td>Caching</td><td>Yes — that's the point</td><td>No</td></tr>
+      <tr><td>Addressing</td><td>A DNS name</td><td><strong>Two static anycast IPs</strong> — great for firewall whitelisting</td></tr>
+      <tr><td>Failover</td><td>Origin groups</td><td><strong>Sub-minute</strong>, no DNS TTL involved</td></tr>
+      <tr><td>Best for</td><td>Static and cacheable dynamic web content</td><td>Non-HTTP, or dynamic traffic needing instant regional failover</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">The failover distinction worth a mark</span>
+    <p>Route 53 failover depends on DNS caching — clients keep the old answer until the TTL expires, so failover takes at least a minute and often longer with badly-behaved resolvers. <strong>Global Accelerator's IPs never change</strong>, so it reroutes at the network layer within seconds. "Fast regional failover without relying on DNS" is unambiguously Global Accelerator.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group" data-label="CloudFront">
+        <div class="flow">
+          <span class="node user">User</span>
+          <span class="arrow">HTTP/HTTPS · DNS name</span>
+          <span class="node hl">Edge cache</span>
+          <span class="arrow dashed">on miss</span>
+          <span class="node">Origin</span>
+        </div>
+      </div>
+      <div class="group" data-label="Global Accelerator">
+        <div class="flow">
+          <span class="node user">User</span>
+          <span class="arrow">any TCP/UDP · 2 static anycast IPs</span>
+          <span class="node hl">Nearest edge<small>AWS backbone · no cache</small></span>
+          <span class="arrow">healthiest endpoint</span>
+          <span class="node good">ALB / NLB / EIP<small>Region A</small></span>
+          <span class="arrow x">sub-minute failover</span>
+          <span class="node dim">Region B</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Cache vs path.</strong> CloudFront caches HTTP behind a DNS name; Global Accelerator gives fixed anycast IPs for any TCP/UDP and fails over between Regions in seconds without any DNS TTL.</figcaption>
+  </figure>
+
+  <h2 data-mark="05" id="check-yourself">Check yourself</h2>
+
+  <details class="check"><summary><code>example.com</code> must point at an Application Load Balancer.</summary>
+  <div class="answer">A Route 53 <strong>alias A record</strong> to the ALB. CNAMEs are not allowed at the zone apex, and alias queries are free and track the ALB's changing IPs.</div></details>
+
+  <details class="check"><summary>A multiplayer game server needs the lowest possible UDP latency worldwide and instant failover between Regions.</summary>
+  <div class="answer"><strong>AWS Global Accelerator</strong>. CloudFront is HTTP-only and caching is irrelevant here; Route 53 latency routing still depends on DNS TTLs for failover.</div></details>
+
+  <details class="check"><summary>German user data must be served only from eu-central-1 for legal reasons.</summary>
+  <div class="answer"><strong>Geolocation routing</strong>. Latency-based routing could legitimately send a German user to Ireland, which breaks the requirement.</div></details>
+
+  <details class="check"><summary>Video files must be viewable only by paying subscribers, delivered fast globally, from a bucket that stays private.</summary>
+  <div class="answer">CloudFront with <strong>OAC</strong> to the private bucket, and <strong>signed cookies</strong> issued after login so one authorisation covers the whole library.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Apex domain to an AWS resource → alias record, always.</li>
+      <li>Latency routing = fastest. Geolocation = legally required location. Weighted = canary. Failover = active-passive.</li>
+      <li>CloudFront caches HTTP; use OAC to keep S3 origins private and signed URLs/cookies for paid content.</li>
+      <li>Versioned filenames beat invalidations.</li>
+      <li>Global Accelerator: static anycast IPs, any TCP/UDP, no caching, seconds-fast failover independent of DNS.</li>
+      <li>Both CloudFront and Global Accelerator move traffic onto the AWS backbone early — that alone is often the performance win.</li>
+    </ol>
+  </div>
+
+  <nav class="lec-nav">
+    <a class="prev" href="09-vpc-connectivity.html">← Connecting VPCs and data centres</a>
+    <a class="next" href="11-rds-aurora.html">Relational: RDS and Aurora →</a>
+  </nav>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

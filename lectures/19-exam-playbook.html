@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The exam playbook · AWS SAA</title>
+<meta name="description" content="How the questions are built, the keyword-to-service map, elimination tactics, timing, and what to do in the last ten minutes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+</head>
+<body>
+<div class="progress-rail"><i></i></div>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs">
+      <span class="num">19</span>
+      <span class="dot">/</span>
+      <span>Architecting</span>
+      <span class="dot">·</span>
+      <span>16 min read</span>
+      <span class="dot">·</span>
+      <a href="index.html">all lectures</a>
+    </div>
+    <h1>The exam playbook</h1>
+    <p class="standfirst">How the questions are built, the keyword-to-service map, elimination tactics, timing, and what to do in the last ten minutes.</p>
+    <div class="meta-strip">
+      <span class="chip on">Design Secure Architectures</span>
+      <span class="chip on">Design Resilient Architectures</span>
+      <span class="chip on">Design High-Performing Architectures</span>
+      <span class="chip on">Design Cost-Optimized Architectures</span>
+      <span class="chip">Strategy</span>
+      <span class="chip">Keywords</span>
+      <span class="chip">Elimination</span>
+      <span class="chip">Timing</span>
+    </div>
+  </header>
+
+<p>You now know the material. This lecture is about the other half of the score: how the questions are built, how to dismantle them, and how to spend the 130 minutes.</p>
+
+  <h2 data-mark="01" id="the-format-precisely">The format, precisely</h2>
+
+  <ul>
+    <li><strong>65 questions, 130 minutes</strong> — exactly 2 minutes each. Multiple choice (one of four) or multiple response (two or three of five/six; the question always tells you how many).</li>
+    <li><strong>Only 50 are scored.</strong> 15 are unscored pretest items scattered invisibly through the paper. A question that feels bizarre may simply not count — don't let it rattle you.</li>
+    <li><strong>Scaled score 100–1000, pass at 720.</strong> It is not a percentage; there is no per-domain pass requirement.</li>
+    <li>Domain weights: <strong>Secure 30%, Resilient 26%, High-Performing 24%, Cost-Optimised 20%.</strong></li>
+    <li>No penalty for wrong answers. <strong>Never leave a question blank.</strong></li>
+  </ul>
+
+  <h2 data-mark="02" id="how-a-question-is-constructed">How a question is constructed</h2>
+
+  <p>Almost every question has the same anatomy:</p>
+
+<pre><code>[ Scenario         ]  A company runs a three-tier web app on EC2 …
+[ Complication     ]  … traffic is unpredictable and the database is
+                      overwhelmed during sales events …
+[ The actual ask   ]  Which solution meets these requirements
+[ The qualifier    ]  … with the LEAST operational overhead?
+</code></pre>
+
+  <p>The <strong>qualifier is the answer key</strong>. Several options usually work technically; the qualifier picks between them. Read it first and last.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Qualifier</th><th>It is selecting for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>MOST cost-effective</strong></td><td>Serverless, Spot, colder storage tiers, gateway endpoints, scaling to zero</td></tr>
+      <tr><td><strong>LEAST operational overhead</strong> / "fully managed"</td><td>Managed services over self-managed: Lambda over EC2, Fargate over EC2, Aurora over self-hosted MySQL, Firehose over custom consumers</td></tr>
+      <tr><td><strong>MOST secure</strong></td><td>Least privilege, roles not keys, private subnets, encryption, VPC endpoints, no public access</td></tr>
+      <tr><td><strong>HIGHEST availability</strong> / "no manual intervention"</td><td>Multi-AZ, automatic failover, more redundancy — cost is not the concern here</td></tr>
+      <tr><td><strong>MINIMAL downtime</strong> (migration)</td><td>DMS with ongoing replication, blue/green, read replica promotion</td></tr>
+      <tr><td><strong>MINIMAL changes to the application</strong></td><td>Lift-and-shift-friendly: EFS instead of rewriting to S3, Amazon MQ instead of SQS, RDS instead of DynamoDB</td></tr>
+      <tr><td><strong>REAL-TIME</strong> vs <strong>NEAR real-time</strong></td><td>Kinesis Data Streams vs Firehose. The word "near" is doing real work.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="03" id="elimination-tactics">Elimination tactics</h2>
+
+  <p>Aim to remove two options instantly, then reason about the remaining two. Options are usually wrong for one of these reasons:</p>
+
+  <ol>
+    <li><strong>Technically impossible.</strong> Attaching an EBS volume across AZs. A CNAME at the zone apex. An LSI added to an existing table. A gateway endpoint reached from on-premises. Lambda running for 30 minutes. ACM certificates on EC2.</li>
+    <li><strong>Solves a different problem.</strong> Read replicas offered for high availability. Multi-AZ offered for read scaling. CloudFront offered for a UDP workload.</li>
+    <li><strong>Violates the qualifier.</strong> It works, but it's the expensive option in a cost question, or the hand-rolled option in a "least operational overhead" question.</li>
+    <li><strong>Contains an anti-pattern.</strong> Hard-coded access keys. Opening 0.0.0.0/0 on port 22. Storing session state on instances. Public database subnets. Root user for daily work. <strong>Any option containing an anti-pattern is wrong even if the rest of it is right.</strong></li>
+  </ol>
+
+  <figure class="diagram">
+    <div class="stack">
+      <span class="node hl">Read the qualifier first<small>MOST cost-effective · LEAST overhead · MOST secure · HIGHEST availability</small></span>
+      <span class="arrow"></span>
+      <span class="node">Read the scenario<small>looking for that one thing</small></span>
+      <span class="arrow"></span>
+      <span class="node bad">Eliminate two<small>impossible · wrong problem · violates qualifier · anti-pattern</small></span>
+      <span class="arrow"></span>
+      <span class="node">Decide between the last two<small>find the one word that differs</small></span>
+      <span class="arrow"></span>
+      <span class="node good">Pick &amp; move on<small>flag if unsure — never blank</small></span>
+    </div>
+    <figcaption><strong>The question method.</strong> Several options usually work; the qualifier is what separates them, so read it first and check it last.</figcaption>
+  </figure>
+
+  <div class="note exam">
+    <span class="label">Answer-shape tells</span>
+    <p>Extreme words ("always", "never", "all traffic") are usually wrong. Options that require writing and maintaining custom code lose to a managed service when the qualifier mentions overhead. If two options are nearly identical apart from one word, that word is the entire question — find it and decide on it. And if two options are both wrong for the same reason, the answer is one of the other two.</p>
+  </div>
+
+  <h2 data-mark="04" id="keyword-service-map">Keyword → service map</h2>
+
+  <p>Skim this the morning of the exam.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>If you see…</th><th>Think</th></tr></thead>
+    <tbody>
+      <tr><td>Shared file system, multiple instances</td><td>EFS (Windows/SMB → FSx for Windows; HPC/ML → FSx for Lustre)</td></tr>
+      <tr><td>Static IP for whitelisting</td><td>NLB, or Global Accelerator</td></tr>
+      <tr><td>Path-based / host-based routing</td><td>ALB</td></tr>
+      <tr><td>Decouple, buffer, absorb spikes</td><td>SQS</td></tr>
+      <tr><td>Fan out to several systems</td><td>SNS (→ SQS per consumer)</td></tr>
+      <tr><td>React to an AWS event, or run on a schedule</td><td>EventBridge</td></tr>
+      <tr><td>Orchestrate a multi-step workflow</td><td>Step Functions</td></tr>
+      <tr><td>Real-time, replayable, multiple consumers</td><td>Kinesis Data Streams</td></tr>
+      <tr><td>Simplest streaming delivery into S3</td><td>Data Firehose</td></tr>
+      <tr><td>Query data in S3 with SQL, no infrastructure</td><td>Athena (+ Glue Catalog)</td></tr>
+      <tr><td>Data warehouse, complex analytical joins</td><td>Redshift</td></tr>
+      <tr><td>Full-text search / log analytics</td><td>OpenSearch</td></tr>
+      <tr><td>Microsecond reads on DynamoDB</td><td>DAX</td></tr>
+      <tr><td>Session state, shopping cart, key-value at scale</td><td>DynamoDB</td></tr>
+      <tr><td>Global active-active NoSQL</td><td>DynamoDB Global Tables</td></tr>
+      <tr><td>Global relational with &lt;1 s RPO</td><td>Aurora Global Database</td></tr>
+      <tr><td>Lambda exhausting DB connections</td><td>RDS Proxy</td></tr>
+      <tr><td>Private access to S3 from a VPC, free</td><td>Gateway VPC endpoint</td></tr>
+      <tr><td>Private access to other AWS services, or from on-prem</td><td>Interface endpoint / PrivateLink</td></tr>
+      <tr><td>Hundreds of VPCs, hub and spoke</td><td>Transit Gateway</td></tr>
+      <tr><td>Consistent low latency to on-premises</td><td>Direct Connect (+ VPN backup for HA)</td></tr>
+      <tr><td>Encrypted on-prem link, quickly</td><td>Site-to-Site VPN</td></tr>
+      <tr><td>Migrate 100 TB+ with poor bandwidth</td><td>Snowball Edge</td></tr>
+      <tr><td>Sync/migrate files to AWS over the network</td><td>DataSync</td></tr>
+      <tr><td>Keep the on-prem file share, store in S3</td><td>Storage Gateway (File)</td></tr>
+      <tr><td>Migrate a database with minimal downtime</td><td>DMS (+ SCT if the engine changes)</td></tr>
+      <tr><td>Detect threats / compromised credentials</td><td>GuardDuty</td></tr>
+      <tr><td>Scan for software vulnerabilities</td><td>Inspector</td></tr>
+      <tr><td>Find PII in S3</td><td>Macie</td></tr>
+      <tr><td>Aggregate security findings</td><td>Security Hub</td></tr>
+      <tr><td>SQL injection / XSS / bad bots</td><td>WAF</td></tr>
+      <tr><td>Large DDoS, response team, cost protection</td><td>Shield Advanced</td></tr>
+      <tr><td>Who called this API?</td><td>CloudTrail</td></tr>
+      <tr><td>Is the resource configured correctly, over time?</td><td>AWS Config</td></tr>
+      <tr><td>Rotating database credentials</td><td>Secrets Manager</td></tr>
+      <tr><td>Free config storage, no rotation</td><td>Parameter Store</td></tr>
+      <tr><td>Shell access with no bastion or open ports</td><td>SSM Session Manager</td></tr>
+      <tr><td>Authenticate application end users</td><td>Cognito user pools</td></tr>
+      <tr><td>Workforce SSO across many AWS accounts</td><td>IAM Identity Center</td></tr>
+      <tr><td>Guardrails an account admin cannot remove</td><td>SCPs in Organizations</td></tr>
+      <tr><td>Central backup policy across accounts</td><td>AWS Backup</td></tr>
+      <tr><td>Data cannot be deleted, even by root</td><td>S3 Object Lock, Compliance mode</td></tr>
+      <tr><td>Unknown S3 access patterns</td><td>S3 Intelligent-Tiering</td></tr>
+      <tr><td>Cheapest long-term archive</td><td>S3 Glacier Deep Archive</td></tr>
+      <tr><td>Alert me about spending</td><td>AWS Budgets</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="05" id="timing">Timing</h2>
+
+  <ul>
+    <li><strong>Two minutes per question</strong> is the budget. Track it at milestones: you should be near question 25 at the 50-minute mark and question 50 at 100 minutes.</li>
+    <li><strong>Three passes.</strong> Pass 1: answer everything you're confident about within 90 seconds, flag anything else, and <em>always select something</em> before moving on. Pass 2: work the flagged questions with the time saved. Pass 3: only revisit answers where you can articulate a concrete reason to change — first instincts are right more often than not.</li>
+    <li>Long scenarios often hinge on one sentence. <strong>Read the final question sentence first</strong>, then the scenario, and you'll read it looking for the right thing.</li>
+    <li>The exam is not adaptive. A hard run of questions means nothing about your score.</li>
+  </ul>
+
+  <h2 data-mark="06" id="a-six-week-plan">A six-week plan</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Week</th><th>Lectures</th><th>Practice</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>01–05 (foundations, IAM, compute)</td><td>Flashcards daily; drill by domain: Secure</td></tr>
+      <tr><td>2</td><td>06–07 (storage)</td><td>Flashcards; drill: Cost. First 20-question quiz.</td></tr>
+      <tr><td>3</td><td>08–10 (networking, edge)</td><td>Drill: Secure + Resilient. Rebuild the VPC diagram from memory.</td></tr>
+      <tr><td>4</td><td>11–13 (data)</td><td>Drill: High-Performing. <strong>First full 65-question mock.</strong></td></tr>
+      <tr><td>5</td><td>14–16 (integration, ops, security)</td><td>Review every mistake logged so far; re-read the lectures they map to.</td></tr>
+      <tr><td>6</td><td>17–19 (architecting, playbook)</td><td>Two full mocks, 48 hours apart. Target 80%+ before booking.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">The highest-leverage habit</span>
+    <p><strong>Log every wrong answer with the reason you got it wrong</strong> — knowledge gap, misread the qualifier, or fell for a distractor. Re-read that log before every session. Reviewing your own mistakes beats doing new questions by a wide margin, because the same handful of confusions cause most losses: Multi-AZ vs read replicas, gateway vs interface endpoints, SQS vs Kinesis, pilot light vs warm standby, latency vs geolocation routing, CloudWatch vs CloudTrail vs Config.</p>
+  </div>
+
+  <h2 data-mark="07" id="the-day-itself">The day itself</h2>
+
+  <ul>
+    <li>Online proctored: clear desk, one monitor, good light, check in 30 minutes early. Test centre: arrive early and bring two forms of ID.</li>
+    <li>Nothing new the day before. Skim your mistake log, the keyword map above, and the takeaways at the end of each lecture.</li>
+    <li>You get the pass/fail on screen at the end and the scaled score by email within a few days.</li>
+    <li>If it goes wrong: 14-day wait, and you keep the mistake log — which by then is the most valuable study asset you own.</li>
+  </ul>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>65 questions, 50 scored, 130 minutes, pass at 720/1000. No penalty for guessing — answer everything.</li>
+      <li>Find the qualifier (cheapest / least overhead / most secure / most available) before choosing. It decides between options that all technically work.</li>
+      <li>Eliminate on impossibility, wrong-problem, qualifier violation, and anti-patterns.</li>
+      <li>Anti-patterns are automatic disqualifiers: hard-coded keys, 0.0.0.0/0 on 22, session state on instances, public databases.</li>
+      <li>Two minutes per question, three passes, flag rather than stall, and never change an answer without a reason you can state.</li>
+      <li>Keep a mistake log and review it more than you do new questions.</li>
+    </ol>
+  </div>
+
+  <nav class="lec-nav">
+    <a class="prev" href="18-cost.html">← Designing for cost</a>
+    <span></span>
+  </nav>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

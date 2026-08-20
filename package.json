@@ -1,0 +1,19 @@
+{
+  "name": "aws-saa",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AWS Certified Solutions Architect \u2013 Associate study workspace",
+  "scripts": {
+    "dev": "npm --prefix app run dev",
+    "build": "npm run lectures && npm --prefix app run build",
+    "preview": "npm --prefix app run preview",
+    "lectures": "node lectures/_assets/build.mjs",
+    "check": "node scripts/check-content.mjs",
+    "setup": "npm install && npm --prefix app install && npx playwright install chromium && npm run lectures",
+    "test:ui": "node scripts/smoke.mjs",
+    "test": "npm run check && npm run test:ui"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

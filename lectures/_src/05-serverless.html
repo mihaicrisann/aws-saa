@@ -1,0 +1,175 @@
+  <p>"No servers to manage", "scale to zero", "pay only for what you use" — the exam has a small vocabulary for serverless, and each phrase points at a short list of services. This lecture is about knowing the list and, more importantly, the <strong>limits</strong> that make an option wrong.</p>
+
+  <h2 data-mark="01">Lambda: the numbers that decide answers</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Limit</th><th>Value</th><th>Why it matters on the exam</th></tr></thead>
+    <tbody>
+      <tr><td>Max execution time</td><td><strong>15 minutes</strong></td><td>Anything longer → Fargate, Batch, Step Functions, or EC2. This is the most-used elimination rule.</td></tr>
+      <tr><td>Memory</td><td>128 MB – 10 GB</td><td>CPU scales <em>with</em> memory. More memory can make a function cheaper by finishing faster.</td></tr>
+      <tr><td>Ephemeral <code>/tmp</code></td><td>512 MB – 10 GB</td><td>Need more or shared state → mount <strong>EFS</strong>.</td></tr>
+      <tr><td>Deployment package</td><td>50 MB zipped / 250 MB unzipped / <strong>10 GB container image</strong></td><td>Big ML dependencies → container image packaging.</td></tr>
+      <tr><td>Payload</td><td>6 MB synchronous, 256 KB async</td><td>Large payloads go via S3 with a pointer.</td></tr>
+      <tr><td>Concurrency</td><td>1,000 per Region by default (raisable)</td><td>Throttling questions.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">Cold starts</span>
+    <p>The fix the exam wants is <strong>Provisioned Concurrency</strong> — keeps N environments initialised and warm, eliminating cold starts for latency-sensitive APIs. <em>Reserved</em> concurrency is a different thing: it caps (and guarantees) how much of the account's concurrency pool a function may use — used to stop one function starving the others, or to protect a downstream database from being hammered.</p>
+  </div>
+
+  <p><strong>Lambda in a VPC</strong>: needed only to reach private resources (RDS, ElastiCache, private ALBs). Attaching it to a VPC means the function has <em>no internet access</em> unless the subnet routes through a <strong>NAT Gateway</strong>, and calls to AWS services should go via <strong>VPC endpoints</strong>. This trade-off is a recurring question.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group" data-label="VPC">
+        <div class="group az" data-label="Private subnet"><span class="node hl">Lambda<small>no public IP</small></span></div>
+        <span class="arrow"></span>
+        <span class="node store">RDS / ElastiCache<small>the reason it's in the VPC</small></span>
+        <span class="arrow"></span>
+        <span class="node">VPC endpoint<small>→ S3, DynamoDB, other AWS APIs</small></span>
+        <span class="arrow"></span>
+        <div class="group az" data-label="Public subnet"><span class="node">NAT Gateway</span></div>
+      </div>
+      <span class="arrow">0.0.0.0/0</span>
+      <span class="node dim">Internet</span>
+    </div>
+    <figcaption><strong>A VPC-attached Lambda has no internet by default.</strong> Private resources are reached directly, AWS APIs via VPC endpoints, and the public internet only through a NAT Gateway.</figcaption>
+  </figure>
+
+  <p><strong>Error handling</strong>: synchronous invokes return the error to the caller. Asynchronous invokes retry twice, then send the event to a <strong>Dead Letter Queue</strong> or an <strong>on-failure destination</strong>. Event-source-mapping (SQS, Kinesis, DynamoDB Streams) has its own retry and failure destination settings.</p>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group col" data-label="Synchronous">
+        <span class="node user">Caller</span>
+        <span class="arrow both">invoke · error returned</span>
+        <span class="node hl">Lambda</span>
+      </div>
+      <div class="group col" data-label="Asynchronous">
+        <span class="node">Event source</span>
+        <span class="arrow dashed">event</span>
+        <span class="node hl">Lambda<small>retries twice</small></span>
+        <span class="arrow x">still failing</span>
+        <span class="node store">DLQ / on-failure destination</span>
+      </div>
+    </div>
+    <figcaption><strong>Who sees the failure depends on the invoke type.</strong> Sync errors go back to the caller; async invokes retry twice and then park the event in a DLQ or failure destination.</figcaption>
+  </figure>
+
+  <h2 data-mark="02">Containers: ECS, EKS, Fargate</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Thing</th><th>What it actually is</th><th>Choose when</th></tr></thead>
+    <tbody>
+      <tr><td><strong>ECS</strong></td><td>AWS's own container orchestrator. Simple, deeply integrated with ALB/IAM/CloudWatch.</td><td>You want containers without Kubernetes overhead. The default AWS answer.</td></tr>
+      <tr><td><strong>EKS</strong></td><td>Managed Kubernetes.</td><td>The question says <strong>Kubernetes</strong>, or portability/existing k8s tooling is a stated requirement.</td></tr>
+      <tr><td><strong>Fargate</strong></td><td>A <em>launch type</em>, not an orchestrator — serverless compute for ECS or EKS tasks.</td><td>"Containers <strong>without managing servers / EC2 instances</strong>." Pay per vCPU-second and GB-second.</td></tr>
+      <tr><td><strong>ECR</strong></td><td>Private container registry with image scanning.</td><td>Where the images live.</td></tr>
+      <tr><td><strong>App Runner</strong></td><td>Source or image → running HTTPS service, fully managed.</td><td>"Deploy a containerised web app with minimal configuration."</td></tr>
+      <tr><td><strong>AWS Batch</strong></td><td>Managed batch job queue over EC2/Fargate, great with Spot.</td><td>Long-running batch jobs — the answer when Lambda's 15 minutes is too short.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">Two roles in ECS, and people mix them up</span>
+    <p>The <strong>task execution role</strong> lets ECS itself pull the image from ECR and write logs to CloudWatch. The <strong>task role</strong> is what your application code uses to call AWS services (S3, DynamoDB). If the app gets access denied talking to S3, it's the <em>task role</em>. If the task won't even start because it can't pull the image, it's the <em>execution role</em>.</p>
+  </div>
+
+  <h2 data-mark="03">API Gateway</h2>
+
+  <p>The managed front door for APIs: auth, throttling, caching, validation, versioning via stages.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>HTTP API</strong></td><td>Cheaper (~70% less), lower latency, fewer features. The default for simple Lambda/HTTP proxying with JWT auth.</td></tr>
+      <tr><td><strong>REST API</strong></td><td>Full feature set: API keys + usage plans, request/response transformation, caching, WAF, resource policies, private endpoints.</td></tr>
+      <tr><td><strong>WebSocket API</strong></td><td>Two-way, stateful connections — chat, live dashboards.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Authorisation options, in the order the exam presents them: <strong>IAM</strong> (internal/service-to-service, SigV4), <strong>Cognito user pools</strong> (app users signing in), <strong>Lambda authorizer</strong> (custom/third-party token logic), <strong>API keys + usage plans</strong> (rate-limit and meter per customer — <em>not</em> authentication on its own).</p>
+
+  <div class="note exam">
+    <span class="label">Throttling and back-pressure</span>
+    <p>"Protect the backend from traffic spikes" → API Gateway <strong>throttling</strong> (429s) and <strong>caching</strong> at the stage level. If the question instead wants no request lost, the answer is to <strong>buffer with SQS</strong> and process asynchronously.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group col" data-label="Shed load">
+        <span class="node user">Clients</span>
+        <span class="arrow"></span>
+        <span class="node hl">API Gateway<small>auth · throttling (429) · caching</small></span>
+        <span class="arrow"></span>
+        <span class="node">Lambda</span>
+      </div>
+      <div class="group col" data-label="Lose no request">
+        <span class="node user">Clients</span>
+        <span class="arrow"></span>
+        <span class="node hl">API Gateway</span>
+        <span class="arrow"></span>
+        <span class="node store">SQS<small>buffer</small></span>
+        <span class="arrow dashed">async</span>
+        <span class="node">Lambda</span>
+      </div>
+    </div>
+    <figcaption><strong>Throttle to protect, buffer to preserve.</strong> API Gateway throttling and caching absorb spikes by rejecting; an SQS queue in the path absorbs them without dropping anything.</figcaption>
+  </figure>
+
+  <h2 data-mark="04">The rest of the serverless kit</h2>
+
+  <ul>
+    <li><strong>Step Functions</strong> — visual state machine for orchestrating multi-step workflows, with retries, branching, parallelism and human approval. The answer for "coordinate long-running or multi-step processes", and how you exceed Lambda's 15 minutes without EC2. <em>Standard</em> workflows: up to a year, exactly-once. <em>Express</em>: up to 5 min, very high volume, at-least-once.</li>
+    <li><strong>AppSync</strong> — managed GraphQL, with real-time subscriptions and offline sync. Cue word: <em>GraphQL</em>.</li>
+    <li><strong>Amplify</strong> — hosting plus backend scaffolding for web/mobile front-ends.</li>
+    <li><strong>Elastic Beanstalk</strong> — not serverless, but the "just deploy my code, AWS handles capacity/LB/scaling, and I still want access to the EC2 instances" answer. You keep full control of the underlying resources; it is free (you pay for what it provisions).</li>
+    <li><strong>Lambda@Edge / CloudFront Functions</strong> — run code at edge locations. CloudFront Functions: sub-millisecond, JS only, viewer request/response, for header manipulation and redirects. Lambda@Edge: heavier, can also run at origin request/response, can make network calls.</li>
+  </ul>
+
+  <h2 data-mark="05">Picking the compute</h2>
+
+  <div class="decisions">
+    <span class="label">Compute decision list</span>
+    <div class="decision"><span class="cue">Event-driven, short, spiky, scale to zero</span><span class="arrow">→</span><span class="ans">Lambda</span></div>
+    <div class="decision"><span class="cue">Runs longer than 15 minutes</span><span class="arrow">→</span><span class="ans">Fargate, AWS Batch, or Step Functions orchestrating steps</span></div>
+    <div class="decision"><span class="cue">Containers, no server management</span><span class="arrow">→</span><span class="ans">ECS on Fargate</span></div>
+    <div class="decision"><span class="cue">The word "Kubernetes" appears</span><span class="arrow">→</span><span class="ans">EKS</span></div>
+    <div class="decision"><span class="cue">Needs OS access, licences, or specialised hardware</span><span class="arrow">→</span><span class="ans">EC2</span></div>
+    <div class="decision"><span class="cue">"Upload code, don't think about infrastructure, keep the servers"</span><span class="arrow">→</span><span class="ans">Elastic Beanstalk</span></div>
+    <div class="decision"><span class="cue">Multi-step workflow with retries and branching</span><span class="arrow">→</span><span class="ans">Step Functions</span></div>
+  </div>
+
+  <h2 data-mark="06">Check yourself</h2>
+
+  <details class="check"><summary>A data conversion job runs 45 minutes per file, triggered by S3 uploads. Design it.</summary>
+  <div class="answer">Lambda is out (15-minute ceiling). S3 event → SQS → <strong>ECS/Fargate</strong> tasks or an <strong>AWS Batch</strong> job (Spot-backed for cost). A small Lambda may still act as the trigger that submits the job.</div></details>
+
+  <details class="check"><summary>An API backed by Lambda has 2–3 s latency on the first request after idle periods.</summary>
+  <div class="answer">Cold starts. Enable <strong>Provisioned Concurrency</strong> on the alias. Secondary wins: smaller deployment package, avoid heavy init outside the handler, and prefer a lighter runtime.</div></details>
+
+  <details class="check"><summary>A Lambda in a VPC times out calling a public third-party API. Why?</summary>
+  <div class="answer">VPC-attached Lambdas have no internet route by default. Put the function in <strong>private subnets whose route table points 0.0.0.0/0 at a NAT Gateway</strong>. (Putting a Lambda in a public subnet does <em>not</em> give it internet — it has no public IP.)</div></details>
+
+  <details class="check"><summary>Which costs less for a low-traffic REST API in front of Lambda, and what do you give up?</summary>
+  <div class="answer"><strong>HTTP API</strong> — roughly 70% cheaper and faster. You give up API keys/usage plans, request/response transformation, response caching, resource policies and direct WAF integration. If the question requires any of those, use a REST API.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Lambda's 15-minute limit is the most useful elimination rule in the compute domain.</li>
+      <li>Provisioned concurrency kills cold starts; reserved concurrency caps blast radius.</li>
+      <li>Fargate is a launch type for ECS/EKS — "containers without managing instances".</li>
+      <li>ECS task execution role pulls images; task role is what your code uses.</li>
+      <li>Step Functions orchestrates; API Gateway fronts, throttles and caches; SQS buffers.</li>
+      <li>A VPC-attached Lambda needs a NAT Gateway for the internet and VPC endpoints for AWS APIs.</li>
+    </ol>
+  </div>

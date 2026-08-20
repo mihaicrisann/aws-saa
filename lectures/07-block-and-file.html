@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block and file storage · AWS SAA</title>
+<meta name="description" content="EBS volume types and their IOPS ceilings, instance store, EFS, the FSx family, and how data gets in from on-premises.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+</head>
+<body>
+<div class="progress-rail"><i></i></div>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs">
+      <span class="num">07</span>
+      <span class="dot">/</span>
+      <span>Storage</span>
+      <span class="dot">·</span>
+      <span>16 min read</span>
+      <span class="dot">·</span>
+      <a href="index.html">all lectures</a>
+    </div>
+    <h1>Block and file storage</h1>
+    <p class="standfirst">EBS volume types and their IOPS ceilings, instance store, EFS, the FSx family, and how data gets in from on-premises.</p>
+    <div class="meta-strip">
+      <span class="chip on">Design High-Performing Architectures</span>
+      <span class="chip on">Design Resilient Architectures</span>
+      <span class="chip">EBS</span>
+      <span class="chip">EFS</span>
+      <span class="chip">FSx</span>
+      <span class="chip">DataSync</span>
+      <span class="chip">Snow</span>
+    </div>
+  </header>
+
+<p>Three shapes of storage, and the exam mostly tests whether you can tell which shape a scenario needs. <strong>Block</strong> = a virtual disk attached to one machine (EBS). <strong>File</strong> = a shared filesystem many machines mount (EFS, FSx). <strong>Object</strong> = S3. Pick the shape first, then the product.</p>
+
+  <h2 data-mark="01" id="ebs-volume-types">EBS volume types</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Type</th><th>Max IOPS / throughput</th><th>Use for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>gp3</strong> (SSD)</td><td>3,000 IOPS &amp; 125 MB/s baseline, up to 16,000 IOPS / 1,000 MB/s — <em>provisioned independently of size</em></td><td><strong>The default.</strong> ~20% cheaper than gp2 and you tune IOPS without growing the disk.</td></tr>
+      <tr><td><strong>gp2</strong> (SSD)</td><td>3 IOPS per GB, max 16,000 — you must grow the volume to get IOPS</td><td>Legacy. If a question describes buying a bigger volume purely for IOPS, the answer is "switch to gp3".</td></tr>
+      <tr><td><strong>io2 Block Express</strong> (SSD)</td><td>Up to 256,000 IOPS, 4,000 MB/s, 99.999% durability</td><td>Critical databases needing sustained high IOPS and sub-ms latency. Supports <strong>Multi-Attach</strong> (one volume, up to 16 instances in the same AZ, cluster-aware filesystem required).</td></tr>
+      <tr><td><strong>st1</strong> (HDD)</td><td>500 MB/s throughput-optimised</td><td>Big sequential reads: log processing, data warehouse, streaming. <strong>Cannot be a boot volume.</strong></td></tr>
+      <tr><td><strong>sc1</strong> (HDD)</td><td>250 MB/s, cheapest</td><td>Cold, rarely accessed. Not a boot volume.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">EBS facts that decide questions</span>
+    <ul>
+      <li>An EBS volume is <strong>zonal</strong> — one AZ, and (except io2 Multi-Attach) attached to <strong>one instance at a time</strong>. "Many instances need the same files" is never EBS.</li>
+      <li><strong>Snapshots are incremental and stored in S3</strong>, are Regional, and can be copied cross-Region (that's how you do EBS DR) and shared with other accounts.</li>
+      <li>Snapshot of an encrypted volume is encrypted; a volume restored from it is encrypted. To encrypt an existing unencrypted volume: snapshot → copy the snapshot <em>with encryption enabled</em> → create a new volume → swap.</li>
+      <li>You can resize and change type live (elastic volumes); the filesystem still needs extending inside the OS.</li>
+      <li><strong>Data Lifecycle Manager</strong> automates snapshot schedules and retention. <strong>Recycle Bin</strong> protects against accidental snapshot deletion.</li>
+    </ul>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node">EC2<small>encrypted or not</small></span>
+      <span class="arrow">snapshot</span>
+      <span class="node store">Snapshot<small>incremental · in S3</small></span>
+      <span class="arrow">copy · encryption on</span>
+      <span class="node store hl">Encrypted snapshot<small>or another Region</small></span>
+      <span class="arrow">create volume</span>
+      <span class="node good">Encrypted volume<small>swap onto the instance</small></span>
+    </div>
+    <figcaption><strong>Snapshots are how EBS moves.</strong> The same snapshot → copy → new volume path encrypts an existing volume and, copied cross-Region, is EBS disaster recovery.</figcaption>
+  </figure>
+
+  <h2 data-mark="02" id="instance-store">Instance store</h2>
+
+  <p>Physically attached NVMe on the host: the <strong>highest possible IOPS</strong>, and <strong>ephemeral</strong> — data is gone when the instance stops, hibernates or terminates (it survives a reboot). Right answer for scratch space, caches, buffers, and the local disks of a distributed system that replicates itself. Wrong answer for anything that must persist.</p>
+
+  <h2 data-mark="03" id="efs">EFS</h2>
+
+  <p>Managed NFS: a filesystem <strong>many EC2 instances across many AZs mount at once</strong>, growing and shrinking automatically. Linux only.</p>
+
+  <ul>
+    <li><strong>Storage classes</strong>: Standard (multi-AZ) and One Zone (cheaper, single AZ). Lifecycle management moves untouched files to Infrequent Access or Archive.</li>
+    <li><strong>Performance modes</strong>: General Purpose (default, lowest latency) vs Max I/O (higher throughput, higher latency, thousands of clients).</li>
+    <li><strong>Throughput modes</strong>: Elastic (default, scales automatically), Provisioned, Bursting.</li>
+    <li>Access is controlled by <strong>security groups on the mount targets</strong>, plus IAM and EFS access points. Encryption at rest via KMS, in transit via TLS.</li>
+    <li>Lambda can mount EFS — the way a function gets more than 10 GB of shared, persistent working storage.</li>
+  </ul>
+
+  <div class="note exam">
+    <span class="label">The single most reliable cue</span>
+    <p><strong>"Multiple EC2 instances need concurrent access to the same files"</strong> → <strong>EFS</strong>. It is right nearly every time, and it eliminates EBS immediately. Add "Windows / SMB / Active Directory" and it becomes <strong>FSx for Windows File Server</strong> instead.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group" data-label="EBS · block">
+        <div class="group az" data-label="One AZ">
+          <div class="flow">
+            <span class="node">EC2</span>
+            <span class="arrow"></span>
+            <span class="node store">EBS volume<small>one instance at a time</small></span>
+          </div>
+        </div>
+      </div>
+      <div class="group" data-label="Instance store · block">
+        <div class="group az" data-label="One AZ">
+          <span class="node warn">EC2<small>NVMe on the host · ephemeral</small></span>
+        </div>
+      </div>
+      <div class="group" data-label="EFS · file (NFS)">
+        <div class="flow">
+          <div class="group az" data-label="AZ a"><span class="node">EC2</span></div>
+          <div class="group az" data-label="AZ b"><span class="node">EC2</span></div>
+          <span class="arrow">mount</span>
+          <span class="node store hl">EFS<small>many instances · many AZs</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Shape first.</strong> EBS is one AZ and one instance (bar io2 Multi-Attach), instance store lives and dies with the host, EFS is the only one many instances across AZs mount at once.</figcaption>
+  </figure>
+
+  <h2 data-mark="04" id="the-fsx-family">The FSx family</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>FSx for…</th><th>It is</th><th>Cue words</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Windows File Server</strong></td><td>Fully managed SMB with Active Directory integration, DFS, Windows ACLs</td><td>Windows, SMB, Active Directory, .NET apps, file share migration</td></tr>
+      <tr><td><strong>Lustre</strong></td><td>Extreme-performance parallel filesystem, hundreds of GB/s, links to an S3 bucket as its data source</td><td>HPC, machine learning training, genomics, financial modelling, "high performance compute cluster"</td></tr>
+      <tr><td><strong>NetApp ONTAP</strong></td><td>Multi-protocol (NFS, SMB, iSCSI) with snapshots, cloning, dedup, tiering</td><td>Migrating an existing NetApp estate; needs both NFS and SMB</td></tr>
+      <tr><td><strong>OpenZFS</strong></td><td>Managed ZFS over NFS, snapshots and cloning</td><td>Migrating ZFS workloads, low-latency NFS</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="05" id="getting-data-in-from-on-premises">Getting data in from on-premises</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>What it does</th><th>Cue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Storage Gateway – File (S3 File Gateway)</strong></td><td>On-prem NFS/SMB share backed by S3 objects, with a local cache</td><td>"Keep the file share, put the data in S3"</td></tr>
+      <tr><td><strong>Storage Gateway – Volume</strong></td><td>iSCSI block volumes backed by S3. <em>Cached</em> = primary data in AWS; <em>Stored</em> = primary data on-prem, async backup to AWS</td><td>Block storage with cloud backup</td></tr>
+      <tr><td><strong>Storage Gateway – Tape</strong></td><td>Virtual tape library that your existing backup software drives</td><td>"Replace physical tapes without changing backup software"</td></tr>
+      <tr><td><strong>DataSync</strong></td><td>Fast one-off or scheduled <strong>transfer/sync</strong> to S3, EFS, or FSx, with validation and encryption. Over the internet or Direct Connect.</td><td>"Migrate 200 TB", "sync nightly"</td></tr>
+      <tr><td><strong>Snowball Edge</strong></td><td>Physical appliance, ~80 TB usable per device, with optional onboard compute</td><td>Tens to hundreds of TB, poor bandwidth</td></tr>
+      <tr><td><strong>Snowmobile</strong></td><td>A shipping container on a lorry, up to 100 PB</td><td>Exabyte-ish migrations</td></tr>
+      <tr><td><strong>Transfer Family</strong></td><td>Managed SFTP / FTPS / FTP endpoints in front of S3 or EFS</td><td>"Partners upload via SFTP"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">Wire or lorry? Do the arithmetic</span>
+    <p>A rough rule: over a 1 Gbps link you move about <strong>10 TB per day</strong>. So 100 TB is roughly 10 days of saturated link — Snowball is usually faster and cheaper. Under ~10 TB, or when the pipe is fat and idle, DataSync over the network wins. Exam questions supply the bandwidth and the volume precisely so you can make this call.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group info" data-label="Over the wire">
+        <div class="flow">
+          <span class="node">On-prem storage</span>
+          <span class="arrow">DataSync</span>
+          <span class="node store">S3 / EFS / FSx<small>~10 TB per day per Gbps</small></span>
+        </div>
+      </div>
+      <div class="group info" data-label="By lorry">
+        <div class="flow">
+          <span class="node">On-prem storage</span>
+          <span class="arrow">copy locally</span>
+          <span class="node hl">Snowball Edge<small>~80 TB usable each</small></span>
+          <span class="arrow dashed">shipped</span>
+          <span class="node store">S3</span>
+        </div>
+      </div>
+      <div class="group info" data-label="Keep the protocol">
+        <div class="flow">
+          <span class="node">On-prem app<small>NFS / SMB / iSCSI / tape</small></span>
+          <span class="arrow"></span>
+          <span class="node">Storage Gateway<small>local cache</small></span>
+          <span class="arrow"></span>
+          <span class="node store">S3</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Three ways in.</strong> DataSync when the link is enough, Snowball when it is not, Storage Gateway when on-prem must keep talking its existing protocol.</figcaption>
+  </figure>
+
+  <h2 data-mark="06" id="picking-the-shape">Picking the shape</h2>
+
+  <div class="decisions">
+    <span class="label">Storage decision list</span>
+    <div class="decision"><span class="cue">One instance, needs a disk / boot volume / database files</span><span class="arrow">→</span><span class="ans">EBS (gp3 default, io2 for heavy DB IOPS)</span></div>
+    <div class="decision"><span class="cue">Many Linux instances, same files, concurrently</span><span class="arrow">→</span><span class="ans">EFS</span></div>
+    <div class="decision"><span class="cue">Windows / SMB / Active Directory</span><span class="arrow">→</span><span class="ans">FSx for Windows File Server</span></div>
+    <div class="decision"><span class="cue">HPC or ML training against S3 data</span><span class="arrow">→</span><span class="ans">FSx for Lustre</span></div>
+    <div class="decision"><span class="cue">Temporary scratch, maximum IOPS, loss acceptable</span><span class="arrow">→</span><span class="ans">Instance store</span></div>
+    <div class="decision"><span class="cue">Unstructured objects, web-scale, HTTP access</span><span class="arrow">→</span><span class="ans">S3</span></div>
+    <div class="decision"><span class="cue">On-prem app must keep its file share</span><span class="arrow">→</span><span class="ans">Storage Gateway (File)</span></div>
+  </div>
+
+  <h2 data-mark="07" id="check-yourself">Check yourself</h2>
+
+  <details class="check"><summary>A CMS on 6 EC2 instances behind an ALB must all see uploaded images immediately.</summary>
+  <div class="answer"><strong>EFS</strong>, mounted by every instance. (In a redesign, S3 plus CloudFront is even better — but EFS is the drop-in answer when the app expects a POSIX filesystem.) EBS cannot do this.</div></details>
+
+  <details class="check"><summary>A gp2 volume is 500 GB purely to reach 1,500 IOPS. Reduce cost.</summary>
+  <div class="answer">Move to <strong>gp3</strong> and provision IOPS independently of capacity — shrink the volume to what the data actually needs and set 3,000 baseline IOPS, which is included. gp3 is also ~20% cheaper per GB.</div></details>
+
+  <details class="check"><summary>300 TB must move to S3. The site has a 500 Mbps link already 60% used.</summary>
+  <div class="answer">Usable ~200 Mbps ≈ 2 TB/day → about 150 days. Use <strong>Snowball Edge</strong> devices (several in parallel). DataSync over that link is not viable.</div></details>
+
+  <details class="check"><summary>An analytics cluster needs a POSIX filesystem with hundreds of GB/s throughput over data already in S3.</summary>
+  <div class="answer"><strong>FSx for Lustre</strong>, linked to the S3 bucket so objects appear as files and results can be written back.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Decide the shape first: one machine → block; many machines → file; over HTTP → object.</li>
+      <li>gp3 is the default EBS type; io2 Block Express for heavy databases; st1/sc1 for sequential HDD and never as a boot volume.</li>
+      <li>EBS is one-AZ, one-instance (bar io2 Multi-Attach). Snapshots are incremental, Regional, and the way you move or DR a volume.</li>
+      <li>Instance store = fastest and ephemeral. Never for persistent data.</li>
+      <li>"Shared access from multiple instances" → EFS; add Windows/SMB → FSx for Windows; add HPC/ML → FSx for Lustre.</li>
+      <li>Migration: DataSync over the wire, Snowball when the wire would take too long, Storage Gateway when on-prem must keep its protocol.</li>
+    </ol>
+  </div>
+
+  <nav class="lec-nav">
+    <a class="prev" href="06-s3.html">← S3, properly</a>
+    <a class="next" href="08-vpc.html">VPC from first principles →</a>
+  </nav>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

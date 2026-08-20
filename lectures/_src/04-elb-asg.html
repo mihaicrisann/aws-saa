@@ -1,0 +1,172 @@
+  <p>A load balancer spreads traffic across healthy targets; an Auto Scaling group keeps the right number of them alive. Together they are what the exam means by "highly available and elastic", and they appear in a large share of resilience questions.</p>
+
+  <h2 data-mark="01">Choosing a load balancer</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>ALB</th><th>NLB</th><th>GWLB</th></tr></thead>
+    <tbody>
+      <tr><td>Layer</td><td>7 (HTTP/HTTPS/gRPC/WebSocket)</td><td>4 (TCP, UDP, TLS)</td><td>3 (IP packets, GENEVE 6081)</td></tr>
+      <tr><td>Routes on</td><td>Path, host, header, query string, source IP, HTTP method</td><td>Protocol + port only</td><td>Nothing — it transparently steers traffic through appliances</td></tr>
+      <tr><td>Performance</td><td>Fast; adds a hop and some latency</td><td><strong>Millions of req/s, ultra-low latency</strong></td><td>Line-rate</td></tr>
+      <tr><td>IP address</td><td>DNS name only, changes</td><td><strong>Static IP per AZ</strong>; supports Elastic IPs</td><td>Endpoint per AZ</td></tr>
+      <tr><td>Targets</td><td>Instances, IPs, Lambda</td><td>Instances, IPs, <strong>ALB</strong></td><td>Third-party firewall / IDS appliances</td></tr>
+      <tr><td>Pick it when</td><td>Any normal web app, microservice routing, containers</td><td>Extreme throughput, non-HTTP protocols, <strong>static IP / whitelisting</strong>, PrivateLink service front</td><td>Insert a virtual firewall (Palo Alto, Fortinet) into the traffic path</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">Three question-cues that decide instantly</span>
+    <p><strong>"Static IP addresses to whitelist in a partner firewall"</strong> → NLB. <strong>"Route <code>/api</code> to one service and <code>/images</code> to another"</strong> → ALB (path-based routing). <strong>"Inspect all traffic with a third-party appliance"</strong> → Gateway Load Balancer.</p>
+  </div>
+
+  <h2 data-mark="02">Things all ELBs do</h2>
+
+  <ul>
+    <li><strong>Cross-zone load balancing</strong> — spreads to targets in <em>every</em> enabled AZ, not just the one that received the connection. Always on and free for ALB; off by default on NLB and chargeable when enabled.</li>
+    <li><strong>Health checks</strong> decide what "healthy" means. Point them at a route that actually tests the app (a <code>/health</code> that touches the DB), not at a static file, or you will happily route to a broken instance.</li>
+    <li><strong>TLS termination</strong> using an <strong>ACM</strong> certificate (free, auto-renewing, for use on ELB/CloudFront/API Gateway). SNI lets one listener serve many certificates.</li>
+    <li><strong>Connection draining / deregistration delay</strong> (default 300 s) lets in-flight requests finish before a target is removed. Lower it if a question complains that scale-in is slow.</li>
+    <li><strong>Access logs</strong> to S3 — off by default; the answer to "we need a record of every request".</li>
+    <li>The load balancer must live in <strong>subnets in ≥2 AZs</strong>, each with at least a /28 and enough free IPs.</li>
+  </ul>
+
+  <div class="note gotcha">
+    <span class="label">Sticky sessions</span>
+    <p>ALB can pin a user to one target with a cookie (<code>AWSALB</code> for duration-based, <code>AWSALBAPP</code> for application-based). It works, but the exam prefers you <strong>remove the need for it</strong> — push session state to <strong>ElastiCache or DynamoDB</strong> so any instance can serve any user. If an option offers "store session state externally", it usually beats "enable stickiness".</p>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">Where did the client's IP go?</span>
+    <p>Behind an ALB the app sees the ALB's IP; the real client is in the <strong><code>X-Forwarded-For</code></strong> header. An NLB in <em>instance</em> target mode preserves the client IP natively. This is the answer whenever logs "show the load balancer's address instead of the user's".</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group col" data-label="ALB (layer 7)">
+        <span class="node user">Client</span>
+        <span class="arrow"></span>
+        <span class="node hl">ALB</span>
+        <span class="arrow">source = ALB IP · X-Forwarded-For = client</span>
+        <span class="node">EC2</span>
+      </div>
+      <div class="group col" data-label="NLB · instance targets (layer 4)">
+        <span class="node user">Client</span>
+        <span class="arrow"></span>
+        <span class="node hl">NLB</span>
+        <span class="arrow">source = client IP</span>
+        <span class="node">EC2</span>
+      </div>
+    </div>
+    <figcaption><strong>Where the client IP lives.</strong> Behind an ALB read <code>X-Forwarded-For</code>; an NLB in instance mode hands the real source IP straight to the target.</figcaption>
+  </figure>
+
+  <h2 data-mark="03">Auto Scaling groups</h2>
+
+  <p>An ASG is defined by a <strong>launch template</strong> (what to launch), a set of <strong>subnets</strong> (where — use one per AZ, ≥2), and <strong>min / desired / max</strong>. It replaces unhealthy instances automatically, which is half of what "self-healing" means on the exam.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Scaling policy</th><th>How it works</th><th>Use when</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Target tracking</strong></td><td>"Keep average CPU at 60%" — AWS manages the thresholds</td><td>The default and usually correct answer. Simplest to operate.</td></tr>
+      <tr><td><strong>Step scaling</strong></td><td>CloudWatch alarm → add N instances, bigger breach → add more</td><td>You need different responses to different severities</td></tr>
+      <tr><td><strong>Simple scaling</strong></td><td>One alarm, one adjustment, then a cooldown</td><td>Legacy; rarely the best answer</td></tr>
+      <tr><td><strong>Scheduled</strong></td><td>Scale at a fixed time</td><td><strong>Known, recurring</strong> load — "traffic triples every weekday at 09:00"</td></tr>
+      <tr><td><strong>Predictive</strong></td><td>ML forecasts load and pre-provisions</td><td>Recurring but not perfectly regular patterns; warms capacity <em>before</em> the spike</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Useful metric targets: <code>ASGAverageCPUUtilization</code>, <code>ALBRequestCountPerTarget</code> (better for request-bound apps than CPU), or a custom metric such as SQS <code>ApproximateNumberOfMessagesVisible</code> per instance — the standard answer for scaling workers off a queue.</p>
+
+  <div class="note exam">
+    <span class="label">"Scaling reacts too slowly"</span>
+    <p>Ranked fixes: (1) shorten boot time with a <strong>golden AMI</strong> or an ASG <strong>warm pool</strong>; (2) switch to <strong>predictive</strong> or <strong>scheduled</strong> scaling if the pattern is known; (3) reduce the cooldown / use target tracking instead of simple scaling; (4) scale on a leading indicator (request count, queue depth) rather than a lagging one (CPU).</p>
+  </div>
+
+  <h2 data-mark="04">Lifecycle hooks and health</h2>
+
+  <ul>
+    <li><strong>Lifecycle hooks</strong> pause an instance in <code>Pending:Wait</code> or <code>Terminating:Wait</code> so you can bootstrap it or drain/copy logs off it before it disappears.</li>
+    <li>Set the ASG's health check type to <strong>ELB</strong> (not just EC2) so an instance that boots but serves 500s gets replaced. EC2 health checks only see the hypervisor.</li>
+    <li><strong>Termination policy</strong> default: balance across AZs first, then oldest launch template, then closest to the next billing hour.</li>
+    <li><strong>Instance refresh</strong> rolls the fleet onto a new launch template version with a minimum healthy percentage — the answer to "deploy a new AMI with no downtime".</li>
+    <li>Suspend the <code>ReplaceUnhealthy</code> or <code>Terminate</code> processes when you need to debug an instance without the ASG killing it.</li>
+  </ul>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group bad col" data-label="Health check type: EC2">
+        <span class="node">Hypervisor says OK</span>
+        <span class="arrow"></span>
+        <span class="node bad">Instance serves HTTP 500<small>stays in service</small></span>
+      </div>
+      <div class="group good col" data-label="Health check type: ELB">
+        <span class="node">Target group /health fails</span>
+        <span class="arrow"></span>
+        <span class="node good">ASG replaces the instance<small>self-healing</small></span>
+      </div>
+    </div>
+    <figcaption><strong>EC2 checks see the hypervisor, ELB checks see the app.</strong> Set the ASG health check type to ELB or broken-but-running instances keep receiving traffic.</figcaption>
+  </figure>
+
+  <h2 data-mark="05">The whole picture</h2>
+
+<pre><code>  Route 53 → ALB (public subnets, AZ-a + AZ-b)
+                │  health check /healthz, TLS from ACM
+                ▼
+          Target group  ← registered by the ASG
+                │
+     ┌──────────┴──────────┐
+  EC2 AZ-a              EC2 AZ-b        min 2 / desired 4 / max 12
+     │                     │            target tracking @ 60% CPU
+     └────── session state ┴──► ElastiCache or DynamoDB
+</code></pre>
+
+  <p>Note the minimum of 2, one per AZ: with <code>min=1</code> an AZ failure means an outage while the replacement boots. "Minimum two, spread over two AZs" is the resilient answer.</p>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Users</span>
+      <span class="arrow">Route 53</span>
+      <div class="group" data-label="VPC">
+        <div class="group az" data-label="Public subnets AZ-a + AZ-b"><span class="node hl">ALB<small>TLS from ACM · health check /healthz</small></span></div>
+        <span class="arrow">target group</span>
+        <div class="group" data-label="ASG · min 2 / desired 4 / max 12">
+          <div class="group az" data-label="AZ-a"><span class="node">EC2</span><span class="node">EC2</span></div>
+          <div class="group az" data-label="AZ-b"><span class="node">EC2</span><span class="node">EC2</span></div>
+        </div>
+      </div>
+      <span class="arrow dashed">session state</span>
+      <span class="node store">ElastiCache / DynamoDB</span>
+    </div>
+    <figcaption><strong>Minimum two, one per AZ.</strong> The ALB fans out over the target group the ASG registers; with <code>min=1</code> an AZ loss is an outage until the replacement boots.</figcaption>
+  </figure>
+
+  <h2 data-mark="06">Check yourself</h2>
+
+  <details class="check"><summary>Users are logged out at random after a scale-out event. Best fix?</summary>
+  <div class="answer">Session state is local to each instance. Move it to <strong>ElastiCache (Redis) or DynamoDB</strong> so any instance can serve any request. Enabling ALB stickiness is a workaround that still loses sessions whenever an instance is replaced.</div></details>
+
+  <details class="check"><summary>A partner will only call your service if you give them fixed IP addresses. What do you put in front?</summary>
+  <div class="answer">A <strong>Network Load Balancer</strong> — it gets a static IP per AZ and supports Elastic IPs. If you also need layer-7 routing, put an ALB behind the NLB as a target.</div></details>
+
+  <details class="check"><summary>Traffic reliably triples at 09:00 every weekday, and target tracking is always five minutes late.</summary>
+  <div class="answer"><strong>Scheduled scaling</strong> to raise the desired capacity just before 09:00 (or <strong>predictive scaling</strong>). Combine with a shorter boot time via a golden AMI or warm pool.</div></details>
+
+  <details class="check"><summary>An instance passes EC2 status checks but returns HTTP 500. The ASG leaves it running. Why?</summary>
+  <div class="answer">The ASG health check type is <strong>EC2</strong>, which only sees hypervisor-level health. Set it to <strong>ELB</strong> so the target group's application health check drives replacement.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>ALB = HTTP with content-based routing. NLB = layer 4, extreme scale, <strong>static IPs</strong>. GWLB = insert third-party appliances.</li>
+      <li>ASG + ELB across ≥2 AZs with <code>min ≥ 2</code> is the baseline "highly available" answer.</li>
+      <li>Target tracking is the default scaling policy; scheduled/predictive for known patterns; queue depth for workers.</li>
+      <li>Set ASG health checks to ELB, or broken-but-running instances stay in service.</li>
+      <li>Prefer externalised session state over sticky sessions.</li>
+      <li>Real client IP lives in <code>X-Forwarded-For</code> behind an ALB; an NLB preserves it natively.</li>
+    </ol>
+  </div>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lectures · AWS SAA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_assets/lecture.css">
+<style>
+  .toc-mod { margin: 36px 0 0; }
+  .toc-mod > h2 { margin: 0 0 2px; }
+  .toc-mod > p.blurb { color: var(--muted-fg); margin: 0 0 12px; font-size: 14px; }
+  .toc-list { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .toc-item {
+    display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: baseline;
+    padding: 12px 16px; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--fg);
+  }
+  .toc-item:last-child { border-bottom: 0; }
+  .toc-item:hover { background: var(--muted); }
+  .toc-item .n { font-size: 12px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
+  .toc-item .t { font-weight: 500; font-size: 15px; }
+  .toc-item .s { display: block; font-weight: 400; font-size: 14px; color: var(--muted-fg); margin-top: 2px; }
+  .toc-item .m { font-size: 12px; color: var(--muted-fg); white-space: nowrap; }
+</style>
+</head>
+<body>
+<button class="theme-btn" type="button" aria-label="Toggle theme">☾</button>
+<article class="lecture">
+  <header class="masthead">
+    <div class="crumbs"><span class="num">INDEX</span><span class="dot">/</span><span>SAA-C03 / SAA-C04</span></div>
+    <h1>Lectures</h1>
+    <p class="standfirst">19 lectures, about 322 minutes of reading, ordered so each one only assumes the ones before it.</p>
+  </header>
+  <section class="toc-mod">
+    <h2 data-mark="M0">Ground rules</h2>
+    <p class="blurb">The mental model everything else hangs off.</p>
+    <div class="toc-list">
+      <a class="toc-item" href="01-aws-shape.html">
+        <span class="n">01</span>
+        <span class="t">The shape of AWS<span class="s">Regions, Availability Zones, edge locations, and who is responsible for what. Every later answer is a consequence of this geometry.</span></span>
+        <span class="m">12m</span>
+      </a>
+      <a class="toc-item" href="02-iam.html">
+        <span class="n">02</span>
+        <span class="t">IAM: who may do what<span class="s">Users, roles, policies, and the evaluation logic that decides every API call in AWS. The single most-tested topic on the exam.</span></span>
+        <span class="m">18m</span>
+      </a>
+    </div>
+  </section>
+  <section class="toc-mod">
+    <h2 data-mark="M1">Compute</h2>
+    <p class="blurb">Where your code actually runs, and how it scales.</p>
+    <div class="toc-list">
+      <a class="toc-item" href="03-ec2.html">
+        <span class="n">03</span>
+        <span class="t">EC2 and what it costs<span class="s">Instance families, the five purchasing models, placement groups, and instance metadata. Most cost questions on the exam live here.</span></span>
+        <span class="m">16m</span>
+      </a>
+      <a class="toc-item" href="04-elb-asg.html">
+        <span class="n">04</span>
+        <span class="t">Load balancing and auto scaling<span class="s">ALB vs NLB vs GWLB, target groups, health checks, and the scaling policies that make an architecture 'resilient' in exam language.</span></span>
+        <span class="m">16m</span>
+      </a>
+      <a class="toc-item" href="05-serverless.html">
+        <span class="n">05</span>
+        <span class="t">Serverless and containers<span class="s">Lambda's real limits, ECS vs EKS vs Fargate, API Gateway, and the question the exam is really asking when it says 'no servers to manage'.</span></span>
+        <span class="m">18m</span>
+      </a>
+    </div>
+  </section>
+  <section class="toc-mod">
+    <h2 data-mark="M2">Storage</h2>
+    <p class="blurb">Object, block, file — and picking correctly under pressure.</p>
+    <div class="toc-list">
+      <a class="toc-item" href="06-s3.html">
+        <span class="n">06</span>
+        <span class="t">S3, properly<span class="s">Storage classes, lifecycle, versioning, encryption, access control, and performance. Expect S3 in a fifth of your questions.</span></span>
+        <span class="m">22m</span>
+      </a>
+      <a class="toc-item" href="07-block-and-file.html">
+        <span class="n">07</span>
+        <span class="t">Block and file storage<span class="s">EBS volume types and their IOPS ceilings, instance store, EFS, the FSx family, and how data gets in from on-premises.</span></span>
+        <span class="m">16m</span>
+      </a>
+    </div>
+  </section>
+  <section class="toc-mod">
+    <h2 data-mark="M3">Networking</h2>
+    <p class="blurb">The domain that decides most exam questions.</p>
+    <div class="toc-list">
+      <a class="toc-item" href="08-vpc.html">
+        <span class="n">08</span>
+        <span class="t">VPC from first principles<span class="s">Subnets, route tables, internet and NAT gateways, security groups versus NACLs. Build the mental picture once and networking questions become mechanical.</span></span>
+        <span class="m">20m</span>
+      </a>
+      <a class="toc-item" href="09-vpc-connectivity.html">
+        <span class="n">09</span>
+        <span class="t">Connecting VPCs and data centres<span class="s">Peering, Transit Gateway, Site-to-Site VPN, Direct Connect, VPC endpoints and PrivateLink — and the exact cue that selects each one.</span></span>
+        <span class="m">18m</span>
+      </a>
+      <a class="toc-item" href="10-edge.html">
+        <span class="n">10</span>
+        <span class="t">The edge: DNS, CDN, anycast<span class="s">Route 53 routing policies, CloudFront behaviours and origin protection, and when Global Accelerator beats a CDN.</span></span>
+        <span class="m">16m</span>
+      </a>
+    </div>
+  </section>
+  <section class="toc-mod">
+    <h2 data-mark="M4">Data</h2>
+    <p class="blurb">Relational, NoSQL, cache, analytics.</p>
+    <div class="toc-list">
+      <a class="toc-item" href="11-rds-aurora.html">
+        <span class="n">11</span>
+        <span class="t">Relational: RDS and Aurora<span class="s">Multi-AZ versus read replicas — the distinction the exam tests over and over — plus Aurora's architecture, backups, and failover behaviour.</span></span>
+        <span class="m">18m</span>
+      </a>
+      <a class="toc-item" href="12-dynamodb.html">
+        <span class="n">12</span>
+        <span class="t">DynamoDB<span class="s">Partition keys, capacity modes, GSIs versus LSIs, DAX, Streams and Global Tables. Single-digit millisecond latency at any scale — with rules.</span></span>
+        <span class="m">18m</span>
+      </a>
+      <a class="toc-item" href="13-caching-analytics.html">
+        <span class="n">13</span>
+        <span class="t">Caching and analytics<span class="s">ElastiCache Redis vs Memcached, Redshift, Athena, Glue, Kinesis, EMR, OpenSearch. Mostly a service-recognition exercise — learn the cues.</span></span>
+        <span class="m">18m</span>
+      </a>
+    </div>
+  </section>
+  <section class="toc-mod">
+    <h2 data-mark="M5">Integration &amp; ops</h2>
+    <p class="blurb">Decoupling, observability, and the security toolbox.</p>
+    <div class="toc-list">
+      <a class="toc-item" href="14-decoupling.html">
+        <span class="n">14</span>
+        <span class="t">Decoupling: queues, topics, events<span class="s">SQS, SNS, EventBridge, Step Functions and Amazon MQ. 'Decouple' is exam code for a specific short list of answers.</span></span>
+        <span class="m">16m</span>
+      </a>
+      <a class="toc-item" href="15-observability.html">
+        <span class="n">15</span>
+        <span class="t">Observability and governance<span class="s">CloudWatch vs CloudTrail vs Config — three services people confuse — plus X-Ray, Systems Manager, Organizations and Control Tower.</span></span>
+        <span class="m">16m</span>
+      </a>
+      <a class="toc-item" href="16-security-toolbox.html">
+        <span class="n">16</span>
+        <span class="t">The security toolbox<span class="s">KMS and envelope encryption, Secrets Manager vs Parameter Store, ACM, WAF, Shield, GuardDuty, Inspector, Macie, and Cognito.</span></span>
+        <span class="m">20m</span>
+      </a>
+    </div>
+  </section>
+  <section class="toc-mod">
+    <h2 data-mark="M6">Architecting</h2>
+    <p class="blurb">Putting it together the way the exam grades it.</p>
+    <div class="toc-list">
+      <a class="toc-item" href="17-resilience-dr.html">
+        <span class="n">17</span>
+        <span class="t">Resilience and disaster recovery<span class="s">RTO and RPO, the four DR strategies and their cost order, and how to read a resilience question in ten seconds.</span></span>
+        <span class="m">14m</span>
+      </a>
+      <a class="toc-item" href="18-cost.html">
+        <span class="n">18</span>
+        <span class="t">Designing for cost<span class="s">Where the money actually goes, the levers per service, and the cost-management tools the exam names by title.</span></span>
+        <span class="m">14m</span>
+      </a>
+      <a class="toc-item" href="19-exam-playbook.html">
+        <span class="n">19</span>
+        <span class="t">The exam playbook<span class="s">How the questions are built, the keyword-to-service map, elimination tactics, timing, and what to do in the last ten minutes.</span></span>
+        <span class="m">16m</span>
+      </a>
+    </div>
+  </section>
+</article>
+<script src="_assets/lecture.js"></script>
+</body>
+</html>

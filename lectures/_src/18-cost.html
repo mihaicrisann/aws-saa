@@ -1,0 +1,169 @@
+  <p>The cost domain is 20% of the exam and the easiest to score on, because cheap answers follow patterns. This lecture is the pattern list: where money goes, the lever per service, and the tools the exam names.</p>
+
+  <h2 data-mark="01">Where the money actually goes</h2>
+
+  <ol>
+    <li><strong>Compute hours</strong> — usually the largest line. Reduced by right-sizing, commitments, Spot, and scaling to zero.</li>
+    <li><strong>Data transfer out</strong> — the sneaky one. Inbound is free; <strong>outbound to the internet costs</strong>; <strong>cross-AZ traffic costs in both directions</strong>; cross-Region costs; traffic within an AZ using private IPs is free.</li>
+    <li><strong>Storage</strong> — driven by class and by everything you forgot: old snapshots, unattached EBS volumes, noncurrent S3 versions, incomplete multipart uploads, unassociated Elastic IPs, and now <em>all</em> public IPv4 addresses.</li>
+    <li><strong>Managed service premiums</strong> — NAT Gateway hours + per-GB processing, interface endpoint hours, provisioned IOPS, provisioned concurrency.</li>
+  </ol>
+
+  <div class="note exam">
+    <span class="label">Data transfer, in one line each</span>
+    <p>In → free. Out to internet → expensive. Between AZs → charged both directions. Within an AZ over private IPs → free. Through CloudFront → cheaper than direct egress. Through a <strong>gateway endpoint</strong> to S3/DynamoDB → free and bypasses NAT. Over <strong>Direct Connect</strong> → much cheaper per GB than internet egress.</p>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <div class="group" data-label="Region">
+        <div class="group az" data-label="AZ 1">
+          <span class="node">EC2</span>
+          <span class="arrow good">free</span>
+          <span class="node">EC2<small>private IP</small></span>
+        </div>
+        <span class="arrow bad both">charged both ways</span>
+        <div class="group az" data-label="AZ 2">
+          <span class="node">EC2</span>
+        </div>
+      </div>
+      <span class="arrow bad">out to internet</span>
+      <span class="node user">Internet</span>
+    </div>
+    <div class="flow">
+      <span class="node">EC2</span>
+      <span class="arrow x">via NAT (hourly + per GB)</span>
+      <span class="node dim">NAT Gateway</span>
+      <span class="node">EC2</span>
+      <span class="arrow good">gateway endpoint · free</span>
+      <span class="node store hl">S3 / DynamoDB</span>
+    </div>
+    <figcaption><strong>Data transfer costs.</strong> Inbound and intra-AZ private traffic are free; cross-AZ is charged in both directions; internet egress is the expensive line. S3/DynamoDB traffic belongs on a gateway endpoint, not through NAT.</figcaption>
+  </figure>
+
+  <h2 data-mark="02">The lever per service</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>Cheapest correct move</th></tr></thead>
+    <tbody>
+      <tr><td><strong>EC2</strong></td><td>Right-size first (Compute Optimizer), then <strong>Graviton</strong>, then commit with a <strong>Compute Savings Plan</strong>, then <strong>Spot</strong> for anything interruptible. Stop non-production instances out of hours with an EventBridge schedule.</td></tr>
+      <tr><td><strong>Auto Scaling</strong></td><td>Scale in aggressively; use a mixed-instances policy with Spot; scale to a minimum that matches real off-peak demand.</td></tr>
+      <tr><td><strong>Lambda</strong></td><td>Tune memory — more memory means more CPU and can cut total cost by finishing faster. Remove unused provisioned concurrency. Use ARM/Graviton.</td></tr>
+      <tr><td><strong>S3</strong></td><td>Lifecycle to IA / Glacier / Deep Archive; <strong>Intelligent-Tiering</strong> when patterns are unknown; expire noncurrent versions; abort incomplete multipart uploads; use <strong>Storage Lens</strong> and Storage Class Analysis to find the fat.</td></tr>
+      <tr><td><strong>EBS</strong></td><td>gp2 → <strong>gp3</strong> (~20% cheaper, IOPS independent of size). Delete unattached volumes and stale snapshots; automate retention with Data Lifecycle Manager.</td></tr>
+      <tr><td><strong>RDS / Aurora</strong></td><td>Reserved Instances for steady databases; <strong>Aurora Serverless v2</strong> for spiky or dev workloads; stop non-prod instances; right-size before committing.</td></tr>
+      <tr><td><strong>DynamoDB</strong></td><td>Provisioned + auto scaling for predictable traffic (much cheaper than on-demand); TTL to delete expired items free; avoid Scans.</td></tr>
+      <tr><td><strong>Networking</strong></td><td>Gateway endpoints instead of NAT for S3/DynamoDB; keep chatty traffic within an AZ; CloudFront in front of S3/ALB; release unused Elastic IPs.</td></tr>
+      <tr><td><strong>Analytics</strong></td><td>Athena over Parquet, compressed and partitioned — often a 90%+ reduction in scanned bytes. Redshift RIs or Serverless. EMR task nodes on Spot.</td></tr>
+      <tr><td><strong>Logs</strong></td><td>Set CloudWatch Logs retention (the default is forever) and archive to S3.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 data-mark="03">Commitment models, one more time</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Covers</th><th>Flexibility</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Compute Savings Plan</strong></td><td>EC2 (any family, size, Region, OS), <strong>Fargate, Lambda</strong></td><td>Highest — the usual right answer</td></tr>
+      <tr><td><strong>EC2 Instance Savings Plan</strong></td><td>One family in one Region</td><td>Lower, slightly bigger discount</td></tr>
+      <tr><td><strong>Standard RI</strong></td><td>Specific instance config</td><td>Lowest; sellable on the Marketplace; zonal RIs also reserve capacity</td></tr>
+      <tr><td><strong>Convertible RI</strong></td><td>Specific config, exchangeable</td><td>Middle</td></tr>
+      <tr><td><strong>Spot</strong></td><td>Interruptible workloads</td><td>No commitment, up to 90% off</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="stack">
+      <span class="node">Right-size<small>Compute Optimizer · Graviton</small></span>
+      <span class="arrow">then</span>
+      <span class="node">Interruptible?</span>
+    </div>
+    <div class="cols">
+      <div class="group good col" data-label="Yes">
+        <span class="node good">Spot<small>up to 90% off, no commitment</small></span>
+      </div>
+      <div class="group col" data-label="No — steady 1–3 yr baseline">
+        <div class="stack">
+          <span class="node hl">Compute Savings Plan<small>EC2 any family/Region + Fargate + Lambda</small></span>
+          <span class="arrow dashed">more locked in</span>
+          <span class="node">EC2 Instance SP<small>one family, one Region</small></span>
+          <span class="arrow dashed"></span>
+          <span class="node">Standard RI<small>fixed config · Marketplace · zonal = capacity</small></span>
+        </div>
+      </div>
+      <div class="group col" data-label="No — variable / bursty">
+        <span class="node">On-Demand<small>schedule non-prod off</small></span>
+      </div>
+    </div>
+    <figcaption><strong>Compute purchasing decision.</strong> Right-size first, Spot for anything interruptible, and for a steady baseline the Compute Savings Plan is the default answer — RIs only when the exact config is fixed or capacity must be reserved.</figcaption>
+  </figure>
+
+  <p>In an Organization, <strong>consolidated billing</strong> pools usage so volume discounts apply across accounts, and unused RI/Savings Plan capacity is shared automatically — itself a valid cost answer.</p>
+
+  <h2 data-mark="04">The cost tools, by the question they answer</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tool</th><th>Answers</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Cost Explorer</strong></td><td>"Where did the money go, and what will it be next month?" Visualise and forecast; also recommends RIs and Savings Plans.</td></tr>
+      <tr><td><strong>AWS Budgets</strong></td><td>"<strong>Alert me</strong> when spend or usage crosses a threshold, or when the forecast will." Can trigger actions such as applying a restrictive IAM policy.</td></tr>
+      <tr><td><strong>Cost and Usage Report (CUR)</strong></td><td>"Give me every line item for analysis" — delivered to S3, queried with Athena/QuickSight.</td></tr>
+      <tr><td><strong>Cost Allocation Tags</strong></td><td>"Which team/project/environment spent this?" Activate them in the billing console; tag everything.</td></tr>
+      <tr><td><strong>Compute Optimizer</strong></td><td>"Are these instances/volumes/functions the right size?" — machine-learning right-sizing recommendations.</td></tr>
+      <tr><td><strong>Trusted Advisor</strong></td><td>"Find idle resources, low utilisation, unassociated EIPs" — cost checks alongside security and fault-tolerance ones.</td></tr>
+      <tr><td><strong>Cost Anomaly Detection</strong></td><td>"Tell me when spend behaves unusually" — ML-based, alerts on anomalies.</td></tr>
+      <tr><td><strong>Pricing Calculator</strong></td><td>"Estimate this architecture before we build it."</td></tr>
+      <tr><td><strong>Billing Conductor</strong></td><td>Custom chargeback rates for internal billing.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">Budgets vs Cost Explorer</span>
+    <p>They're often both offered. <strong>Cost Explorer analyses</strong> what happened; <strong>Budgets alerts</strong> on thresholds. If the requirement contains the word "notify", "alert" or "threshold", the answer is <strong>AWS Budgets</strong>.</p>
+  </div>
+
+  <h2 data-mark="05">Cost patterns the exam loves</h2>
+
+  <div class="decisions">
+    <span class="label">Scenario → answer</span>
+    <div class="decision"><span class="cue">Dev/test instances idle overnight and at weekends</span><span class="arrow">→</span><span class="ans">Stop them on an EventBridge schedule (Instance Scheduler)</span></div>
+    <div class="decision"><span class="cue">Archive that must be kept 7 years, retrieval in hours is fine</span><span class="arrow">→</span><span class="ans">S3 Glacier Deep Archive via a lifecycle rule</span></div>
+    <div class="decision"><span class="cue">Fault-tolerant batch processing</span><span class="arrow">→</span><span class="ans">Spot, via EC2 Fleet or AWS Batch</span></div>
+    <div class="decision"><span class="cue">Big NAT Gateway data-processing charges to S3</span><span class="arrow">→</span><span class="ans">Free S3 gateway endpoint</span></div>
+    <div class="decision"><span class="cue">Steady 24/7 baseline for the next 3 years</span><span class="arrow">→</span><span class="ans">Compute Savings Plan (or RIs if the type is fixed)</span></div>
+    <div class="decision"><span class="cue">Unknown S3 access patterns</span><span class="arrow">→</span><span class="ans">Intelligent-Tiering</span></div>
+    <div class="decision"><span class="cue">Serving lots of static content from S3/EC2</span><span class="arrow">→</span><span class="ans">CloudFront — cheaper egress plus origin offload</span></div>
+    <div class="decision"><span class="cue">Which team is spending what?</span><span class="arrow">→</span><span class="ans">Cost allocation tags + Cost Explorer</span></div>
+  </div>
+
+  <h2 data-mark="06">Check yourself</h2>
+
+  <details class="check"><summary>A company runs 200 gp2 volumes sized purely for IOPS. Cut cost with no performance loss.</summary>
+  <div class="answer">Migrate to <strong>gp3</strong> and provision IOPS separately from capacity, shrinking the volumes to their actual data needs. gp3 is also about 20% cheaper per GB, and includes 3,000 IOPS baseline free.</div></details>
+
+  <details class="check"><summary>The bill spikes and nobody notices for three weeks.</summary>
+  <div class="answer"><strong>AWS Budgets</strong> with actual and forecasted alerts to SNS, plus <strong>Cost Anomaly Detection</strong>. Use Cost Explorer afterwards to work out what drove it.</div></details>
+
+  <details class="check"><summary>An Athena query over a year of JSON logs costs far too much per run.</summary>
+  <div class="answer">Athena charges per TB scanned. Convert to <strong>Parquet</strong> (columnar), <strong>compress</strong>, and <strong>partition by date</strong> so queries scan only the relevant partitions and columns. Typically a 90%+ cost reduction.</div></details>
+
+  <details class="check"><summary>An application makes constant cross-AZ calls between its tiers. Where's the waste?</summary>
+  <div class="answer"><strong>Cross-AZ data transfer is charged in both directions.</strong> Keep chatty tiers zone-local where resilience allows (or accept it as the price of multi-AZ), and use gateway endpoints and caching to cut the volume.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Right-size before you commit; commit with a Compute Savings Plan; use Spot for anything interruptible.</li>
+      <li>Data transfer out and cross-AZ traffic are the hidden costs; gateway endpoints and CloudFront are the standard fixes.</li>
+      <li>S3 lifecycle + Intelligent-Tiering + expiring old versions covers most storage savings.</li>
+      <li>gp2 → gp3, always. Delete unattached volumes, stale snapshots and idle Elastic IPs.</li>
+      <li>"Alert on spend" → Budgets. "Analyse spend" → Cost Explorer. "Right-size" → Compute Optimizer. "Attribute spend" → cost allocation tags.</li>
+      <li>Non-production should not run at 3 a.m. Schedule it off.</li>
+    </ol>
+  </div>
