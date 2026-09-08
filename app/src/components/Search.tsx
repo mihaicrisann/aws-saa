@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import cheatJson from '@content/cheatsheet.json'
-import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import {
+  Command,
+  CommandDialog,
+  CommandDialogPopup,
+  CommandEmpty,
+  CommandGroup,
+  CommandGroupLabel,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandPanel,
+} from '@/components/ui/command'
 import { lectureNo } from '@/lib/content'
 
 interface Entry { lecture: string; n: number; lectureTitle: string; id: string; title: string; text: string }
@@ -66,37 +77,43 @@ export default function Search({ open, onOpenChange }: { open: boolean; onOpenCh
   }
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="Search" description="Search lectures and the cheat sheet">
-      <Command shouldFilter={false}>
-      <CommandInput placeholder="Search lectures and cheat sheet — object lock, transit gateway, ExternalId…" value={q} onValueChange={setQ} />
-      <CommandList>
-        {terms.length > 0 && !results.sections.length && !results.cheats.length && <CommandEmpty>Nothing found.</CommandEmpty>}
-        {results.sections.length > 0 && (
-          <CommandGroup heading="Lectures">
-            {results.sections.map((e) => (
-              <CommandItem key={`${e.lecture}#${e.id}`} value={`${e.lecture}#${e.id}`} onSelect={() => go(`/learn/${e.lecture}#${e.id}`)} className="flex-col items-start gap-0.5">
-                <span className="text-sm">
-                  <span className="mr-2 text-muted-foreground tabular-nums">{lectureNo(e.lecture)}</span>
-                  {e.title}
-                  <span className="ml-2 text-xs text-muted-foreground">{e.lectureTitle}</span>
-                </span>
-                <span className="line-clamp-1 text-xs text-muted-foreground">{snippet(e.text, terms[0])}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-        {results.cheats.length > 0 && (
-          <CommandGroup heading="Cheat sheet">
-            {results.cheats.map((r, i) => (
-              <CommandItem key={i} value={`cheat-${i}`} onSelect={() => go('/cheatsheet')} className="flex-col items-start gap-0.5">
-                <span className="line-clamp-2 text-sm">{r.text}</span>
-                <span className="text-xs text-muted-foreground">{r.section}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-      </CommandList>
-      </Command>
+    <CommandDialog open={open} onOpenChange={onOpenChange}>
+      <CommandDialogPopup aria-label="Search lectures and the cheat sheet">
+        <Command mode="none" value={q} onValueChange={setQ}>
+          <CommandInput placeholder="Search lectures and cheat sheet — object lock, transit gateway, ExternalId…" />
+          <CommandPanel>
+            <CommandList>
+              {terms.length > 0 && !results.sections.length && !results.cheats.length && <CommandEmpty>Nothing found.</CommandEmpty>}
+              {results.sections.length > 0 && (
+                <CommandGroup>
+                  <CommandGroupLabel>Lectures</CommandGroupLabel>
+                  {results.sections.map((e) => (
+                    <CommandItem key={`${e.lecture}#${e.id}`} value={`${e.lecture}#${e.id}`} onClick={() => go(`/learn/${e.lecture}#${e.id}`)} className="flex-col items-start gap-0.5 py-2">
+                      <span className="text-sm">
+                        <span className="mr-2 text-muted-foreground tabular-nums">{lectureNo(e.lecture)}</span>
+                        {e.title}
+                        <span className="ml-2 text-xs text-muted-foreground">{e.lectureTitle}</span>
+                      </span>
+                      <span className="line-clamp-1 text-xs text-muted-foreground">{snippet(e.text, terms[0])}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+              {results.cheats.length > 0 && (
+                <CommandGroup>
+                  <CommandGroupLabel>Cheat sheet</CommandGroupLabel>
+                  {results.cheats.map((r, i) => (
+                    <CommandItem key={i} value={`cheat-${i}`} onClick={() => go('/cheatsheet')} className="flex-col items-start gap-0.5 py-2">
+                      <span className="line-clamp-2 text-sm">{r.text}</span>
+                      <span className="text-xs text-muted-foreground">{r.section}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </CommandPanel>
+        </Command>
+      </CommandDialogPopup>
     </CommandDialog>
   )
 }

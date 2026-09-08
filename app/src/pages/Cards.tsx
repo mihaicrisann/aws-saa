@@ -5,11 +5,10 @@ import { useStore, setCard } from '@/lib/store'
 import { freshCard, isDue, schedule, describeInterval, type Grade } from '@/lib/srs'
 import { useHotkeys } from '@/lib/hotkeys'
 import { Field, DomainPicker, LecturePicker } from '@/components/Filters'
-import { PageHeader, DomainBadge, Nothing, Meter, QuietLink } from '@/components/parts'
+import { PageHeader, DomainBadge, Nothing, Meter, QuietLink, Choice } from '@/components/parts'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Frame, FramePanel } from '@/components/ui/frame'
 import { Kbd } from '@/components/ui/kbd'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 
 const GRADES: { g: Grade; label: string; key: string }[] = [
@@ -86,22 +85,26 @@ export default function Cards() {
     return (
       <div className="mx-auto max-w-2xl">
         <PageHeader title="Cards" description={`Recall, then rate yourself honestly — the rating decides when the card comes back. ${dueTotal} of ${flashcards.length} due.`} />
-        <Card>
-          <CardContent className="grid gap-5">
+        <Frame>
+          <FramePanel className="grid gap-5">
             <Field label="Domain"><DomainPicker value={domain} onChange={(v) => { setDomain(v); syncParams(v, lecture) }} /></Field>
             <Field label="Lecture"><LecturePicker value={lecture} onChange={(v) => { setLecture(v); syncParams(domain, v) }} /></Field>
             <Field label="Scope">
-              <ToggleGroup type="single" variant="outline" size="sm" value={dueOnly ? 'due' : 'all'} onValueChange={(v) => v && setDueOnly(v === 'due')}>
-                <ToggleGroupItem value="due">Due now</ToggleGroupItem>
-                <ToggleGroupItem value="all">Everything</ToggleGroupItem>
-              </ToggleGroup>
+              <Choice
+                value={dueOnly ? 'due' : 'all'}
+                onChange={(v) => v && setDueOnly(v === 'due')}
+                options={[
+                  { value: 'due', label: 'Due now' },
+                  { value: 'all', label: 'Everything' },
+                ]}
+              />
             </Field>
-          </CardContent>
-          <CardFooter className="justify-between border-t">
+          </FramePanel>
+          <FramePanel className="flex items-center justify-between px-5 py-3">
             <span className="text-sm text-muted-foreground">{pool.length} cards</span>
             <Button disabled={!pool.length} onClick={start}>Start</Button>
-          </CardFooter>
-        </Card>
+          </FramePanel>
+        </Frame>
         {!pool.length && (
           <div className="mt-4">
             <Nothing title="Nothing due here">Come back tomorrow, or switch to "Everything" to work ahead.</Nothing>
@@ -117,7 +120,7 @@ export default function Cards() {
         <PageHeader title={`${done} card${done === 1 ? '' : 's'} reviewed`} description="Cards rated Good or Easy come back in days, not minutes, so the deck shrinks as things stick." />
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setQueue(null)}>Pick another slice</Button>
-          <Button asChild><Link to="/drill">Drill questions</Link></Button>
+          <Button render={<Link to="/drill" />}>Drill questions</Button>
         </div>
       </div>
     )
@@ -133,27 +136,28 @@ export default function Cards() {
         <span className="text-muted-foreground tabular-nums">{queue.length} left</span>
       </div>
 
-      <div style={{ perspective: 1400 }}>
+      <Frame style={{ perspective: 1400 }}>
         <div
           className="relative transition-transform duration-500 ease-[cubic-bezier(.22,.61,.36,1)] motion-reduce:transition-none"
           style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateX(180deg)' : 'none' }}
         >
-          <button
-            type="button"
-            onClick={() => setFlipped(true)}
-            className="flex min-h-64 w-full flex-col justify-center rounded-2xl border bg-card px-8 py-8 text-left"
-            style={{ backfaceVisibility: 'hidden' }}
-          >
-            <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
-              <DomainBadge id={current.domain} />
-              <span>Lecture {lectureNo(current.lecture)}</span>
-              {state.reps > 0 && <span>· seen {state.reps}×</span>}
-            </div>
-            <div className="text-xl leading-snug font-medium">{current.front}</div>
-          </button>
+          <FramePanel className="p-0" style={{ backfaceVisibility: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setFlipped(true)}
+              className="flex min-h-64 w-full flex-col justify-center px-8 py-8 text-left"
+            >
+              <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
+                <DomainBadge id={current.domain} />
+                <span>Lecture {lectureNo(current.lecture)}</span>
+                {state.reps > 0 && <span>· seen {state.reps}×</span>}
+              </div>
+              <div className="text-xl leading-snug font-medium">{current.front}</div>
+            </button>
+          </FramePanel>
 
-          <div
-            className="absolute inset-0 flex flex-col justify-center overflow-y-auto rounded-2xl border bg-card px-8 py-8"
+          <FramePanel
+            className="absolute inset-0 flex flex-col justify-center overflow-y-auto px-8 py-8"
             style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}
             aria-hidden={!flipped}
           >
@@ -164,9 +168,9 @@ export default function Cards() {
                 <span className="font-medium text-foreground">Exam note. </span>{current.note}
               </div>
             )}
-          </div>
+          </FramePanel>
         </div>
-      </div>
+      </Frame>
 
       <div className="mt-4">
         {flipped ? (

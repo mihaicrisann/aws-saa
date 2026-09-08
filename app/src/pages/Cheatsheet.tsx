@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
 import cheatJson from '@content/cheatsheet.json'
-import { PageHeader } from '@/components/parts'
+import { PageHeader, Rows, Choice } from '@/components/parts'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
 type Section = { id: string; title: string; blurb: string; kind: 'pairs' | 'triples' | 'list'; rows: (string | string[])[] }
@@ -29,17 +28,17 @@ export default function Cheatsheet() {
       <PageHeader
         title="Cheat sheet"
         description="Cue words, the pairs people confuse, hard numbers, and the answer shapes that are automatically wrong."
-        actions={<Button asChild variant="outline" size="sm"><a href="/lectures/19-exam-playbook.html" target="_blank" rel="noreferrer">Exam playbook</a></Button>}
+        actions={<Button render={<a href="/lectures/19-exam-playbook.html" target="_blank" rel="noreferrer" />} variant="outline" size="sm">Exam playbook</Button>}
       />
 
       <div className="sticky top-14 z-30 -mx-5 mb-6 flex flex-wrap items-center gap-2 bg-background/95 px-5 py-2 backdrop-blur md:top-0 md:-mx-10 md:px-10">
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search — static ip, multi-az, glacier, least overhead…" className="min-w-60 flex-1" />
-        <Tabs value={active} onValueChange={setActive} className="max-w-full">
-          <TabsList className="h-auto max-w-full flex-wrap">
-            <TabsTrigger value="all">All</TabsTrigger>
-            {cheat.sections.map((s) => <TabsTrigger key={s.id} value={s.id}>{s.title}</TabsTrigger>)}
-          </TabsList>
-        </Tabs>
+        <Choice
+          className="flex-wrap"
+          value={active}
+          onChange={(v) => v && setActive(v)}
+          options={[{ value: 'all', label: 'All' }, ...cheat.sections.map((s) => ({ value: s.id, label: s.title }))]}
+        />
       </div>
 
       {sections.length === 0 && <p className="py-16 text-center text-sm text-muted-foreground">Nothing matches "{query}".</p>}
@@ -49,12 +48,12 @@ export default function Cheatsheet() {
           <section key={s.id}>
             <h2 className="text-sm font-medium">{s.title}</h2>
             <p className="mt-0.5 mb-3 max-w-xl text-sm text-muted-foreground">{s.blurb}</p>
-            <div className="overflow-hidden rounded-2xl border">
+            <Rows>
               {s.rows.map((r, i) => (
                 <div
                   key={i}
                   className={cn(
-                    'grid gap-x-4 gap-y-1 border-b px-4 py-2.5 text-sm last:border-b-0',
+                    'grid gap-x-4 gap-y-1 px-4 py-2.5 text-sm',
                     s.kind === 'triples' ? 'sm:grid-cols-[1fr_1fr_1.6fr]' : s.kind === 'pairs' ? 'sm:grid-cols-2' : '',
                   )}
                 >
@@ -74,7 +73,7 @@ export default function Cheatsheet() {
                   )}
                 </div>
               ))}
-            </div>
+            </Rows>
           </section>
         ))}
       </div>

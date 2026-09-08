@@ -7,13 +7,13 @@ import { ConfidencePicker, useTicker, fmtSeconds } from '@/components/Confidence
 import { useHotkeys } from '@/lib/hotkeys'
 import QuestionView from '@/components/QuestionView'
 import { Field, DomainPicker, LecturePicker, toggleChoice } from '@/components/Filters'
-import { PageHeader, Nothing, Meter } from '@/components/parts'
+import { PageHeader, Nothing, Meter, Rows, Choice } from '@/components/parts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Frame, FramePanel } from '@/components/ui/frame'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Kbd } from '@/components/ui/kbd'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export default function Drill() {
   const [params, setParams] = useSearchParams()
@@ -101,8 +101,8 @@ export default function Drill() {
     return (
       <div className="mx-auto max-w-2xl">
         <PageHeader title="Drill" description="Short sets with the reasoning right after each answer. Attack one domain or one lecture at a time." />
-        <Card>
-          <CardContent className="grid gap-5">
+        <Frame>
+          <FramePanel className="grid gap-5">
             <Field label="Domain">
               <DomainPicker value={domain} onChange={(v) => { setDomain(v); syncParams(v, lecture) }} />
             </Field>
@@ -110,9 +110,11 @@ export default function Drill() {
               <LecturePicker value={lecture} onChange={(v) => { setLecture(v); syncParams(domain, v) }} />
             </Field>
             <Field label="Length">
-              <ToggleGroup type="single" variant="outline" size="sm" value={String(count)} onValueChange={(v) => v && setCount(Number(v))}>
-                {[5, 10, 20, 40].map((c) => <ToggleGroupItem key={c} value={String(c)}>{c}</ToggleGroupItem>)}
-              </ToggleGroup>
+              <Choice
+                value={String(count)}
+                onChange={(v) => v && setCount(Number(v))}
+                options={[5, 10, 20, 40].map((c) => ({ value: String(c), label: c }))}
+              />
             </Field>
             <Field label="Scope">
               <Label className="flex items-center gap-2 text-sm font-normal">
@@ -120,12 +122,12 @@ export default function Drill() {
                 Only questions I haven't seen
               </Label>
             </Field>
-          </CardContent>
-          <CardFooter className="justify-between border-t">
+          </FramePanel>
+          <FramePanel className="flex items-center justify-between px-5 py-3">
             <span className="text-sm text-muted-foreground">{pool.length} match</span>
             <Button disabled={!pool.length} onClick={start}>Start</Button>
-          </CardFooter>
-        </Card>
+          </FramePanel>
+        </Frame>
         {!pool.length && (
           <div className="mt-4">
             <Nothing title="Nothing matches">Loosen the filters, or untick "only unseen".</Nothing>
@@ -150,20 +152,20 @@ export default function Drill() {
         <div className="flex gap-2">
           <Button onClick={start}>Another {count}</Button>
           <Button variant="outline" onClick={() => setSet(null)}>Change filters</Button>
-          <Button asChild variant="ghost"><Link to="/mistakes">Mistake log</Link></Button>
+          <Button render={<Link to="/mistakes" />} variant="ghost">Mistake log</Button>
         </div>
         {missed.length > 0 && (
           <div className="mt-8">
             <h2 className="mb-2 text-sm font-medium">Missed</h2>
-            <div className="overflow-hidden rounded-2xl border">
+            <Rows>
               {missed.map(({ q, confidence: c }) => (
-                <Link key={q.id} to={questionHref(q)} className="flex items-start gap-3 border-b px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted/50">
+                <Link key={q.id} to={questionHref(q)} className="flex items-start gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50">
                   <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{lectureNo(q.lecture)}</span>
                   <span className="line-clamp-2 text-muted-foreground">{q.stem}</span>
                   {c === 'sure' && <span className="ml-auto shrink-0 text-xs text-bad">sure</span>}
                 </Link>
               ))}
-            </div>
+            </Rows>
           </div>
         )}
       </div>
@@ -193,7 +195,7 @@ export default function Drill() {
             {revealed ? <><Kbd>Enter</Kbd> next</> : <><Kbd>1</Kbd>–<Kbd>{current!.options.length}</Kbd> pick · <Kbd>Enter</Kbd> check</>}
           </span>
           {revealed ? (
-            <Button onClick={advance}>{i + 1 === set.length ? 'Results' : 'Next'} <ArrowRight data-icon="inline-end" /></Button>
+            <Button onClick={advance}>{i + 1 === set.length ? 'Results' : 'Next'} <ArrowRight /></Button>
           ) : (
             <Button disabled={!chosen.length} onClick={check}>Check</Button>
           )}

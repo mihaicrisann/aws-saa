@@ -4,11 +4,11 @@ import { domains, lectures, flashcards, questions, exam, scaledScore, lectureNo 
 import { useStore, useMirror, resetProgress, exportStore, importStore, studyStreak, today } from '@/lib/store'
 import { isDue } from '@/lib/srs'
 import Readiness from '@/components/Readiness'
-import { PageHeader, Stat, Meter, Nothing } from '@/components/parts'
+import { PageHeader, Stat, StatRow, Rows, Meter, Nothing } from '@/components/parts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialog, AlertDialogClose, AlertDialogPopup, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 
@@ -95,12 +95,12 @@ export default function Progress() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatRow>
         <Stat label="Accuracy" value={total ? `${Math.round(acc * 100)}%` : '—'} hint={total ? `≈ ${scaledScore(acc)} scaled` : 'no data yet'} />
         <Stat label="Answered" value={total} hint={`of ${questions.length}`} />
         <Stat label="Cards due" value={dueCards} hint={`${Object.keys(store.cards).length} started`} />
         <Stat label="Streak" value={studyStreak(store.activity)} hint="days" />
-      </div>
+      </StatRow>
 
       <div className="mt-4 grid gap-4 md:grid-cols-[260px_1fr]">
         <Card>
@@ -188,16 +188,16 @@ export default function Progress() {
         {perLecture.length === 0 ? (
           <Nothing title="Nothing measured yet">Answer some questions in a <Link to="/drill" className="underline underline-offset-4">drill</Link> first.</Nothing>
         ) : (
-          <div className="overflow-hidden rounded-2xl border">
+          <Rows>
             {perLecture.map(({ l, total, correct, acc }) => (
-              <Link key={l.id} to={`/learn/${l.id}`} className="grid grid-cols-[28px_1fr_120px_56px] items-center gap-3 border-b px-4 py-2.5 text-sm transition-colors last:border-b-0 hover:bg-muted/50">
+              <Link key={l.id} to={`/learn/${l.id}`} className="grid grid-cols-[28px_1fr_120px_56px] items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted/50">
                 <span className="text-xs text-muted-foreground tabular-nums">{lectureNo(l.id)}</span>
                 <span className="truncate">{l.title}</span>
                 <Meter value={acc} color={acc >= 0.72 ? 'var(--good)' : acc >= 0.5 ? 'var(--domain-perf)' : 'var(--bad)'} />
                 <span className="text-right text-xs text-muted-foreground tabular-nums">{correct}/{total}</span>
               </Link>
             ))}
-          </div>
+          </Rows>
         )}
       </section>
 
@@ -211,17 +211,17 @@ export default function Progress() {
               : `A copy is ${mirror === 'saving' ? 'being written' : 'kept'} in notes/progress.json while the dev server runs, and restored from there if this browser is empty.`}
         </p>
         <AlertDialog>
-          <AlertDialogTrigger asChild><Button variant="destructive" size="sm">Reset all progress</Button></AlertDialogTrigger>
-          <AlertDialogContent>
+          <AlertDialogTrigger render={<Button variant="destructive" size="sm" />}>Reset all progress</AlertDialogTrigger>
+          <AlertDialogPopup>
             <AlertDialogHeader>
               <AlertDialogTitle>Erase everything?</AlertDialogTitle>
               <AlertDialogDescription>All attempts, card schedules, notes and exam history. Export first if you want a copy.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Keep</AlertDialogCancel>
-              <AlertDialogAction onClick={resetProgress}>Erase</AlertDialogAction>
+              <AlertDialogClose render={<Button variant="outline" />}>Keep</AlertDialogClose>
+              <AlertDialogClose render={<Button variant="destructive" />} onClick={resetProgress}>Erase</AlertDialogClose>
             </AlertDialogFooter>
-          </AlertDialogContent>
+          </AlertDialogPopup>
         </AlertDialog>
       </section>
     </div>

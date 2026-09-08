@@ -79,17 +79,13 @@ export default function LectureReader() {
             Notes{note.trim() ? ' •' : ''}
           </Button>
           {qCount > 0 && (
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/drill?lecture=${id}`}>Drill {qCount}</Link>
-            </Button>
+            <Button render={<Link to={`/drill?lecture=${id}`} />} variant="outline" size="sm">Drill {qCount}</Button>
           )}
           {cCount > 0 && (
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/cards?lecture=${id}`}>Cards {cCount}</Link>
-            </Button>
+            <Button render={<Link to={`/cards?lecture=${id}`} />} variant="outline" size="sm">Cards {cCount}</Button>
           )}
           <Button size="sm" variant={readAt ? 'secondary' : 'default'} onClick={markAndAdvance}>
-            {readAt ? <><Check data-icon="inline-start" /> Read</> : next ? 'Mark read, next' : 'Mark read'}
+            {readAt ? <><Check /> Read</> : next ? 'Mark read, next' : 'Mark read'}
             <Kbd className="ml-1">n</Kbd>
           </Button>
         </div>
@@ -118,18 +114,12 @@ export default function LectureReader() {
 
       <nav className="mt-6 flex items-center justify-between gap-3">
         {prev ? (
-          <Button asChild variant="ghost" className="max-w-[48%]">
-            <Link to={`/learn/${prev.id}`}><ArrowLeft data-icon="inline-start" /> <span className="truncate">{prev.title}</span></Link>
-          </Button>
+          <Button render={<Link to={`/learn/${prev.id}`} />} variant="ghost" className="max-w-[48%]"><ArrowLeft /> <span className="truncate">{prev.title}</span></Button>
         ) : <span />}
         {next ? (
-          <Button asChild variant="ghost" className="max-w-[48%]">
-            <Link to={`/learn/${next.id}`}><span className="truncate">{next.title}</span> <ArrowRight data-icon="inline-end" /></Link>
-          </Button>
+          <Button render={<Link to={`/learn/${next.id}`} />} variant="ghost" className="max-w-[48%]"><span className="truncate">{next.title}</span> <ArrowRight /></Button>
         ) : (
-          <Button asChild>
-            <Link to="/exam">Sit a mock exam <ArrowRight data-icon="inline-end" /></Link>
-          </Button>
+          <Button render={<Link to="/exam" />}>Sit a mock exam <ArrowRight /></Button>
         )}
       </nav>
     </div>

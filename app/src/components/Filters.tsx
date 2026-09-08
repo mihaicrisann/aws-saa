@@ -1,7 +1,6 @@
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { domains, lectures, lectureNo, shortDomain, type DomainId } from '@/lib/content'
-import { DomainDot } from './parts'
+import { Choice, DomainDot } from './parts'
 import type { ReactNode } from 'react'
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -15,28 +14,32 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 
 export function DomainPicker({ value, onChange }: { value: DomainId | 'all'; onChange: (v: DomainId | 'all') => void }) {
   return (
-    <ToggleGroup type="single" variant="outline" size="sm" value={value} onValueChange={(v) => v && onChange(v as DomainId | 'all')}>
-      <ToggleGroupItem value="all">All</ToggleGroupItem>
-      {domains.map((d) => (
-        <ToggleGroupItem key={d.id} value={d.id} className="gap-1.5">
-          <DomainDot id={d.id} /> {shortDomain(d.id)}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <Choice
+      value={value}
+      onChange={(v) => v && onChange(v)}
+      options={[
+        { value: 'all' as const, label: 'All' },
+        ...domains.map((d) => ({ value: d.id, label: <><DomainDot id={d.id} /> {shortDomain(d.id)}</> })),
+      ]}
+    />
   )
 }
 
+const LECTURE_ITEMS = [
+  { value: 'all', label: 'Any lecture' },
+  ...lectures.map((l) => ({ value: l.id, label: `${lectureNo(l.id)} · ${l.title}` })),
+]
+
 export function LecturePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select items={LECTURE_ITEMS} value={value} onValueChange={(v) => onChange(v ?? 'all')}>
       <SelectTrigger className="w-full sm:w-80">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">Any lecture</SelectItem>
-        {lectures.map((l) => (
-          <SelectItem key={l.id} value={l.id}>
-            {lectureNo(l.id)} · {l.title}
+        {LECTURE_ITEMS.map((l) => (
+          <SelectItem key={l.value} value={l.value}>
+            {l.label}
           </SelectItem>
         ))}
       </SelectContent>

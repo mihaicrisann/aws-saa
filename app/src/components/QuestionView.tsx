@@ -134,13 +134,9 @@ function Footer({ q, chosen }: { q: Question; chosen: number[] }) {
   }
   return (
     <div className="flex flex-wrap items-center gap-1 text-xs">
-      <Button asChild variant="ghost" size="xs">
-        <Link to={questionHref(q)}>
-          {q.anchor ? 'Read the section' : `Lecture ${lectureNo(q.lecture)}`} <ArrowUpRight data-icon="inline-end" />
-        </Link>
-      </Button>
+      <Button render={<Link to={questionHref(q)} />} variant="ghost" size="xs">{q.anchor ? 'Read the section' : `Lecture ${lectureNo(q.lecture)}`} <ArrowUpRight /></Button>
       <Button variant="ghost" size="xs" onClick={copy}>
-        <Copy data-icon="inline-start" /> {copied ? 'Copied — paste in the terminal' : 'Ask Claude about this'}
+        <Copy /> {copied ? 'Copied — paste in the terminal' : 'Ask Claude about this'}
       </Button>
     </div>
   )

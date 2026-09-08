@@ -1,5 +1,6 @@
-/* Lecture stylesheet. Same neutral tokens as the app (shadcn "rhea"): one type
-   family, greys, colour only where it carries meaning. */
+/* Lecture stylesheet. Same neutral tokens as the app (coss.com ui on Base UI):
+   one type family, greys, colour only where it carries meaning. Panels get the
+   same 18px radius and hairline top-light as the app's Frame and Card. */
 
 :root {
   --bg: oklch(1 0 0);
@@ -12,7 +13,9 @@
   --bad: oklch(0.6 0.2 25);
   --warn: oklch(0.7 0.15 70);
   --info: oklch(0.55 0.16 250);
-  --radius: 14px;
+  --radius: 18px;
+  --radius-sm: 10px;
+  --panel: 0 1px 2px -1px oklch(0 0 0 / .05), 0 1px 0 oklch(0 0 0 / .04);
   --font: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
@@ -27,6 +30,7 @@
   --bad: oklch(0.72 0.17 25);
   --warn: oklch(0.8 0.13 75);
   --info: oklch(0.72 0.13 250);
+  --panel: 0 -1px 0 oklch(1 0 0 / .06);
 }
 
 * { box-sizing: border-box; }
@@ -84,7 +88,7 @@ code {
   background: var(--muted); padding: 1px 5px; border-radius: 5px;
 }
 pre {
-  background: var(--muted); border-radius: var(--radius); padding: 14px 16px; margin: 16px 0;
+  background: var(--muted); border-radius: var(--radius-sm); padding: 14px 16px; margin: 16px 0;
   overflow-x: auto; font-size: 13px; line-height: 1.55;
 }
 pre code { background: none; padding: 0; font-size: inherit; }
@@ -95,7 +99,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
 .note {
   --tone: var(--muted-fg);
   margin: 18px 0; padding: 12px 16px;
-  border-left: 2px solid var(--tone); border-radius: 0 var(--radius) var(--radius) 0;
+  border-left: 2px solid var(--tone); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   background: var(--muted);
   font-size: 14.5px;
 }
@@ -106,7 +110,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
 .note.nuance { --tone: var(--info); }
 
 /* ── tables ── */
-.table-wrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--border); border-radius: var(--radius); }
+.table-wrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--panel); }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--border); }
 th { font-size: 12px; font-weight: 600; color: var(--muted-fg); background: var(--muted); }
@@ -115,7 +119,7 @@ td:first-child { white-space: nowrap; }
 @media (max-width: 620px) { td:first-child { white-space: normal; } }
 
 /* ── decision tables ── */
-.decisions { margin: 18px 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; font-size: 14px; }
+.decisions { margin: 18px 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; font-size: 14px; background: var(--card); box-shadow: var(--panel); }
 .decisions > .label { display: block; padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--muted-fg); background: var(--muted); border-bottom: 1px solid var(--border); }
 .decision { display: grid; grid-template-columns: 1fr 20px 1.3fr; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
 .decision:last-child { border-bottom: 0; }
@@ -128,7 +132,7 @@ td:first-child { white-space: nowrap; }
 }
 
 /* ── self-checks ── */
-.check { border: 1px solid var(--border); border-radius: var(--radius); margin: 10px 0; overflow: hidden; }
+.check { border: 1px solid var(--border); border-radius: var(--radius); margin: 10px 0; overflow: hidden; background: var(--card); box-shadow: var(--panel); }
 .check > summary {
   cursor: pointer; padding: 11px 14px 11px 40px; list-style: none; position: relative;
   font-weight: 500; font-size: 14.5px; line-height: 1.5;
@@ -148,7 +152,7 @@ td:first-child { white-space: nowrap; }
 @keyframes unfold { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 
 /* ── takeaways ── */
-.takeaways { margin: 40px 0 0; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.takeaways { margin: 40px 0 0; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--panel); }
 .takeaways h2 { margin: 0 0 8px; font-size: 15px; }
 .takeaways ol { margin: 0; padding-left: 20px; }
 .takeaways li { margin: 6px 0; font-size: 14.5px; }
@@ -185,7 +189,7 @@ td:first-child { white-space: nowrap; }
      </div>
      <figcaption>…</figcaption>
    </figure> */
-.diagram { margin: 20px 0; padding: 18px 16px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); overflow-x: auto; }
+.diagram { margin: 20px 0; padding: 18px 16px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); overflow-x: auto; box-shadow: var(--panel); }
 .diagram figcaption { margin-top: 12px; font-size: 13px; color: var(--muted-fg); line-height: 1.5; }
 .diagram figcaption strong { color: var(--fg); }
 

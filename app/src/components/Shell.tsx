@@ -4,7 +4,7 @@ import { Moon, Sun, Keyboard, PanelLeft, SearchIcon, LayoutGrid, BookOpen, Layer
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Dialog, DialogPopup, DialogHeader, DialogPanel, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { useStore, setTheme } from '@/lib/store'
 import { useHotkeys } from '@/lib/hotkeys'
 import Search from '@/components/Search'
@@ -128,10 +128,13 @@ export default function Shell() {
       <main className="min-w-0 flex-1 px-5 pt-16 pb-20 md:px-10 md:pt-4">
         <div className="mb-4 hidden md:flex md:items-center md:gap-1 md:-ml-2">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'} aria-pressed={!collapsed} onClick={toggleSidebar}>
-                <PanelLeft />
-              </Button>
+            <TooltipTrigger
+              aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+              aria-pressed={!collapsed}
+              onClick={toggleSidebar}
+              render={<Button variant="ghost" size="icon-sm" />}
+            >
+              <PanelLeft />
             </TooltipTrigger>
             <TooltipContent side="right">{collapsed ? 'Show' : 'Hide'} sidebar <Kbd>[</Kbd></TooltipContent>
           </Tooltip>
@@ -151,12 +154,12 @@ export default function Shell() {
       <Search open={search} onOpenChange={setSearch} />
 
       <Dialog open={help} onOpenChange={setHelp}>
-        <DialogContent className="sm:max-w-md">
+        <DialogPopup className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Keyboard shortcuts</DialogTitle>
             <DialogDescription>Work anywhere except inside a text field.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2 text-sm">
+          <DialogPanel className="grid gap-2 text-sm">
             <div className="flex flex-wrap items-center gap-1.5">
               {NAV.map((n) => (
                 <span key={n.to} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs">
@@ -176,8 +179,8 @@ export default function Shell() {
                 </div>
               ))}
             </dl>
-          </div>
-        </DialogContent>
+          </DialogPanel>
+        </DialogPopup>
       </Dialog>
     </div>
   )

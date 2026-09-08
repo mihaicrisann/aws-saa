@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Kbd } from '@/components/ui/kbd'
+import { Choice } from './parts'
 import type { Confidence } from '@/lib/store'
 
 export const CONFIDENCE: { id: Confidence; label: string; key: string }[] = [
@@ -13,13 +13,12 @@ export function ConfidencePicker({ value, onChange }: { value?: Confidence; onCh
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
       <span className="text-muted-foreground">How sure?</span>
-      <ToggleGroup type="single" variant="outline" size="sm" value={value ?? ''} onValueChange={(v) => onChange((v || undefined) as Confidence | undefined)}>
-        {CONFIDENCE.map((c) => (
-          <ToggleGroupItem key={c.id} value={c.id} className="gap-1.5">
-            {c.label} <Kbd>{c.key}</Kbd>
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <Choice
+        allowEmpty
+        value={value ?? ''}
+        onChange={onChange}
+        options={CONFIDENCE.map((c) => ({ value: c.id, label: <>{c.label} <Kbd>{c.key}</Kbd></> }))}
+      />
     </div>
   )
 }

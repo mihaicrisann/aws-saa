@@ -4,7 +4,7 @@ import { questions, lectureById, sameSet, isMulti, lectureNo, questionHref } fro
 import { useStore, setMistakeMeta, clearMistake, recordAttempt, type MistakeMeta, type Confidence } from '@/lib/store'
 import QuestionView from '@/components/QuestionView'
 import { toggleChoice } from '@/components/Filters'
-import { PageHeader, DomainBadge, Nothing, QuietLink } from '@/components/parts'
+import { PageHeader, DomainBadge, Nothing, QuietLink, Stat, StatRow } from '@/components/parts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -66,14 +66,11 @@ export default function Mistakes() {
         </p>
       )}
       {openCount > 0 && (
-        <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatRow className="mb-6">
           {byReason.map((r) => (
-            <div key={r.id} className="rounded-2xl border px-4 py-3">
-              <div className="text-xl font-semibold tabular-nums">{r.n}</div>
-              <div className="text-xs text-muted-foreground">{r.label}</div>
-            </div>
+            <Stat key={r.id} label={r.label} value={r.n} />
           ))}
-        </div>
+        </StatRow>
       )}
 
       {rows.length === 0 ? (
@@ -111,10 +108,15 @@ export default function Mistakes() {
 
                       <div className="mt-4 grid gap-3 border-t pt-4">
                         <div className="text-xs text-muted-foreground">Why did I miss it?</div>
-                        <ToggleGroup type="single" variant="outline" size="sm" value={meta.reason ?? ''} onValueChange={(v) => setMistakeMeta(q.id, { reason: (v || undefined) as MistakeMeta['reason'] })}>
+                        <ToggleGroup
+                          variant="outline"
+                          size="sm"
+                          value={meta.reason ? [meta.reason] : []}
+                          onValueChange={(v) => setMistakeMeta(q.id, { reason: v[0] as MistakeMeta['reason'] })}
+                        >
                           {REASONS.map((r) => (
                             <Tooltip key={r.id}>
-                              <TooltipTrigger asChild><ToggleGroupItem value={r.id}>{r.label}</ToggleGroupItem></TooltipTrigger>
+                              <TooltipTrigger render={<ToggleGroupItem value={r.id} />}>{r.label}</TooltipTrigger>
                               <TooltipContent>{r.hint}</TooltipContent>
                             </Tooltip>
                           ))}
@@ -144,7 +146,7 @@ export default function Mistakes() {
                   ) : (
                     <>
                       <Button size="sm" variant="outline" onClick={() => { setRetrying(q.id); setChosen([]); setRevealed(false) }}>Retry blind</Button>
-                      <Button asChild size="sm" variant="ghost"><Link to={`/drill?lecture=${q.lecture}`}>Drill this lecture</Link></Button>
+                      <Button render={<Link to={`/drill?lecture=${q.lecture}`} />} size="sm" variant="ghost">Drill this lecture</Button>
                       <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setMistakeMeta(q.id, { resolved: !meta.resolved })}>
                         {meta.resolved ? 'Reopen' : 'Mark understood'}
                       </Button>

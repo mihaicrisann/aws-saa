@@ -10,10 +10,11 @@ import { toggleChoice } from '@/components/Filters'
 import { PageHeader, QuietLink } from '@/components/parts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Frame, FramePanel } from '@/components/ui/frame'
 import { Kbd } from '@/components/ui/kbd'
-import { Progress } from '@/components/ui/progress'
+import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress'
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog, AlertDialogClose, AlertDialogPopup, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 
@@ -146,8 +147,8 @@ export default function Exam() {
       <div className="mx-auto max-w-2xl px-5 py-12">
         <QuietLink to="/"><ArrowLeft className="mr-1 inline size-3.5" />Overview</QuietLink>
         <PageHeader title="Mock exam" description="A countdown, no feedback until you submit, and a full review at the end. Questions are drawn to the exam's real domain weights." />
-        <Card>
-          <CardContent className="grid gap-3 text-sm">
+        <Frame>
+          <FramePanel className="grid gap-3 text-sm">
             {[
               ['Questions', `${full}, drawn from ${bank.length}`],
               ['Time', `${exam.minutes} minutes — about 2 per question`],
@@ -160,13 +161,13 @@ export default function Exam() {
                 <span>{v}</span>
               </div>
             ))}
-          </CardContent>
-          <CardFooter className="flex-wrap gap-2 border-t">
+          </FramePanel>
+          <FramePanel className="flex flex-wrap gap-2 px-5 py-4">
             <Button onClick={() => begin(full, exam.minutes)}>Full · {full} q / {exam.minutes} min</Button>
             <Button variant="outline" onClick={() => begin(30, 60)}>Half · 30 q / 60 min</Button>
             <Button variant="outline" onClick={() => begin(15, 30)}>Quick · 15 q / 30 min</Button>
-          </CardFooter>
-        </Card>
+          </FramePanel>
+        </Frame>
         <p className="mt-4 text-xs text-muted-foreground">{exam.note}</p>
       </div>
     )
@@ -205,9 +206,9 @@ export default function Exam() {
               {byLecture.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nothing missed.</p>
               ) : (
-                <div className="grid gap-1">
+                <div className="-mx-2 grid gap-0.5">
                   {byLecture.map(([lec, n]) => (
-                    <Link key={lec} to={`/learn/${lec}`} className="flex items-center justify-between rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-muted">
+                    <Link key={lec} to={`/learn/${lec}`} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent">
                       <span><span className="mr-2 text-muted-foreground tabular-nums">{lectureNo(lec)}</span>{lectureById[lec]?.title ?? lec}</span>
                       <span className="text-bad tabular-nums">{n}</span>
                     </Link>
@@ -217,8 +218,8 @@ export default function Exam() {
             </CardContent>
             <CardFooter className="flex-wrap gap-2 border-t">
               <Button onClick={() => setPhase('review')}>Review every question</Button>
-              <Button asChild variant="outline"><Link to="/mistakes">Mistake log</Link></Button>
-              <Button asChild variant="ghost"><Link to="/">Overview</Link></Button>
+              <Button render={<Link to="/mistakes" />} variant="outline">Mistake log</Button>
+              <Button render={<Link to="/" />} variant="ghost">Overview</Button>
             </CardFooter>
           </Card>
         </div>
@@ -271,7 +272,11 @@ export default function Exam() {
           <span className={cn('ml-auto text-base font-medium tabular-nums', low && 'text-bad')}>{fmt(remaining)}</span>
           <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>Submit</Button>
         </div>
-        <Progress value={(1 - remaining / (session.minutes * 60)) * 100} className="h-0.5 rounded-none" />
+        <Progress value={(1 - remaining / (session.minutes * 60)) * 100} aria-label="Time used">
+          <ProgressTrack className="h-0.5 rounded-none bg-transparent">
+            <ProgressIndicator className={cn(low && 'bg-bad')} />
+          </ProgressTrack>
+        </Progress>
       </header>
 
       <div className="mx-auto grid max-w-4xl gap-5 px-5 py-6 lg:grid-cols-[1fr_180px]">
@@ -280,12 +285,12 @@ export default function Exam() {
             <QuestionView q={q} chosen={chosen} revealed={false} onToggle={toggle} showMeta={false} />
           </CardContent>
           <CardFooter className="flex-wrap gap-2 border-t">
-            <Button variant="outline" size="sm" disabled={i === 0} onClick={() => setI(i - 1)}><ArrowLeft data-icon="inline-start" /> Previous</Button>
+            <Button variant="outline" size="sm" disabled={i === 0} onClick={() => setI(i - 1)}><ArrowLeft /> Previous</Button>
             <Button variant={flagged ? 'secondary' : 'ghost'} size="sm" onClick={toggleFlag} aria-pressed={flagged}>
-              <Flag data-icon="inline-start" className={cn(flagged && 'fill-current')} /> {flagged ? 'Flagged' : 'Flag'} <Kbd>f</Kbd>
+              <Flag className={cn(flagged && 'fill-current')} /> {flagged ? 'Flagged' : 'Flag'} <Kbd>f</Kbd>
             </Button>
             <Button size="sm" className="ml-auto" onClick={() => (i + 1 < qs.length ? setI(i + 1) : setConfirming(true))}>
-              {i + 1 < qs.length ? <>Next <ArrowRight data-icon="inline-end" /></> : 'Finish'}
+              {i + 1 < qs.length ? <>Next <ArrowRight /></> : 'Finish'}
             </Button>
           </CardFooter>
         </Card>
@@ -321,7 +326,7 @@ export default function Exam() {
       </div>
 
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
-        <AlertDialogContent>
+        <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Submit the exam?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -331,10 +336,10 @@ export default function Exam() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep working</AlertDialogCancel>
-            <AlertDialogAction onClick={finish}>Submit</AlertDialogAction>
+            <AlertDialogClose render={<Button variant="outline" />}>Keep working</AlertDialogClose>
+            <AlertDialogClose render={<Button />} onClick={finish}>Submit</AlertDialogClose>
           </AlertDialogFooter>
-        </AlertDialogContent>
+        </AlertDialogPopup>
       </AlertDialog>
     </div>
   )

@@ -6,7 +6,7 @@ import { lectures, modules, flashcards, domains, exam, lectureNo, scaledScore, s
 import Readiness, { type DomainStat } from '@/components/Readiness'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { PageHeader, Stat, Meter } from '@/components/parts'
+import { PageHeader, Stat, StatRow, Meter } from '@/components/parts'
 
 export default function Dashboard() {
   const store = useStore((s) => s)
@@ -61,12 +61,12 @@ export default function Dashboard() {
         <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </Link>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatRow className="mt-4">
         <Stat label="Lectures read" value={`${read}/${lectures.length}`} />
         <Stat label="Cards due" value={dueCards} hint={`of ${flashcards.length}`} />
         <Stat label="Open mistakes" value={openMistakes} />
         <Stat label="Streak" value={streak} hint={streak === 1 ? 'day' : 'days'} />
-      </div>
+      </StatRow>
 
       <div className="mt-4 grid gap-4 md:grid-cols-[260px_1fr]">
         <Card>
@@ -96,9 +96,7 @@ export default function Dashboard() {
                   </div>
                 )
               })}
-              <Button asChild variant="ghost" size="sm" className="mt-1 w-fit -ml-2">
-                <Link to="/learn">All lectures <ArrowRight data-icon="inline-end" /></Link>
-              </Button>
+              <Button render={<Link to="/learn" />} variant="ghost" size="sm" className="mt-1 w-fit -ml-2">All lectures <ArrowRight /></Button>
             </CardContent>
           </Card>
 
@@ -122,7 +120,7 @@ export default function Dashboard() {
                   </div>
                 )
               })}
-              <Link to={focus.to} className="mt-1 flex items-center justify-between rounded-xl border px-3 py-2 transition-colors hover:bg-muted/50">
+              <Link to={focus.to} className="mt-1 flex items-center justify-between rounded-lg border px-3 py-2 transition-colors hover:bg-accent">
                 <span><span className="text-muted-foreground">Focus · </span>{focus.text}</span>
                 <ArrowRight className="size-3.5 text-muted-foreground" />
               </Link>

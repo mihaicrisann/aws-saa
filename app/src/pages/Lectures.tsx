@@ -3,7 +3,7 @@ import { Check } from 'lucide-react'
 import { lectures, modules, lectureNo } from '@/lib/content'
 import { useStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
-import { PageHeader, DomainDot } from '@/components/parts'
+import { PageHeader, DomainDot, Rows } from '@/components/parts'
 import { cn } from '@/lib/utils'
 
 export default function Lectures() {
@@ -17,9 +17,7 @@ export default function Lectures() {
         title="Learn"
         description={`${lectures.length} lectures, about ${totalMinutes} minutes. In order — each one only assumes the ones before it. ${read} read.`}
         actions={
-          <Button asChild variant="outline" size="sm">
-            <a href="/lectures/index.html" target="_blank" rel="noreferrer">Open as plain HTML</a>
-          </Button>
+          <Button render={<a href="/lectures/index.html" target="_blank" rel="noreferrer" />} variant="outline" size="sm">Open as plain HTML</Button>
         }
       />
 
@@ -31,14 +29,14 @@ export default function Lectures() {
             <section key={m.id}>
               <h2 className="text-sm font-medium">{m.name}</h2>
               <p className="mt-0.5 mb-3 text-sm text-muted-foreground">{m.blurb}</p>
-              <div className="overflow-hidden rounded-2xl border">
+              <Rows>
                 {ls.map((l) => {
                   const done = !!readMap[l.id]
                   return (
                     <Link
                       key={l.id}
                       to={`/learn/${l.id}`}
-                      className="grid grid-cols-[28px_1fr_auto] items-baseline gap-3 border-b px-4 py-3 transition-colors last:border-b-0 hover:bg-muted/50"
+                      className="grid grid-cols-[28px_1fr_auto] items-baseline gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
                     >
                       <span className={cn('text-xs tabular-nums', done ? 'text-good' : 'text-muted-foreground')}>
                         {done ? <Check className="size-3.5" /> : lectureNo(l.id)}
@@ -54,7 +52,7 @@ export default function Lectures() {
                     </Link>
                   )
                 })}
-              </div>
+              </Rows>
             </section>
           )
         })}
