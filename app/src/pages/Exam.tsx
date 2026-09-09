@@ -153,7 +153,7 @@ export default function Exam() {
               ['Questions', `${full}, drawn from ${bank.length}`],
               ['Time', `${exam.minutes} minutes — about 2 per question`],
               ['Mix', domains.map((d) => `${shortDomain(d.id)} ${d.weight}%`).join(' · ')],
-              ['Pass', `${exam.passingScore} scaled, roughly 72% correct`],
+              ['Pass', `${exam.passingScore} of ${exam.scaleMax} scaled — not a percentage, and no per-domain minimum`],
               ['Rules', 'Flag what you are unsure of, answer everything, review at the end. No penalty for guessing.'],
             ].map(([k, v]) => (
               <div key={k} className="grid grid-cols-[90px_1fr] gap-3">

@@ -46,13 +46,18 @@ for (const q of questions) {
   if (new Set(q.options).size !== q.options?.length) fail(`question ${q.id}: duplicate options`)
   if (q.distractors) q.options.forEach((_, i) => q.correct.includes(i) || q.distractors[i] || fail(`question ${q.id}: option ${i} is wrong but has no distractor note`))
   if (q.explanation && q.explanation.length < 40) fail(`question ${q.id}: explanation too short`)
-  if (!Array.isArray(q.options) || q.options.length < 3) fail(`question ${q.id}: needs at least 3 options`)
+  if (!Array.isArray(q.options)) fail(`question ${q.id}: needs options`)
   if (!Array.isArray(q.correct) || !q.correct.length) fail(`question ${q.id}: no correct answer`)
   q.correct.forEach((i) => (i >= 0 && i < q.options.length) || fail(`question ${q.id}: correct index ${i} out of range`))
   if (q.distractors && q.distractors.length !== q.options.length)
     fail(`question ${q.id}: distractors length must match options`)
   if (q.correct.length > 1 && !/choose\s+(two|three)/i.test(q.stem))
     fail(`question ${q.id}: multi-answer but the stem does not say "Choose TWO/THREE"`)
+  // the exam guide allows exactly two response shapes: one correct of four, or two+ of five+
+  if (q.correct?.length === 1 && q.options?.length !== 4)
+    fail(`question ${q.id}: single-answer questions have exactly 4 options, found ${q.options?.length}`)
+  if (q.correct?.length > 1 && q.options?.length < 5)
+    fail(`question ${q.id}: multi-answer questions have 5 or more options, found ${q.options?.length}`)
 }
 
 const seenC = new Set()
