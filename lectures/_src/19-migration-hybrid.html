@@ -1,0 +1,210 @@
+  <p>Two families of question live here. <strong>Migration</strong>: something exists elsewhere and has to end up on AWS — the exam asks which service moves it and how much downtime that costs. <strong>Hybrid and edge</strong>: something cannot leave the building or cannot tolerate the latency of a Region — the exam asks which box AWS ships you. Both are decided by one or two words in the scenario.</p>
+
+  <h2 data-mark="01">Moving bytes: the bandwidth question</h2>
+
+  <p>Before any service name, work out whether the data can travel over the wire in the time allowed. That single calculation eliminates half the options.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>Moves</th><th>Over</th><th>Reach for it when</th></tr></thead>
+    <tbody>
+      <tr><td><strong>DataSync</strong></td><td>Files and objects, <strong>online</strong>, one-off or scheduled</td><td>Internet, VPN or Direct Connect</td><td>NFS/SMB/HDFS or S3 → AWS, and the link is fast enough. Handles verification, retries and incremental syncs for you.</td></tr>
+      <tr><td><strong>Storage Gateway</strong></td><td>Files and volumes, <strong>ongoing</strong></td><td>Same</td><td>On-premises servers must <em>keep</em> reading and writing while the data lives in AWS. It is a permanent presence, not a migration.</td></tr>
+      <tr><td><strong>Transfer Family</strong></td><td>Files, <strong>ongoing</strong>, pushed by third parties</td><td>SFTP, FTPS, FTP, AS2</td><td>Partners already have an SFTP client and a script. You want the protocol without running the server. Lands directly in S3 or EFS.</td></tr>
+      <tr><td><strong>Snow Family</strong></td><td>Bulk, <strong>offline</strong></td><td>A courier</td><td>The link is too slow, too expensive, or does not exist.</td></tr>
+      <tr><td><strong>Direct Connect</strong></td><td>Anything, ongoing</td><td>A private circuit</td><td>Consistent throughput matters permanently — but ordering one takes <strong>weeks to months</strong>, so it is never the answer to "migrate by Friday".</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">The arithmetic the exam expects</span>
+    <p>A useful rule: <strong>100 Mbps moves roughly 1 TB per day</strong> at full utilisation. So 500 TB over a 1 Gbps link that is also carrying production traffic is months, not days — Snow. And 2 TB over the same link is an afternoon — DataSync. If the scenario gives you a link speed and a deadline, it wants you to do this sum.</p>
+  </div>
+
+  <h2 data-mark="02">The Snow family</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Device</th><th>Capacity</th><th>Also does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Snowcone</strong></td><td>Small, a few TB. Portable and rugged.</td><td>Edge compute in a space with no room and no power budget. Can ship back or use DataSync to send over the network.</td></tr>
+      <tr><td><strong>Snowball Edge Storage Optimized</strong></td><td>Tens of TB per device, cluster them for more</td><td>The default bulk-transfer answer.</td></tr>
+      <tr><td><strong>Snowball Edge Compute Optimized</strong></td><td>Less storage, EC2 instances and optional GPU</td><td><strong>Processing data where it is generated</strong> — a ship, a factory, a disconnected site — then shipping the results.</td></tr>
+      <tr><td><strong>Snowmobile</strong></td><td>Exabytes. It is a lorry.</td><td>Only correct when the scenario says <strong>petabytes or more</strong> in one move.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">Snowball Edge is two products</span>
+    <p>If the scenario only moves data, <strong>Storage Optimized</strong>. If it mentions <em>running</em> anything at the remote site — analytics, machine learning inference, filtering before upload — it wants <strong>Compute Optimized</strong>. Reading past that word is the classic loss here.</p>
+  </div>
+
+  <h2 data-mark="03">Migrating servers and databases</h2>
+
+  <figure class="diagram">
+    <div class="stack">
+      <div class="group" data-label="On premises">
+        <div class="flow">
+          <span class="node">App servers</span>
+          <span class="node store">Oracle DB</span>
+        </div>
+      </div>
+      <span class="arrow">replicate live</span>
+      <div class="group solid" data-label="AWS">
+        <div class="flow">
+          <span class="node hl">MGN<small>Application Migration Service</small></span>
+          <span class="arrow">cutover</span>
+          <span class="node">EC2 instances</span>
+        </div>
+      </div>
+    </div>
+    <div class="flow">
+      <span class="node store">Oracle schema</span>
+      <span class="arrow">SCT</span>
+      <span class="node hl">Converted schema</span>
+      <span class="arrow">DMS</span>
+      <span class="node store good">Aurora PostgreSQL</span>
+    </div>
+    <figcaption><strong>Two independent pipelines.</strong> MGN lifts whole servers with continuous block replication and a short cutover. Databases go through DMS — and only need the Schema Conversion Tool when the engine changes.</figcaption>
+  </figure>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>Job</th><th>Exam cue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Application Discovery Service</strong></td><td>Inventories on-premises servers and their dependencies <em>before</em> you plan</td><td>"We do not know what we have" / "map dependencies"</td></tr>
+      <tr><td><strong>Migration Hub</strong></td><td>One dashboard tracking progress across the other tools</td><td>"Track the migration in a single place"</td></tr>
+      <tr><td><strong>Application Migration Service (MGN)</strong></td><td>Lift-and-shift servers to EC2 by continuous block-level replication</td><td>"Rehost with minimal downtime", "no application changes"</td></tr>
+      <tr><td><strong>Database Migration Service (DMS)</strong></td><td>Moves the <strong>data</strong>, and keeps the source live throughout</td><td>"Minimal downtime", "continue serving during the migration"</td></tr>
+      <tr><td><strong>Schema Conversion Tool (SCT)</strong></td><td>Converts <strong>schema and stored code</strong> between different engines</td><td>Only when the source and target engines differ</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note exam">
+    <span class="label">Homogeneous vs heterogeneous — a guaranteed question</span>
+    <p><strong>Homogeneous</strong> = same engine either side (Oracle → RDS for Oracle, MySQL → Aurora MySQL). DMS alone; the schema already fits.</p>
+    <p><strong>Heterogeneous</strong> = the engine changes (Oracle → Aurora PostgreSQL, SQL Server → MySQL). <strong>SCT first to convert the schema, then DMS to move the data.</strong> If an option offers DMS by itself for a cross-engine move, it is incomplete.</p>
+    <p>DMS also does <strong>continuous replication (CDC)</strong>, which is what "cut over with almost no downtime" is buying.</p>
+  </div>
+
+  <h2 data-mark="04">Migrating applications into containers</h2>
+
+  <p>The exam frames this as a trade between effort now and cost later. Learn the ladder and match it to the qualifier.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Approach</th><th>What changes</th><th>Lands on</th><th>Chosen when the scenario says</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Rehost</strong></td><td>Nothing</td><td>EC2 via MGN</td><td>"Fastest migration", "no code changes", a hard deadline</td></tr>
+      <tr><td><strong>Replatform</strong></td><td>Packaging only — the app is containerised as-is</td><td><strong>ECS on Fargate</strong>, or EKS if they already run Kubernetes</td><td>"Reduce operational overhead", "without rewriting the application"</td></tr>
+      <tr><td><strong>Refactor</strong></td><td>The architecture</td><td>Lambda, Step Functions, managed services</td><td>"Re-architect", "event-driven", and no time pressure</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">ECS or EKS</span>
+    <p>Once containerised, the default is <strong>ECS on Fargate</strong> — no cluster to run, no nodes to patch. Pick <strong>EKS</strong> only when the scenario names Kubernetes, existing Helm charts, or a need to keep the same tooling on-premises. <strong>ECS Anywhere</strong> and <strong>EKS Anywhere</strong> run those control planes against <em>your own</em> hardware, which is the answer when containers must keep running in a data centre you are not leaving.</p>
+  </div>
+
+  <h2 data-mark="05">Hybrid and edge compute</h2>
+
+  <p>Four boxes, four different reasons. The reason is always stated in the scenario.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Option</th><th>Where it runs</th><th>The words that select it</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Outposts</strong></td><td>A rack of genuine AWS hardware <strong>in your data centre</strong>, same APIs</td><td><strong>"Data must remain on premises"</strong> for residency or regulation, or single-digit-millisecond latency to on-premises systems, <em>while still using AWS services</em></td></tr>
+      <tr><td><strong>Local Zones</strong></td><td>An AWS-run site in a metro area, close to users</td><td>"Single-digit-millisecond latency to users <strong>in a specific city</strong>" — media editing, gaming, remote workstations</td></tr>
+      <tr><td><strong>Wavelength</strong></td><td>Inside a telecoms provider's <strong>5G</strong> network</td><td>The scenario says <strong>5G</strong> or <strong>mobile devices</strong> needing ultra-low latency</td></tr>
+      <tr><td><strong>VMware Cloud on AWS</strong></td><td>VMware's own stack on dedicated AWS hosts</td><td>"Keep using vSphere / vCenter", "existing VMware skills and tooling"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="cols">
+      <div class="group col" data-label="Data cannot leave">
+        <div class="stack">
+          <span class="node user">On-prem app</span>
+          <span class="arrow">ms</span>
+          <span class="node hl">Outposts rack</span>
+        </div>
+      </div>
+      <div class="group col" data-label="Users in one city">
+        <div class="stack">
+          <span class="node user">Users</span>
+          <span class="arrow">ms</span>
+          <span class="node hl">Local Zone</span>
+        </div>
+      </div>
+      <div class="group col" data-label="5G devices">
+        <div class="stack">
+          <span class="node user">Handsets</span>
+          <span class="arrow">5G</span>
+          <span class="node hl">Wavelength Zone</span>
+        </div>
+      </div>
+      <div class="group col" data-label="No connectivity">
+        <div class="stack">
+          <span class="node user">Ship / rig</span>
+          <span class="arrow">offline</span>
+          <span class="node hl">Snowball Edge<small>compute optimized</small></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><strong>Same shape, four causes.</strong> Residency picks Outposts, metro latency picks a Local Zone, mobile latency picks Wavelength, and no network at all picks a Snow device.</figcaption>
+  </figure>
+
+  <div class="note gotcha">
+    <span class="label">Do not confuse edge compute with the edge network</span>
+    <p><strong>CloudFront and Global Accelerator</strong> put <em>traffic</em> closer to users. <strong>Local Zones, Wavelength and Outposts</strong> put <em>your compute and data</em> closer. A question about caching static assets is CloudFront; a question about an application server that must sit within 5 ms of a factory floor is Outposts.</p>
+  </div>
+
+  <h2 data-mark="06">Reading a migration question in ten seconds</h2>
+
+  <div class="decisions">
+    <span class="label">Cue → answer</span>
+    <div class="decision"><span class="cue">Petabytes, slow or absent link</span><span class="arrow">→</span><span class="ans">Snowball Edge (cluster), or Snowmobile at exabyte scale</span></div>
+    <div class="decision"><span class="cue">Terabytes, decent link, one-off or scheduled</span><span class="arrow">→</span><span class="ans">DataSync</span></div>
+    <div class="decision"><span class="cue">On-prem servers must keep using the data</span><span class="arrow">→</span><span class="ans">Storage Gateway</span></div>
+    <div class="decision"><span class="cue">Partners upload over SFTP</span><span class="arrow">→</span><span class="ans">Transfer Family</span></div>
+    <div class="decision"><span class="cue">Same DB engine, minimal downtime</span><span class="arrow">→</span><span class="ans">DMS with CDC</span></div>
+    <div class="decision"><span class="cue">Different DB engine</span><span class="arrow">→</span><span class="ans">SCT to convert the schema, then DMS</span></div>
+    <div class="decision"><span class="cue">Lift whole servers, no code changes</span><span class="arrow">→</span><span class="ans">Application Migration Service</span></div>
+    <div class="decision"><span class="cue">Containerise without rewriting</span><span class="arrow">→</span><span class="ans">ECS on Fargate</span></div>
+    <div class="decision"><span class="cue">Data must stay in the building</span><span class="arrow">→</span><span class="ans">Outposts</span></div>
+    <div class="decision"><span class="cue">5G, mobile, ultra-low latency</span><span class="arrow">→</span><span class="ans">Wavelength</span></div>
+    <div class="decision"><span class="cue">Keep vSphere</span><span class="arrow">→</span><span class="ans">VMware Cloud on AWS</span></div>
+    <div class="decision"><span class="cue">Process data at a disconnected site</span><span class="arrow">→</span><span class="ans">Snowball Edge Compute Optimized</span></div>
+  </div>
+
+  <h2 data-mark="07">Check yourself</h2>
+
+  <details class="check"><summary>900 TB of archives must reach S3 within a month. The site has a 500 Mbps internet link shared with production.</summary>
+  <div class="answer">Snow. At 500 Mbps you would move roughly 5 TB a day <em>if you saturated the link</em>, so 900 TB is around six months — and you cannot starve production. Order a <strong>cluster of Snowball Edge Storage Optimized</strong> devices. Direct Connect fails on lead time as well as throughput.</div></details>
+
+  <details class="check"><summary>An Oracle database moves to Aurora PostgreSQL with the business running throughout.</summary>
+  <div class="answer"><strong>SCT then DMS.</strong> The engines differ, so the Schema Conversion Tool converts schema, views and stored procedures first; DMS then does a full load followed by <strong>change data capture</strong>, so the source stays live until a short cutover.</div></details>
+
+  <details class="check"><summary>A hospital must run a patient application on AWS services but is legally barred from letting the data leave its premises.</summary>
+  <div class="answer"><strong>Outposts.</strong> It is the only option that puts real AWS infrastructure and APIs inside their own data centre. Local Zones and Wavelength are AWS-operated sites — the data still leaves the building.</div></details>
+
+  <details class="check"><summary>A monolith on ageing VMs must reach AWS this quarter with no code changes, then cut operational cost.</summary>
+  <div class="answer">Two steps, and the exam rewards saying so: <strong>rehost with MGN</strong> to hit the deadline, then <strong>replatform onto ECS with Fargate</strong> to remove the servers. Refactoring to Lambda is the right long-term answer to a different, unhurried question.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Do the bandwidth sum first — roughly 1 TB per day per 100 Mbps. It eliminates half the options before you read them.</li>
+      <li>DataSync moves files online; Storage Gateway keeps on-premises access permanent; Transfer Family is the SFTP endpoint; Snow is the courier.</li>
+      <li>Snowball Edge Compute Optimized is the answer whenever anything is <em>processed</em> at the remote site.</li>
+      <li>Same engine → DMS alone. Different engine → <strong>SCT then DMS</strong>. CDC is what buys near-zero downtime.</li>
+      <li>Rehost with MGN for speed, replatform onto ECS Fargate to cut overhead, refactor to serverless only when time allows.</li>
+      <li>Residency → Outposts. Metro latency → Local Zones. 5G → Wavelength. vSphere → VMware Cloud on AWS. Disconnected → Snow.</li>
+    </ol>
+  </div>

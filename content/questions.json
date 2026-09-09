@@ -7592,5 +7592,977 @@
       "",
       "A single connection with no backup fails the high-availability requirement."
     ]
+  },
+  {
+    "id": "q314",
+    "domain": "cost",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 2,
+    "anchor": "moving-bytes-the-bandwidth-question",
+    "stem": "A broadcaster must move 600 TB of archive footage into S3 within four weeks. The site has a 1 Gbps internet connection that also carries production traffic, and no private circuit to AWS. What should the architect propose?",
+    "options": [
+      "Order AWS Snowball Edge Storage Optimized devices and ship the archive",
+      "Copy the data with AWS DataSync over the existing internet connection",
+      "Order an AWS Direct Connect circuit and copy the data across it",
+      "Use S3 Transfer Acceleration with multipart uploads from the archive servers"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "A saturated 1 Gbps link moves roughly 10 TB a day, so 600 TB is about two months even before leaving headroom for production. Offline transfer with Snowball Edge is the only option that meets a four-week deadline.",
+    "distractors": [
+      "",
+      "DataSync is the right tool when the link is fast enough, but it cannot make 600 TB fit through a shared 1 Gbps connection in four weeks.",
+      "Direct Connect provisioning typically takes weeks to months, so it cannot meet this deadline and does not solve a one-off bulk move.",
+      "Transfer Acceleration improves long-distance throughput to S3 but is still bounded by the same 1 Gbps link."
+    ]
+  },
+  {
+    "id": "q315",
+    "domain": "cost",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 2,
+    "anchor": "the-snow-family",
+    "stem": "An offshore survey vessel collects several terabytes of sensor data per voyage. It has no usable connectivity at sea, and the crew must run machine learning inference on the data during the voyage to flag anomalies. Which option fits?",
+    "options": [
+      "AWS Snowball Edge Compute Optimized",
+      "AWS Snowball Edge Storage Optimized",
+      "AWS Snowcone with DataSync uploads",
+      "AWS Outposts installed on the vessel"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Compute Optimized Snowball Edge devices carry EC2 instances and optional GPU alongside storage, which is exactly the case of processing data at a disconnected site and shipping the results back.",
+    "distractors": [
+      "",
+      "Storage Optimized devices are for bulk transfer only and cannot run the inference workload on board.",
+      "Snowcone is small and its DataSync path needs connectivity, which the vessel does not have.",
+      "Outposts requires reliable network connectivity back to its home Region, which a ship at sea cannot provide."
+    ]
+  },
+  {
+    "id": "q316",
+    "domain": "perf",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 2,
+    "anchor": "migrating-servers-and-databases",
+    "stem": "A company is moving a large Oracle database to Amazon Aurora PostgreSQL. The application must keep serving customers until a brief cutover window. Which combination should the architect use? (Choose TWO.)",
+    "options": [
+      "AWS Schema Conversion Tool to convert the schema and stored procedures",
+      "AWS Database Migration Service with change data capture enabled",
+      "AWS Database Migration Service on its own, with no schema step",
+      "An Aurora read replica of the Oracle database, promoted at cutover",
+      "AWS Application Migration Service to replicate the database servers"
+    ],
+    "correct": [
+      0,
+      1
+    ],
+    "explanation": "The engines differ, so this is a heterogeneous migration: SCT converts schema and stored code first, then DMS performs a full load followed by ongoing change data capture so the source stays live until a short cutover.",
+    "distractors": [
+      "",
+      "",
+      "DMS moves data but does not convert schema or stored procedures between different engines.",
+      "Aurora read replicas can be created from RDS MySQL or PostgreSQL sources, not from Oracle.",
+      "Application Migration Service rehosts servers as EC2 instances; it does not convert a database to Aurora."
+    ]
+  },
+  {
+    "id": "q317",
+    "domain": "perf",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 1,
+    "anchor": "migrating-servers-and-databases",
+    "stem": "A self-managed MySQL database on-premises must move to Amazon Aurora MySQL with as little downtime as possible. Which approach is correct?",
+    "options": [
+      "AWS DMS with a full load followed by change data capture, then cut over",
+      "AWS Schema Conversion Tool followed by AWS DMS",
+      "Export a mysqldump file, copy it with DataSync, and import it into Aurora",
+      "AWS Application Discovery Service to replicate the database continuously"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Source and target are the same engine family, so no schema conversion is needed. DMS loads the existing data and then replicates ongoing changes, leaving only a short cutover.",
+    "distractors": [
+      "",
+      "SCT is only needed when the engine changes; adding it here is unnecessary work.",
+      "A dump and import requires the database to be quiesced for the whole copy, which is the downtime the requirement rules out.",
+      "Application Discovery Service inventories servers and dependencies; it does not replicate data."
+    ]
+  },
+  {
+    "id": "q318",
+    "domain": "cost",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 2,
+    "anchor": "moving-bytes-the-bandwidth-question",
+    "stem": "An on-premises NFS share holds 8 TB of engineering files. The files must be copied to Amazon EFS every night, with verification and only changed data transferred. A 500 Mbps link to AWS is available and largely idle overnight. Which service should be used?",
+    "options": [
+      "AWS DataSync",
+      "AWS Storage Gateway in file mode",
+      "AWS Transfer Family",
+      "An AWS Snowcone shipped nightly"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "DataSync is purpose-built for scheduled, incremental transfers between NFS or SMB and AWS storage, and it handles verification and retries. The link comfortably carries the nightly delta.",
+    "distractors": [
+      "",
+      "Storage Gateway provides ongoing on-premises access to data held in AWS; it is not a scheduled replication tool.",
+      "Transfer Family exposes SFTP, FTPS and AS2 endpoints for external parties pushing files, which is not this workflow.",
+      "Shipping a device nightly is absurd for a delta that fits comfortably in an overnight window."
+    ]
+  },
+  {
+    "id": "q319",
+    "domain": "perf",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 2,
+    "anchor": "hybrid-and-edge-compute",
+    "stem": "A hospital must run a new patient records application using AWS services and APIs, but regulation forbids patient data from leaving the hospital's own premises. Which option meets both requirements?",
+    "options": [
+      "AWS Outposts",
+      "An AWS Local Zone in the nearest metropolitan area",
+      "AWS Wavelength Zones",
+      "A dedicated AWS Direct Connect circuit to the nearest Region"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Outposts places genuine AWS hardware and the same APIs inside the customer's data centre, so the data never leaves the premises while the team still builds on AWS services.",
+    "distractors": [
+      "",
+      "Local Zones are AWS-operated facilities, so the data would leave the hospital's premises.",
+      "Wavelength Zones sit inside telecoms providers' networks and are aimed at 5G latency, not data residency.",
+      "Direct Connect is a private network path to a Region; the data still ends up in the Region."
+    ]
+  },
+  {
+    "id": "q320",
+    "domain": "perf",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 2,
+    "anchor": "hybrid-and-edge-compute",
+    "stem": "A game studio needs its multiplayer backend to respond in single-digit milliseconds to players on a mobile carrier's 5G network. Which AWS option is designed for this?",
+    "options": [
+      "Deploy the backend to AWS Wavelength Zones",
+      "Deploy the backend to AWS Outposts in the carrier's data centre",
+      "Put Amazon CloudFront in front of the backend",
+      "Use AWS Global Accelerator with endpoints in three Regions"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Wavelength embeds AWS compute and storage inside 5G providers' networks so traffic from mobile devices never leaves the carrier network, which is the only way to reach single-digit-millisecond latency for 5G clients.",
+    "distractors": [
+      "",
+      "Outposts is customer-premises hardware for residency and on-premises latency, not for reaching mobile subscribers.",
+      "CloudFront caches and terminates connections at edge locations but does not run the game backend close to 5G devices.",
+      "Global Accelerator improves the path into a Region; it cannot remove the hop out of the carrier network."
+    ]
+  },
+  {
+    "id": "q321",
+    "domain": "cost",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 1,
+    "anchor": "hybrid-and-edge-compute",
+    "stem": "An enterprise runs hundreds of workloads on VMware vSphere and wants to move to AWS quickly while keeping its existing vCenter tooling, runbooks and staff skills. What should the architect recommend?",
+    "options": [
+      "VMware Cloud on AWS",
+      "Rehost every virtual machine onto EC2 with AWS Application Migration Service",
+      "Re-architect the workloads onto Amazon ECS with AWS Fargate",
+      "AWS Outposts running VMware software"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "VMware Cloud on AWS runs the familiar VMware stack on dedicated AWS infrastructure, so existing vSphere tooling and operational practice carry over with no conversion.",
+    "distractors": [
+      "",
+      "Rehosting to EC2 works, but it abandons vCenter and the tooling the requirement explicitly wants to keep.",
+      "Re-architecting onto containers is the slowest option and discards the existing skills entirely.",
+      "Outposts extends AWS services into a data centre; it is not a way to run the VMware stack."
+    ]
+  },
+  {
+    "id": "q322",
+    "domain": "perf",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 2,
+    "anchor": "migrating-applications-into-containers",
+    "stem": "A stable Linux monolith running on EC2 must be moved off long-lived servers to cut patching and scaling effort. The team cannot rewrite the application and does not use Kubernetes. What should they do?",
+    "options": [
+      "Containerise the application and run it on Amazon ECS with AWS Fargate",
+      "Containerise the application and run it on Amazon EKS with managed node groups",
+      "Refactor the application into AWS Lambda functions behind API Gateway",
+      "Move the application to a larger EC2 instance in an Auto Scaling group"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Packaging the application unchanged and running it on Fargate removes the servers, patching and capacity management without touching application code, which is exactly a replatform.",
+    "distractors": [
+      "",
+      "EKS adds a Kubernetes control plane and node management the team has no existing reason to take on.",
+      "Refactoring to Lambda is a rewrite, which the requirement rules out.",
+      "A bigger instance in an Auto Scaling group still leaves the team patching and operating servers."
+    ]
+  },
+  {
+    "id": "q323",
+    "domain": "cost",
+    "lecture": "19-migration-hybrid",
+    "difficulty": 1,
+    "anchor": "moving-bytes-the-bandwidth-question",
+    "stem": "Hundreds of external partners upload nightly settlement files using SFTP clients and scripts that cannot be changed. The files must land in Amazon S3 with no servers to operate. Which service should be used?",
+    "options": [
+      "AWS Transfer Family",
+      "AWS DataSync agents installed at each partner",
+      "An EC2 Auto Scaling group running an SFTP daemon behind a Network Load Balancer",
+      "Amazon S3 presigned URLs issued to each partner"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Transfer Family provides fully managed SFTP, FTPS, FTP and AS2 endpoints that write straight into S3, so partners keep their existing clients and there is no server to run.",
+    "distractors": [
+      "",
+      "DataSync requires an agent the partners would have to deploy and operate, and it is not an SFTP endpoint.",
+      "Running SFTP on EC2 works but leaves the company operating and patching the fleet, which the requirement excludes.",
+      "Presigned URLs speak HTTPS, not SFTP, so the partners' existing clients could not use them."
+    ]
+  },
+  {
+    "id": "q324",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "difficulty": 2,
+    "anchor": "the-ai-services-by-input",
+    "stem": "A firm has ten years of scanned paper contracts as PDFs. It needs the text, tables and form fields extracted, and then the parties and dates identified, with the least development effort. Which combination should be used?",
+    "options": [
+      "Amazon Textract, then Amazon Comprehend",
+      "Amazon Rekognition, then Amazon Comprehend",
+      "Amazon Textract, then Amazon Translate",
+      "Amazon SageMaker with a custom document model"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Textract extracts text, tables and form fields from scanned documents, and Comprehend then detects entities such as organisations, people and dates. Both are managed and need no model training.",
+    "distractors": [
+      "",
+      "Rekognition analyses images and video for objects and faces; it is not designed for document layout and form extraction.",
+      "Translate converts between languages, which is not what identifying parties and dates requires.",
+      "SageMaker means building and training what these two services already provide, which is the opposite of least effort."
+    ]
+  },
+  {
+    "id": "q325",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "difficulty": 1,
+    "anchor": "the-ai-services-by-input",
+    "stem": "A user-generated video platform must automatically flag uploads containing explicit or violent imagery before they are published. Which AWS service does this with no model training?",
+    "options": [
+      "Amazon Rekognition content moderation",
+      "Amazon Comprehend sentiment analysis",
+      "Amazon Textract",
+      "Amazon Kendra"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Rekognition analyses images and video and includes a content moderation capability that returns labels for explicit and violent material out of the box.",
+    "distractors": [
+      "",
+      "Comprehend analyses text; it cannot inspect video frames.",
+      "Textract extracts text from scanned documents and does not perform moderation.",
+      "Kendra is an intelligent search service over documents, not a moderation service."
+    ]
+  },
+  {
+    "id": "q326",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "difficulty": 2,
+    "anchor": "the-ai-services-by-input",
+    "stem": "A support centre records customer calls in English and needs searchable Spanish transcripts, plus a sentiment score per call. Which pipeline is correct?",
+    "options": [
+      "Amazon Transcribe, then Amazon Translate, then Amazon Comprehend",
+      "Amazon Polly, then Amazon Translate, then Amazon Comprehend",
+      "Amazon Transcribe, then Amazon Comprehend, then Amazon Polly",
+      "Amazon Lex, then Amazon Translate, then Amazon Rekognition"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Transcribe converts the recorded speech to text, Translate renders it in Spanish, and Comprehend scores sentiment on the text.",
+    "distractors": [
+      "",
+      "Polly synthesises speech from text, which is the wrong direction for a recording.",
+      "Ending with Polly produces audio, not the searchable Spanish transcript that was asked for.",
+      "Lex builds conversational bots and Rekognition analyses images; neither fits this pipeline."
+    ]
+  },
+  {
+    "id": "q327",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "difficulty": 2,
+    "anchor": "seeing-inside-a-distributed-application",
+    "stem": "An API built from a dozen microservices is intermittently slow. Every service reports healthy CloudWatch metrics and no errors appear in its logs, and the team cannot tell which service is responsible. What should they implement?",
+    "options": [
+      "AWS X-Ray tracing across the services",
+      "A CloudWatch Logs Insights query across every log group",
+      "AWS CloudTrail data events for the services",
+      "Amazon CloudWatch anomaly detection on each service's latency metric"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "X-Ray follows an individual request across service boundaries and produces a service map with per-hop latency, which is the only way to attribute end-to-end slowness when each component looks healthy on its own.",
+    "distractors": [
+      "",
+      "Logs Insights searches log text but does not correlate one request's path across services.",
+      "CloudTrail records who called which API for audit purposes; it is not a latency tool.",
+      "Anomaly detection flags an unusual metric on one service but still will not show where a single slow request spent its time."
+    ]
+  },
+  {
+    "id": "q328",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "difficulty": 2,
+    "anchor": "purpose-built-databases",
+    "stem": "An industrial IoT platform ingests millions of time-stamped sensor readings per hour. Queries are almost always over a time range, recent data must be fast, and older data should move to cheaper storage automatically. Which database fits best?",
+    "options": [
+      "Amazon Timestream",
+      "Amazon DynamoDB with a sort key on the timestamp",
+      "Amazon Aurora PostgreSQL with partitioned tables",
+      "Amazon Neptune"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Timestream is purpose-built for time series: it tiers data from an in-memory store to cost-optimised storage automatically and provides time-series functions such as interpolation and smoothing.",
+    "distractors": [
+      "",
+      "DynamoDB can store the readings but the tiering, retention and time-series analytics would all have to be built by hand.",
+      "Aurora can be partitioned by time but requires manual partition management and is not optimised for this ingest rate.",
+      "Neptune is a graph database for relationship queries, not time series."
+    ]
+  },
+  {
+    "id": "q329",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "difficulty": 1,
+    "anchor": "purpose-built-databases",
+    "stem": "A social application must answer queries such as \"which people are connected to this user through at most three mutual friends\". Which purpose-built database should the architect choose?",
+    "options": [
+      "Amazon Neptune",
+      "Amazon DocumentDB",
+      "Amazon Keyspaces",
+      "Amazon QLDB"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Neptune is a managed graph database, and traversing relationships several hops deep is the workload graph databases exist for.",
+    "distractors": [
+      "",
+      "DocumentDB stores JSON documents with MongoDB compatibility and has no efficient multi-hop traversal.",
+      "Keyspaces is managed Apache Cassandra, a wide-column store with no graph traversal.",
+      "QLDB provides an immutable, verifiable ledger, which is a different problem entirely."
+    ]
+  },
+  {
+    "id": "q330",
+    "domain": "secure",
+    "lecture": "20-managed-services",
+    "difficulty": 2,
+    "anchor": "purpose-built-databases",
+    "stem": "A regulator requires a system of record where every change to a document is retained and the company can cryptographically prove to an auditor that no historical entry was altered or deleted. Which service is designed for this?",
+    "options": [
+      "Amazon QLDB",
+      "Amazon S3 with versioning enabled",
+      "Amazon RDS with automated backups and point-in-time recovery",
+      "Amazon DynamoDB with point-in-time recovery and Streams"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "QLDB maintains an append-only journal with a cryptographic hash chain, so the complete history of every change can be verified as untampered — which is what proving integrity to an auditor requires.",
+    "distractors": [
+      "",
+      "Versioning keeps previous object versions but a sufficiently privileged principal can delete them, and it proves nothing cryptographically.",
+      "Backups let you restore a past state; they do not provide a verifiable, tamper-evident history.",
+      "Point-in-time recovery and Streams give recovery and change capture, not cryptographic verification of the history."
+    ]
+  },
+  {
+    "id": "q331",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "difficulty": 2,
+    "anchor": "the-ai-services-by-input",
+    "stem": "Employees waste time hunting through thousands of internal policy documents held in S3 and SharePoint. The company wants them to ask questions in plain English and get specific answers with the source passage. Which service should be used?",
+    "options": [
+      "Amazon Kendra",
+      "Amazon OpenSearch Service",
+      "Amazon Athena",
+      "Amazon Comprehend"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Kendra is an intelligent search service with built-in connectors that answers natural-language questions over enterprise documents and returns the relevant passage.",
+    "distractors": [
+      "",
+      "OpenSearch is a powerful search and analytics engine, but it is keyword-oriented and the cluster must be designed and operated.",
+      "Athena runs SQL over structured files in S3 and cannot answer natural-language questions over documents.",
+      "Comprehend extracts entities and sentiment from text but does not provide a search experience."
+    ]
+  },
+  {
+    "id": "q332",
+    "domain": "secure",
+    "lecture": "20-managed-services",
+    "difficulty": 2,
+    "anchor": "governance-and-the-rest-of-the-toolbox",
+    "stem": "A platform team must let application teams deploy only a fixed set of pre-approved, pre-configured stacks, without granting the developers permission to create the underlying resources directly. Which service does this?",
+    "options": [
+      "AWS Service Catalog",
+      "AWS Organizations with service control policies",
+      "AWS Config with conformance packs",
+      "AWS Systems Manager Automation runbooks"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Service Catalog publishes approved products as a menu that users launch with a launch constraint role, so they deploy the stack without holding the underlying resource permissions themselves.",
+    "distractors": [
+      "",
+      "SCPs set the outer boundary of what an account may do but do not offer a curated catalogue of deployable products.",
+      "Config detects and reports non-compliant resources after the fact; it does not provision anything.",
+      "Automation runbooks execute operational tasks; they are not a self-service product catalogue with permission constraints."
+    ]
+  },
+  {
+    "id": "q333",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "difficulty": 1,
+    "anchor": "governance-and-the-rest-of-the-toolbox",
+    "stem": "A retailer wants to send targeted promotional SMS and email to customer segments and then measure campaign engagement. Which service is intended for this?",
+    "options": [
+      "Amazon Pinpoint",
+      "Amazon SNS",
+      "Amazon SES with a Lambda function per campaign",
+      "Amazon EventBridge Scheduler"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Pinpoint is the customer engagement service: it manages segments, runs multi-channel campaigns and reports engagement analytics.",
+    "distractors": [
+      "",
+      "SNS is pub/sub for applications and operational notifications, with no segmentation or campaign analytics.",
+      "SES sends email but has no segmentation, no SMS channel and no campaign engagement reporting without building it.",
+      "EventBridge Scheduler triggers actions on a schedule; it is not a campaign platform."
+    ]
+  },
+  {
+    "id": "q334",
+    "domain": "perf",
+    "lecture": "03-ec2",
+    "difficulty": 2,
+    "anchor": "placement-groups",
+    "stem": "A tightly coupled HPC simulation needs the lowest possible network latency and highest packet-per-second performance between its nodes. Which two choices support this? (Choose TWO.)",
+    "options": [
+      "Launch the instances in a cluster placement group",
+      "Attach an Elastic Fabric Adapter to each instance",
+      "Spread the instances across three Availability Zones",
+      "Use a partition placement group across racks",
+      "Enable Auto Scaling with a target tracking policy on CPU"
+    ],
+    "correct": [
+      0,
+      1
+    ],
+    "explanation": "A cluster placement group packs instances onto the same high-bisection-bandwidth segment for the lowest latency between them, and an Elastic Fabric Adapter bypasses the operating system network stack for HPC message passing.",
+    "distractors": [
+      "",
+      "",
+      "Spreading across Availability Zones adds inter-AZ latency, which is the opposite of what this workload needs.",
+      "Partition placement groups isolate racks for large distributed data stores; they do not minimise latency between nodes.",
+      "Auto Scaling changes capacity and does nothing for the latency between existing nodes."
+    ]
+  },
+  {
+    "id": "q335",
+    "domain": "perf",
+    "lecture": "04-elb-asg",
+    "difficulty": 2,
+    "anchor": "choosing-a-load-balancer",
+    "stem": "A trading platform terminates millions of TCP connections per second and must add a handful of static IP addresses to partner allow-lists, with the lowest possible latency. Which load balancer should be used?",
+    "options": [
+      "A Network Load Balancer",
+      "An Application Load Balancer",
+      "A Gateway Load Balancer",
+      "An Application Load Balancer behind AWS Global Accelerator"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "NLB operates at layer 4, handles millions of requests per second at ultra-low latency, and provides one static IP per Availability Zone, which is what partner allow-listing requires.",
+    "distractors": [
+      "",
+      "ALB works at layer 7 with higher per-request overhead and its addresses are DNS names that can change.",
+      "Gateway Load Balancer exists to insert third-party virtual appliances into the traffic path, not to serve clients.",
+      "Global Accelerator does provide static anycast addresses, but it adds a component this single-Region requirement does not need and still leaves layer 7 overhead."
+    ]
+  },
+  {
+    "id": "q336",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "difficulty": 2,
+    "anchor": "lambda-the-numbers-that-decide-answers",
+    "stem": "A CPU-bound Lambda function takes 9 seconds per invocation and the team wants it noticeably faster. They have already optimised the code. What should they change first?",
+    "options": [
+      "Increase the function's memory allocation",
+      "Increase the function timeout",
+      "Increase the reserved concurrency for the function",
+      "Move the function into a VPC with a larger subnet"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Lambda allocates CPU proportionally to memory, so raising the memory setting is how a CPU-bound function is given more processing power, often lowering total cost because duration falls.",
+    "distractors": [
+      "",
+      "Timeout only sets when Lambda gives up; it does not make an invocation run faster.",
+      "Reserved concurrency governs how many invocations run in parallel, not the speed of a single one.",
+      "Placing a function in a VPC adds networking constraints and does nothing for CPU-bound execution."
+    ]
+  },
+  {
+    "id": "q337",
+    "domain": "perf",
+    "lecture": "07-block-and-file",
+    "difficulty": 2,
+    "anchor": "ebs-volume-types",
+    "stem": "A single-instance relational database requires more than 100,000 provisioned IOPS on one volume with consistent sub-millisecond latency, and the data must survive an instance stop. Which storage should be used?",
+    "options": [
+      "An io2 Block Express EBS volume",
+      "A gp3 EBS volume with maximum provisioned IOPS",
+      "An NVMe instance store volume",
+      "An Amazon EFS file system in Max I/O mode"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "io2 Block Express supports up to 256,000 IOPS on one volume with sub-millisecond latency, and EBS volumes persist independently of the instance lifecycle.",
+    "distractors": [
+      "",
+      "gp3 tops out at 16,000 IOPS per volume, well below the requirement.",
+      "Instance store is ephemeral and its data is lost when the instance stops, which the requirement forbids.",
+      "EFS is a shared NFS file system whose latency profile does not suit a single-instance transactional database."
+    ]
+  },
+  {
+    "id": "q338",
+    "domain": "perf",
+    "lecture": "10-edge",
+    "difficulty": 2,
+    "anchor": "cloudfront",
+    "stem": "A CloudFront distribution serves both static images and a personalised API. The images should be cached for a long time while API responses must never be cached. What is the correct configuration?",
+    "options": [
+      "Two cache behaviours with different path patterns and separate cache policies",
+      "One default cache behaviour with a short TTL applied to everything",
+      "Two distributions, one per origin, behind the same alternate domain name",
+      "A Lambda@Edge function that deletes the cache after each API request"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Cache behaviours are matched by path pattern, so one behaviour for the image paths uses a long TTL while another for the API paths uses a caching-disabled policy on the same distribution.",
+    "distractors": [
+      "",
+      "A single short TTL both under-caches the images and still risks serving stale personalised responses.",
+      "Two distributions cannot share one alternate domain name, and the split is unnecessary.",
+      "Lambda@Edge cannot delete cache entries per request, and invalidations are not a caching strategy."
+    ]
+  },
+  {
+    "id": "q339",
+    "domain": "perf",
+    "lecture": "11-rds-aurora",
+    "difficulty": 1,
+    "anchor": "multi-az-vs-read-replicas",
+    "stem": "An RDS for PostgreSQL instance is saturated by a growing volume of reporting queries, while write throughput is comfortable. The reports can tolerate data that is a few seconds old. What should the architect do?",
+    "options": [
+      "Add read replicas and point the reporting workload at them",
+      "Convert the instance to a Multi-AZ deployment",
+      "Enable storage auto scaling on the instance",
+      "Increase the backup retention period and report from snapshots"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Read replicas take read traffic off the primary and are asynchronous, which the few-seconds staleness tolerance explicitly permits.",
+    "distractors": [
+      "",
+      "Multi-AZ is a synchronous standby for availability; its standby does not serve read traffic.",
+      "Storage auto scaling adds capacity, not read throughput.",
+      "Snapshots are point-in-time backups and are not queryable as a live reporting source."
+    ]
+  },
+  {
+    "id": "q340",
+    "domain": "perf",
+    "lecture": "12-dynamodb",
+    "difficulty": 2,
+    "anchor": "the-feature-list-that-answers-questions",
+    "stem": "A DynamoDB-backed product catalogue is read-heavy with repeated lookups of the same items. The team wants microsecond read latency with no application caching logic to write. What should they add?",
+    "options": [
+      "Amazon DynamoDB Accelerator (DAX)",
+      "An Amazon ElastiCache for Redis cluster in front of the table",
+      "A global secondary index on the product identifier",
+      "DynamoDB Streams with a Lambda cache warmer"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "DAX is an in-memory cache built for DynamoDB that delivers microsecond reads and is API-compatible, so the application keeps using DynamoDB calls with no caching code.",
+    "distractors": [
+      "",
+      "ElastiCache would work but the application must implement cache population and invalidation itself.",
+      "A GSI supports queries on a different key; it does not reduce latency for repeated reads of the same item.",
+      "Streams capture changes; they are not a read cache."
+    ]
+  },
+  {
+    "id": "q341",
+    "domain": "perf",
+    "lecture": "13-caching-analytics",
+    "difficulty": 2,
+    "anchor": "kinesis-data-streams-vs-firehose",
+    "stem": "Clickstream events must be delivered to Amazon S3 in near real time with no servers or shard management, and several unrelated consumers must each replay the same events independently for up to 24 hours. Which design is correct?",
+    "options": [
+      "Kinesis Data Streams for the consumers, with a Firehose delivery stream to S3",
+      "Kinesis Data Firehose only, with each consumer reading from S3",
+      "Kinesis Data Streams only, with a consumer application writing to S3",
+      "Amazon SQS standard queues, one per consumer, with a Lambda writer to S3"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Data Streams retains records so multiple independent consumers can read and replay the same events, and a Firehose delivery stream reading from it handles buffered, serverless delivery into S3.",
+    "distractors": [
+      "",
+      "Firehose does not retain records for independent replay; consumers would be limited to whatever landed in S3.",
+      "Writing to S3 from a custom consumer means building and operating the batching, retry and partitioning Firehose provides.",
+      "Fanning out to per-consumer SQS queues loses ordering and replay, and adds queues to manage."
+    ]
+  },
+  {
+    "id": "q342",
+    "domain": "perf",
+    "lecture": "06-s3",
+    "difficulty": 2,
+    "anchor": "performance-and-cost-levers",
+    "stem": "Field teams across several continents upload 5 GB video files to a single S3 bucket in eu-west-1. Uploads are slow and frequently fail near the end. Which two changes address this? (Choose TWO.)",
+    "options": [
+      "Enable S3 Transfer Acceleration on the bucket",
+      "Use multipart upload for the large files",
+      "Enable S3 Versioning on the bucket",
+      "Switch the bucket to S3 Intelligent-Tiering",
+      "Put an Application Load Balancer in front of the bucket"
+    ],
+    "correct": [
+      0,
+      1
+    ],
+    "explanation": "Transfer Acceleration routes uploads over the AWS backbone from the nearest edge location, and multipart upload parallelises the transfer and lets a failed part be retried instead of the whole file.",
+    "distractors": [
+      "",
+      "",
+      "Versioning protects against overwrite and deletion but does nothing for upload speed or reliability.",
+      "Intelligent-Tiering optimises storage cost after the object has landed.",
+      "S3 is not fronted by an Application Load Balancer."
+    ]
+  },
+  {
+    "id": "q343",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "difficulty": 3,
+    "anchor": "policy-evaluation-logic",
+    "stem": "A developer's IAM role has an identity policy allowing every S3 action. A permissions boundary attached to the role allows only s3:GetObject. An SCP on the account allows all S3 actions. What can the role do in S3?",
+    "options": [
+      "Only s3:GetObject",
+      "Every S3 action, because the identity policy allows them",
+      "Nothing, because the boundary and the identity policy disagree",
+      "Every S3 action except those the boundary omits, if the resource policy allows them"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "An action is allowed only if it is permitted by every applicable policy type. The permissions boundary caps the role's effective permissions at s3:GetObject regardless of how broad the identity policy is.",
+    "distractors": [
+      "",
+      "A permissions boundary is a ceiling; a broad identity policy cannot exceed it.",
+      "A boundary narrower than the identity policy is the normal case, not a conflict that denies everything.",
+      "A resource policy cannot grant a principal permissions that its own boundary excludes."
+    ]
+  },
+  {
+    "id": "q344",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "difficulty": 2,
+    "anchor": "cross-account-access-the-externalid-trap",
+    "stem": "A company with dozens of AWS accounts wants employees to sign in with their existing corporate directory credentials and receive appropriate permissions in each account, without creating IAM users per account. What should the architect use?",
+    "options": [
+      "AWS IAM Identity Center federated to the corporate directory, with permission sets",
+      "An IAM user in every account, with a shared password policy",
+      "An IAM role in each account with an ExternalId condition on the trust policy",
+      "AWS Directory Service Simple AD in every account"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "IAM Identity Center federates to an external identity provider or directory once and assigns permission sets across all accounts in the organisation, so there are no per-account IAM users.",
+    "distractors": [
+      "",
+      "Per-account IAM users is precisely the long-term credential sprawl the requirement rules out.",
+      "ExternalId protects against the confused deputy problem for third-party access; it is not a workforce sign-in mechanism.",
+      "Simple AD in every account multiplies directories rather than federating one."
+    ]
+  },
+  {
+    "id": "q345",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "difficulty": 2,
+    "anchor": "security-groups-vs-nacls",
+    "stem": "Instances in a private subnet can send requests to the internet through a NAT gateway, but no responses arrive. The security groups allow all outbound traffic, and the subnet's network ACL allows outbound on ports 80 and 443 and inbound on port 443 only. What is the cause?",
+    "options": [
+      "The network ACL does not allow inbound traffic on the ephemeral port range",
+      "The security groups need an explicit inbound rule for the return traffic",
+      "The NAT gateway is in a private subnet with no route to the internet gateway",
+      "The route table is missing a route for 0.0.0.0/0 to the NAT gateway"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Network ACLs are stateless, so return traffic must be allowed explicitly. Responses arrive on ephemeral ports, typically 1024–65535, and the ACL as described blocks them.",
+    "distractors": [
+      "",
+      "Security groups are stateful, so return traffic for an allowed outbound request is permitted automatically.",
+      "If the NAT gateway had no path to the internet the outbound requests would not leave at all.",
+      "Without that route the requests would never reach the NAT gateway in the first place."
+    ]
+  },
+  {
+    "id": "q346",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "difficulty": 2,
+    "anchor": "kms-and-envelope-encryption",
+    "stem": "A compliance policy requires that the cryptographic material behind a KMS key is replaced every year and that data encrypted before the change stays readable without re-encrypting it. What should be configured?",
+    "options": [
+      "Enable automatic key rotation on the customer managed KMS key",
+      "Create a new KMS key each year and re-encrypt all existing data",
+      "Schedule deletion of the key each year and import new material",
+      "Enable automatic rotation on an AWS managed key"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Automatic rotation creates new backing material while retaining the old material and the same key ID, so previously encrypted data decrypts transparently and no re-encryption is needed.",
+    "distractors": [
+      "",
+      "Creating a new key and re-encrypting everything meets the letter of the rule at enormous cost, which the requirement explicitly avoids.",
+      "Scheduling key deletion would make existing ciphertext permanently unreadable.",
+      "AWS managed keys rotate on a schedule AWS controls and cannot be configured to meet a specific policy."
+    ]
+  },
+  {
+    "id": "q347",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "difficulty": 1,
+    "anchor": "threat-detection",
+    "stem": "A company must discover whether any of its thousands of S3 buckets contain customer credit card numbers or other personally identifiable information, and be alerted when new sensitive data appears. Which service does this?",
+    "options": [
+      "Amazon Macie",
+      "Amazon GuardDuty",
+      "Amazon Inspector",
+      "AWS Config with an S3 public-access rule"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Macie uses machine learning and pattern matching to discover and classify sensitive data such as PII and payment card numbers in S3, and reports findings as it scans.",
+    "distractors": [
+      "",
+      "GuardDuty detects malicious or anomalous activity from logs; it does not inspect object contents.",
+      "Inspector scans workloads for software vulnerabilities and unintended network exposure, not data content.",
+      "Config evaluates resource configuration such as public access settings, not what the objects contain."
+    ]
+  },
+  {
+    "id": "q348",
+    "domain": "secure",
+    "lecture": "06-s3",
+    "difficulty": 2,
+    "anchor": "encryption",
+    "stem": "Objects in a bucket must be encrypted with a customer managed key so that key usage is auditable and can be revoked, but the workload writes millions of small objects and KMS request charges have become significant. What should the architect enable?",
+    "options": [
+      "S3 Bucket Keys with SSE-KMS",
+      "SSE-S3 instead of SSE-KMS",
+      "SSE-C, supplying the key on every request",
+      "Client-side encryption with the AWS Encryption SDK"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "An S3 Bucket Key causes S3 to obtain a short-lived bucket-level key from KMS and use it for many objects, cutting KMS request traffic and cost substantially while keeping the customer managed key and its audit trail.",
+    "distractors": [
+      "",
+      "SSE-S3 removes the KMS charges but also removes the customer managed key, its audit trail and the ability to revoke it.",
+      "SSE-C makes the application responsible for holding and supplying keys and provides no KMS audit trail.",
+      "Client-side encryption shifts substantial key handling into the application and does not address the requirement more cheaply."
+    ]
+  },
+  {
+    "id": "q349",
+    "domain": "secure",
+    "lecture": "15-observability",
+    "difficulty": 2,
+    "anchor": "cloudtrail",
+    "stem": "Security requires one immutable record of API activity across every account in the organisation, including accounts created in the future, stored where individual account administrators cannot alter it. What should be configured?",
+    "options": [
+      "An organization trail in CloudTrail delivering to an S3 bucket in a dedicated logging account",
+      "A separate CloudTrail trail in each account writing to that account's own S3 bucket",
+      "CloudWatch Logs subscriptions from each account to a central log group",
+      "AWS Config aggregators collecting configuration items into a management account"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "An organization trail is created once in the management account, applies automatically to every existing and future member account, and can deliver to a bucket in a separate logging account that member administrators cannot modify.",
+    "distractors": [
+      "",
+      "Per-account trails must be created manually for new accounts and leave the logs where local administrators can tamper with them.",
+      "CloudWatch Logs subscriptions move log data but do not by themselves capture API activity in every account automatically.",
+      "Config records resource configuration changes, not the API call history CloudTrail provides."
+    ]
+  },
+  {
+    "id": "q350",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "difficulty": 2,
+    "anchor": "secrets-parameters-certificates",
+    "stem": "A public TLS certificate issued by AWS Certificate Manager will be used on a CloudFront distribution. Where must the certificate be requested or imported?",
+    "options": [
+      "In the us-east-1 Region",
+      "In the same Region as the origin",
+      "In any Region, because CloudFront is global",
+      "In every Region where an edge location serves traffic"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "CloudFront only reads ACM certificates from us-east-1, regardless of where the origin lives. Regional services such as ALB need the certificate in their own Region instead.",
+    "distractors": [
+      "",
+      "The origin's Region is where an Application Load Balancer would need its certificate, not CloudFront.",
+      "CloudFront is global but its certificate lookup is specifically tied to us-east-1.",
+      "Certificates are not provisioned per edge location."
+    ]
+  },
+  {
+    "id": "q351",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "difficulty": 2,
+    "anchor": "cost-patterns-the-exam-loves",
+    "stem": "A VPC spans three Availability Zones with private subnets in each. To save money the team deployed a single NAT gateway in one Availability Zone and routed all three subnets to it. Which two statements describe the consequences? (Choose TWO.)",
+    "options": [
+      "Traffic from the other two Availability Zones incurs cross-AZ data transfer charges",
+      "Losing that Availability Zone removes internet egress for all three subnets",
+      "NAT gateway hourly charges triple compared with one gateway per Availability Zone",
+      "Instances in the other Availability Zones lose their private connectivity to each other",
+      "The NAT gateway cannot scale beyond the bandwidth of a single instance"
+    ],
+    "correct": [
+      0,
+      1
+    ],
+    "explanation": "Routing subnets in other Availability Zones to a single NAT gateway sends that traffic across zones, which is billable, and the gateway becomes a zonal single point of failure for all egress.",
+    "distractors": [
+      "",
+      "",
+      "One gateway costs less per hour than three; the saving is real, which is why the pattern is tempting.",
+      "Traffic between subnets inside a VPC is routed locally and does not involve the NAT gateway.",
+      "NAT gateways scale automatically to tens of gigabits per second, unlike a NAT instance."
+    ]
+  },
+  {
+    "id": "q352",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "difficulty": 2,
+    "anchor": "where-the-money-actually-goes",
+    "stem": "An analytics fleet in private subnets reads terabytes from Amazon S3 in the same Region every day, and the NAT gateway data processing charges dominate the bill. What is the cheapest correct fix?",
+    "options": [
+      "Create an S3 gateway VPC endpoint and route the subnets to it",
+      "Create an S3 interface VPC endpoint powered by AWS PrivateLink",
+      "Move the instances into public subnets with public IP addresses",
+      "Enable S3 Transfer Acceleration for the bucket"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "A gateway endpoint for S3 adds a route so the traffic never traverses the NAT gateway, and gateway endpoints themselves carry no hourly or data processing charge.",
+    "distractors": [
+      "",
+      "An interface endpoint also bypasses the NAT gateway but bills per hour and per GB, so it is not the cheapest option for S3.",
+      "Public subnets remove the NAT charge but expose the fleet directly to the internet, which is a security regression.",
+      "Transfer Acceleration is for long-distance uploads and would add cost, not remove it."
+    ]
+  },
+  {
+    "id": "q353",
+    "domain": "cost",
+    "lecture": "03-ec2",
+    "difficulty": 2,
+    "anchor": "the-five-purchasing-models",
+    "stem": "Developer workstations on EC2 are used only during office hours but take several minutes to warm their in-memory caches after each start. The team wants to stop paying for compute overnight without losing that warm state. What should they use?",
+    "options": [
+      "EC2 hibernation, stopping the instances at the end of the day",
+      "Stopping the instances normally at the end of the day",
+      "Terminating the instances and relaunching from an AMI each morning",
+      "Moving the workstations to Spot Instances with a stop interruption behaviour"
+    ],
+    "correct": [
+      0
+    ],
+    "explanation": "Hibernation writes the instance's memory to the root EBS volume and restores it on start, so the caches survive while compute charges stop overnight.",
+    "distractors": [
+      "",
+      "A normal stop discards memory contents, so the warm-up cost returns every morning.",
+      "Terminating and relaunching loses both the memory state and any local changes.",
+      "Spot Instances can be interrupted at any time, which is unsuitable for interactive developer workstations."
+    ]
   }
 ]

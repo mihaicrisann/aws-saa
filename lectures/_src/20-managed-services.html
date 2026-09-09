@@ -1,0 +1,167 @@
+  <p>A slice of the exam is pure recognition. The scenario describes a job in plain English, three options are services that cannot do it, and one is the service built for exactly that. You do not need to know how these work — you need to map <strong>job → name</strong> in a couple of seconds and move on. This lecture is that map.</p>
+
+  <div class="note exam">
+    <span class="label">Why these questions are free marks</span>
+    <p>They carry the same weight as a VPC routing question and take a tenth of the time. They also have a tell: when an option would require you to <strong>build and train something yourself</strong>, and another option is a managed service that does it out of the box, the managed service wins — the qualifier is almost always "least operational overhead" or "fastest to implement".</p>
+  </div>
+
+  <h2 data-mark="01">The AI services, by input</h2>
+
+  <p>Group them by what goes <em>in</em> and they stop blurring together.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Input</th><th>Service</th><th>Does</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="2">Images and video</td><td><strong>Rekognition</strong></td><td>Objects, faces, celebrities, moderation, text in images. "Detect inappropriate content", "identify faces".</td></tr>
+      <tr><td><strong>Textract</strong></td><td>Extracts <strong>text, forms and tables from scanned documents</strong>. Invoices and PDFs, not photographs.</td></tr>
+      <tr><td rowspan="2">Audio</td><td><strong>Transcribe</strong></td><td>Speech → text. Call recordings, subtitles.</td></tr>
+      <tr><td><strong>Polly</strong></td><td>Text → speech. The mirror image of Transcribe.</td></tr>
+      <tr><td rowspan="4">Text</td><td><strong>Comprehend</strong></td><td>Understands text: sentiment, entities, key phrases, language, PII detection.</td></tr>
+      <tr><td><strong>Translate</strong></td><td>One language → another.</td></tr>
+      <tr><td><strong>Kendra</strong></td><td><strong>Intelligent search</strong> across your documents, answering natural-language questions.</td></tr>
+      <tr><td><strong>Lex</strong></td><td>Conversational bots — the engine behind Alexa. Intents and slots.</td></tr>
+      <tr><td rowspan="2">Your own data</td><td><strong>Forecast</strong></td><td>Time-series prediction: demand, inventory, capacity.</td></tr>
+      <tr><td><strong>Fraud Detector</strong></td><td>Scores online transactions and sign-ups for fraud.</td></tr>
+      <tr><td>Anything</td><td><strong>SageMaker</strong></td><td>Build, train and host <strong>your own</strong> model. The right answer only when no purpose-built service fits, or the scenario says custom model.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="stack">
+      <div class="flow">
+        <span class="node user">Recorded call</span>
+        <span class="arrow">audio</span>
+        <span class="node hl">Transcribe</span>
+        <span class="arrow">text</span>
+        <span class="node hl">Comprehend</span>
+        <span class="arrow">sentiment</span>
+        <span class="node store">DynamoDB</span>
+      </div>
+      <div class="flow">
+        <span class="node user">Scanned invoice</span>
+        <span class="arrow">image</span>
+        <span class="node hl">Textract</span>
+        <span class="arrow">fields</span>
+        <span class="node hl">Translate</span>
+        <span class="arrow">EN</span>
+        <span class="node store">S3</span>
+      </div>
+    </div>
+    <figcaption><strong>They chain.</strong> Multi-step scenarios usually want two of these in a row, with S3 and Lambda between them — read the pipeline left to right and name each hop.</figcaption>
+  </figure>
+
+  <div class="note gotcha">
+    <span class="label">The three pairs that get swapped</span>
+    <p><strong>Textract vs Rekognition</strong> — a scanned <em>document</em> is Textract; a <em>photograph or video frame</em> is Rekognition.<br>
+    <strong>Transcribe vs Polly</strong> — Transcribe listens, Polly speaks.<br>
+    <strong>Kendra vs OpenSearch</strong> — Kendra answers a natural-language question over documents; OpenSearch is a search and log-analytics engine you operate and query.</p>
+  </div>
+
+  <h2 data-mark="02">Purpose-built databases</h2>
+
+  <p>You know RDS, Aurora and DynamoDB. The rest appear as a single distractor-heavy question: the scenario names a <strong>data shape</strong>, and exactly one engine matches it.</p>
+
+  <div class="decisions">
+    <span class="label">Data shape → engine</span>
+    <div class="decision"><span class="cue">Time-stamped metrics from devices, at scale</span><span class="arrow">→</span><span class="ans">Timestream</span></div>
+    <div class="decision"><span class="cue">Relationships, "friends of friends", fraud rings, recommendations</span><span class="arrow">→</span><span class="ans">Neptune (graph)</span></div>
+    <div class="decision"><span class="cue">Immutable, cryptographically verifiable ledger of changes</span><span class="arrow">→</span><span class="ans">QLDB</span></div>
+    <div class="decision"><span class="cue">Existing MongoDB application</span><span class="arrow">→</span><span class="ans">DocumentDB</span></div>
+    <div class="decision"><span class="cue">Existing Cassandra workload</span><span class="arrow">→</span><span class="ans">Keyspaces</span></div>
+    <div class="decision"><span class="cue">Petabyte-scale SQL analytics over a warehouse</span><span class="arrow">→</span><span class="ans">Redshift</span></div>
+    <div class="decision"><span class="cue">Ad-hoc SQL straight over files in S3</span><span class="arrow">→</span><span class="ans">Athena</span></div>
+  </div>
+
+  <div class="note nuance">
+    <span class="label">Ledger vs backup</span>
+    <p>QLDB questions describe an <strong>audit requirement</strong> — "prove no one altered the record". That is not the same as versioning or backups, which prove nothing about tampering. If the scenario says <em>verifiable</em> or <em>immutable history of changes</em>, it is QLDB.</p>
+  </div>
+
+  <h2 data-mark="03">Seeing inside a distributed application</h2>
+
+  <p>Three tools, three different questions, and the exam distinguishes them sharply.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tool</th><th>Answers</th><th>Cue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CloudWatch</strong></td><td>"Is it healthy, and what did it log?"</td><td>Metrics, alarms, dashboards, log queries</td></tr>
+      <tr><td><strong>CloudTrail</strong></td><td>"<strong>Who</strong> called which API, when?"</td><td>Audit, governance, "who deleted it"</td></tr>
+      <tr><td><strong>X-Ray</strong></td><td>"<strong>Where</strong> in the chain of services did the time go?"</td><td><strong>Tracing</strong>, "identify the bottleneck across microservices", "latency in one of the downstream calls"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure class="diagram">
+    <div class="flow">
+      <span class="node user">Client</span>
+      <span class="arrow">30 ms</span>
+      <span class="node">API Gateway</span>
+      <span class="arrow bad">840 ms</span>
+      <span class="node bad">Payments service</span>
+      <span class="arrow">8 ms</span>
+      <span class="node store">DynamoDB</span>
+    </div>
+    <figcaption><strong>This picture is what X-Ray produces.</strong> CloudWatch would show each service is "up" and each log line separately; only a trace attributes the latency to one hop.</figcaption>
+  </figure>
+
+  <div class="note exam">
+    <span class="label">One sentence that settles it</span>
+    <p>"Requests are slow but every service reports healthy, and we cannot tell which one is responsible" → <strong>X-Ray</strong>. Distributed tracing is the only thing that follows a single request across service boundaries.</p>
+  </div>
+
+  <h2 data-mark="04">Governance and the rest of the toolbox</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Service</th><th>The job it is the answer to</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Compute Optimizer</strong></td><td>Recommends right-sizing from actual utilisation — "we are over-provisioned but do not know by how much"</td></tr>
+      <tr><td><strong>Trusted Advisor</strong></td><td>Broad checks across cost, security, fault tolerance, limits</td></tr>
+      <tr><td><strong>Service Catalog</strong></td><td>Give teams a menu of <strong>pre-approved</strong> products they may deploy themselves</td></tr>
+      <tr><td><strong>Proton</strong></td><td>Platform teams publish templated environments for developers to self-serve</td></tr>
+      <tr><td><strong>License Manager</strong></td><td>Track and enforce BYOL licence terms, often with dedicated hosts</td></tr>
+      <tr><td><strong>Personal Health Dashboard</strong></td><td>AWS events affecting <strong>your specific</strong> resources, not the public status page</td></tr>
+      <tr><td><strong>Managed Grafana / Managed Prometheus</strong></td><td>Keep existing Grafana dashboards or Prometheus metrics without operating them</td></tr>
+      <tr><td><strong>AppFlow</strong></td><td>No-code data transfer between SaaS apps (Salesforce, Slack) and AWS</td></tr>
+      <tr><td><strong>AppSync</strong></td><td>Managed <strong>GraphQL</strong>, with subscriptions for real-time clients</td></tr>
+      <tr><td><strong>Amplify</strong></td><td>Host and wire up a web or mobile front end quickly</td></tr>
+      <tr><td><strong>Device Farm</strong></td><td>Test an app on real phones in the cloud</td></tr>
+      <tr><td><strong>Pinpoint</strong></td><td>Targeted campaigns — email, SMS and push to <strong>customers</strong></td></tr>
+      <tr><td><strong>Elastic Transcoder / Kinesis Video Streams</strong></td><td>Convert media file formats / ingest live video for analysis</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note gotcha">
+    <span class="label">Pinpoint is not SNS</span>
+    <p><strong>SNS</strong> is application-to-application fan-out and operational alerts. <strong>Pinpoint</strong> is marketing to end users, with segments, campaigns and engagement analytics. "Notify the operations team" is SNS; "send a promotional SMS to customers who abandoned a basket" is Pinpoint.</p>
+  </div>
+
+  <h2 data-mark="05">Check yourself</h2>
+
+  <details class="check"><summary>Ten years of scanned paper contracts must become searchable structured data, with the parties and dates pulled out.</summary>
+  <div class="answer"><strong>Textract</strong> to extract the text, forms and tables, then <strong>Comprehend</strong> to identify entities such as names and dates. Rekognition reads text in <em>photographs</em>, not document layouts, and SageMaker would mean building what these already do.</div></details>
+
+  <details class="check"><summary>A microservices API is intermittently slow. Every service's CloudWatch alarms are green.</summary>
+  <div class="answer"><strong>X-Ray.</strong> Enable tracing and read the service map — it attributes latency to a specific hop. Healthy per-service metrics are exactly the situation tracing exists for.</div></details>
+
+  <details class="check"><summary>A fleet of sensors writes millions of time-stamped readings an hour, queried by time range.</summary>
+  <div class="answer"><strong>Timestream.</strong> Purpose-built for time series, with automatic tiering from memory to cost-optimised storage and time-series functions built in. DynamoDB can store the data but you would build the retention and roll-ups yourself.</div></details>
+
+  <details class="check"><summary>Developers must launch only approved, pre-configured stacks, without raw permissions.</summary>
+  <div class="answer"><strong>Service Catalog.</strong> Administrators publish products with constraints; users launch from the menu with a launch role rather than their own permissions. Organizations and SCPs restrict what is possible but do not hand anyone a curated menu.</div></details>
+
+  <div class="takeaways">
+    <h2>Take away</h2>
+    <ol>
+      <li>Group the AI services by input: images (Rekognition), documents (Textract), audio in (Transcribe), audio out (Polly), text meaning (Comprehend), languages (Translate), document Q&amp;A (Kendra), bots (Lex).</li>
+      <li>SageMaker is only correct when nothing purpose-built fits or the scenario says custom model.</li>
+      <li>Time series → Timestream. Graph → Neptune. Verifiable ledger → QLDB. MongoDB → DocumentDB. Cassandra → Keyspaces.</li>
+      <li>CloudWatch = health and logs, CloudTrail = who called the API, <strong>X-Ray = where the latency is</strong>.</li>
+      <li>Compute Optimizer right-sizes, Service Catalog hands out approved stacks, Personal Health Dashboard is about <em>your</em> resources.</li>
+      <li>SNS notifies systems and operators; Pinpoint markets to customers.</li>
+    </ol>
+  </div>

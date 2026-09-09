@@ -1,152 +1,1298 @@
 [
-{"id":"f001","domain":"resilient","lecture":"01-aws-shape","front":"Region vs Availability Zone vs edge location","back":"Region = independent geography with 3+ AZs. AZ = one or more discrete data centres with independent power/cooling/network, <2 ms apart. Edge = 600+ caching/termination sites used by CloudFront, Route 53, Global Accelerator, WAF.","note":"Survive an AZ failure → multi-AZ in one Region. Survive a Region failure → second Region."},
-{"id":"f002","domain":"resilient","lecture":"01-aws-shape","front":"Which services are global, regional, zonal?","back":"Global: IAM, Route 53, CloudFront, WAF for CloudFront, Organizations, billing. Regional: S3, DynamoDB, SQS, SNS, Lambda, VPC, ELB, KMS. Zonal: EC2 instances, EBS volumes, subnets, NAT gateway, a single RDS instance.","note":"Picking a service at the wrong scope is a classic distractor."},
-{"id":"f003","domain":"resilient","lecture":"01-aws-shape","front":"Why can't an EBS volume in eu-west-1a attach to an instance in eu-west-1b?","back":"EBS is zonal. Snapshot the volume (snapshots are Regional, stored in S3), then create a new volume from the snapshot in the target AZ.","note":"Same idea for AMIs: they are Regional and must be copied to be launched elsewhere."},
-{"id":"f004","domain":"secure","lecture":"01-aws-shape","front":"Shared responsibility: what is ALWAYS yours?","back":"Your data, and your IAM permissions. Everything else moves with how managed the service is.","note":"Any option claiming AWS configures your security groups or rotates your DB password is wrong."},
-{"id":"f005","domain":"resilient","lecture":"01-aws-shape","front":"Durability vs availability","back":"Durability = does the data still exist (S3: 11 nines). Availability = can you reach it right now (S3 Standard: 99.99%). S3 One Zone-IA keeps 11 nines within ONE AZ but drops availability to 99.5% — and losing the AZ loses the data.","note":""},
-{"id":"f006","domain":"secure","lecture":"02-iam","front":"Compute needs to call an AWS service. What do you attach?","back":"An IAM role (instance profile / execution role / task role). Never access keys, never keys in userdata or an AMI.","note":"Highest-frequency correct answer on the whole exam."},
-{"id":"f007","domain":"secure","lecture":"02-iam","front":"IAM policy evaluation order","back":"1) Any explicit Deny → denied. 2) SCP must permit. 3) Resource-based policy allow. 4) Identity policy / permissions boundary / session policy must all allow. 5) Otherwise implicit deny.","note":"Explicit Deny always wins. Absence of Allow = deny."},
-{"id":"f008","domain":"secure","lecture":"02-iam","front":"What does an SCP do?","back":"Sets the MAXIMUM permissions for accounts in an Organization or OU. It never grants anything — only filters. Does not apply to the management account.","note":"'Admin cannot remove this guardrail' → SCP, not an IAM policy."},
-{"id":"f009","domain":"secure","lecture":"02-iam","front":"Trust policy vs permissions policy on a role","back":"Trust policy = WHO may assume the role (its Principal). Permissions policy = WHAT the role may do once assumed.","note":""},
-{"id":"f010","domain":"secure","lecture":"02-iam","front":"Why does an S3 policy need two ARNs?","back":"Bucket-level actions (ListBucket) act on arn:aws:s3:::bucket. Object-level actions (GetObject, PutObject) act on arn:aws:s3:::bucket/*.","note":"Listing works but downloads fail → the /* ARN is missing."},
-{"id":"f011","domain":"secure","lecture":"02-iam","front":"Third party needs a role in your account. What must the trust policy require?","back":"An sts:ExternalId — a secret shared only with that vendor. Prevents the confused deputy problem.","note":""},
-{"id":"f012","domain":"secure","lecture":"02-iam","front":"Permissions boundary — what is it for?","back":"Caps the maximum permissions of one user or role. Standard use: let developers create roles but not roles more powerful than themselves (anti privilege-escalation).","note":""},
-{"id":"f013","domain":"secure","lecture":"02-iam","front":"Cognito vs IAM Identity Center","back":"Cognito = your application's END USERS. IAM Identity Center (ex AWS SSO) = your WORKFORCE signing into AWS accounts.","note":""},
-{"id":"f014","domain":"cost","lecture":"03-ec2","front":"EC2 family letters","back":"t burstable, m general purpose, c compute optimised, r/x/z memory optimised, i/d storage optimised (instance store), p/g/inf/trn accelerated. Suffix g = Graviton (ARM, ~20% better price/perf), n = network, d = local NVMe, a = AMD.","note":""},
-{"id":"f015","domain":"cost","lecture":"03-ec2","front":"When is Spot the answer?","back":"Fault-tolerant + stateless + interruptible + flexible start/end. Batch, CI, rendering, big-data workers, EMR task nodes. Up to 90% off, 2-minute interruption notice.","note":"Never for something needing a guaranteed uninterrupted window."},
-{"id":"f016","domain":"cost","lecture":"03-ec2","front":"Compute Savings Plan vs EC2 Instance Savings Plan vs RI","back":"Compute SP: any family/size/Region/OS PLUS Fargate and Lambda — most flexible, usually the right answer. EC2 Instance SP: one family in one Region, slightly cheaper. Standard RI: fixed config, biggest discount, sellable; zonal RIs also reserve capacity. Convertible RI: exchangeable.","note":"'We may migrate to Fargate/Lambda' → Compute Savings Plan."},
-{"id":"f017","domain":"cost","lecture":"03-ec2","front":"Dedicated Host vs Dedicated Instance","back":"Dedicated Host: you get the physical server, see sockets and cores, control placement — required for per-socket/per-core BYOL (Oracle, Windows). Dedicated Instance: isolated hardware but no socket visibility or placement control.","note":"'Licences tied to physical cores' → Dedicated Host."},
-{"id":"f018","domain":"perf","lecture":"03-ec2","front":"Three placement groups","back":"Cluster: one rack, one AZ, lowest latency — HPC. Spread: distinct hardware, max 7 per AZ — critical isolated instances. Partition: rack groups — HDFS, Cassandra, Kafka.","note":""},
-{"id":"f019","domain":"perf","lecture":"03-ec2","front":"Scale-out is slow because user data installs dependencies. Fix?","back":"Bake a golden AMI (EC2 Image Builder). Optionally add an ASG warm pool. User data should only do per-instance config.","note":""},
-{"id":"f020","domain":"secure","lecture":"03-ec2","front":"Shell into a private instance with no bastion and no open ports","back":"AWS Systems Manager Session Manager (SSM agent + instance role). Sessions can be logged to S3 or CloudWatch Logs.","note":""},
-{"id":"f021","domain":"secure","lecture":"03-ec2","front":"IMDSv2 — why does it matter?","back":"Requires a session token (PUT) and a low IP hop limit, which blocks SSRF attacks that read IAM credentials from 169.254.169.254 via a vulnerable app.","note":""},
-{"id":"f022","domain":"perf","lecture":"04-elb-asg","front":"ALB vs NLB vs GWLB","back":"ALB: layer 7, path/host/header routing, targets can include Lambda. NLB: layer 4 TCP/UDP, millions of req/s, STATIC IP per AZ. GWLB: layer 3, inserts third-party firewall/IDS appliances (GENEVE 6081).","note":"'Static IP to whitelist' → NLB. 'Route /api vs /images' → ALB."},
-{"id":"f023","domain":"resilient","lecture":"04-elb-asg","front":"Why set the ASG health check type to ELB?","back":"EC2 health checks only see hypervisor status. ELB health checks test the application, so an instance that boots but returns 500s gets replaced.","note":""},
-{"id":"f024","domain":"resilient","lecture":"04-elb-asg","front":"Users logged out at random after scaling. Best fix?","back":"Move session state off the instances into ElastiCache for Redis or DynamoDB. Sticky sessions are a workaround that still loses sessions when an instance is replaced.","note":""},
-{"id":"f025","domain":"perf","lecture":"04-elb-asg","front":"Auto Scaling policies","back":"Target tracking (default, 'keep CPU at 60%'), step scaling (different response per severity), simple (legacy), scheduled (known recurring load), predictive (ML forecast, pre-warms capacity).","note":"'Traffic triples at 09:00 every weekday' → scheduled or predictive."},
-{"id":"f026","domain":"resilient","lecture":"04-elb-asg","front":"How do you scale a worker fleet reading from SQS?","back":"Target tracking on backlog per instance, derived from the ApproximateNumberOfMessagesVisible metric. Queue depth is a leading indicator; CPU is lagging.","note":""},
-{"id":"f027","domain":"resilient","lecture":"04-elb-asg","front":"Lifecycle hooks","back":"Pause an instance in Pending:Wait (bootstrap it) or Terminating:Wait (drain, copy logs off) before Auto Scaling proceeds.","note":""},
-{"id":"f028","domain":"perf","lecture":"05-serverless","front":"Lambda's hard limits","back":"15 min max execution, 128 MB–10 GB memory (CPU scales with it), 512 MB–10 GB /tmp, 50 MB zipped / 250 MB unzipped / 10 GB container image, 6 MB sync payload, 1,000 default concurrency.","note":"The 15-minute ceiling is the single most useful elimination rule."},
-{"id":"f029","domain":"perf","lecture":"05-serverless","front":"Provisioned vs reserved concurrency","back":"Provisioned: keeps N environments warm — kills cold starts. Reserved: caps and guarantees a slice of the account concurrency pool — protects other functions or a downstream database.","note":""},
-{"id":"f030","domain":"secure","lecture":"05-serverless","front":"A VPC-attached Lambda cannot reach the internet. Why?","back":"VPC-attached Lambdas get no public IP. Put them in private subnets routing 0.0.0.0/0 to a NAT gateway, and use VPC endpoints for AWS services.","note":"A public subnet does NOT give a Lambda internet access."},
-{"id":"f031","domain":"perf","lecture":"05-serverless","front":"ECS task execution role vs task role","back":"Execution role: ECS/Fargate pulls the image from ECR and writes logs. Task role: your application code's credentials for calling AWS services.","note":"Task won't start (image pull) → execution role. App gets AccessDenied → task role."},
-{"id":"f032","domain":"perf","lecture":"05-serverless","front":"HTTP API vs REST API","back":"HTTP API: ~70% cheaper, lower latency, JWT authorizers, Lambda proxy. REST API: API keys + usage plans, request/response transformation, caching, resource policies, private endpoints, direct WAF.","note":""},
-{"id":"f033","domain":"perf","lecture":"05-serverless","front":"Job runs longer than 15 minutes. Where does it go?","back":"ECS/Fargate, AWS Batch, Step Functions orchestrating shorter steps, or EC2.","note":""},
-{"id":"f034","domain":"cost","lecture":"06-s3","front":"S3 storage class minimum durations","back":"Standard-IA and One Zone-IA: 30 days. Glacier Instant and Flexible: 90 days. Deep Archive: 180 days. Express One Zone: 1 hour. Objects under 128 KB are not transitioned to IA by default.","note":"This is why 'transition to IA after 3 days' is a wrong answer."},
-{"id":"f035","domain":"cost","lecture":"06-s3","front":"Unknown or changing S3 access patterns. Which class?","back":"S3 Intelligent-Tiering. Small monitoring fee per object, automatic tiering, no retrieval charges, milliseconds in the instant tiers.","note":""},
-{"id":"f036","domain":"cost","lecture":"06-s3","front":"Glacier retrieval times","back":"Instant Retrieval: milliseconds. Flexible Retrieval: expedited 1–5 min, standard 3–5 h, bulk 5–12 h (free). Deep Archive: standard 12 h, bulk 48 h.","note":"'Must be available in milliseconds' rules out everything except Instant Retrieval."},
-{"id":"f037","domain":"secure","lecture":"06-s3","front":"Data must be impossible to delete, even by root","back":"S3 Object Lock in COMPLIANCE mode with a retention period (requires versioning). Governance mode can be overridden by a privileged principal.","note":""},
-{"id":"f038","domain":"resilient","lecture":"06-s3","front":"S3 replication facts","back":"Needs versioning on both buckets + an IAM role. Asynchronous. Only replicates NEW objects — use S3 Batch Replication to backfill. Not chained (A→B→C doesn't reach C from A). RTC gives a 15-minute SLA.","note":""},
-{"id":"f039","domain":"secure","lecture":"06-s3","front":"Serve a private S3 site over HTTPS on a custom domain","back":"CloudFront + Origin Access Control (OAC) + an ACM certificate in us-east-1 + Route 53 alias. Block Public Access stays fully on.","note":"OAC replaces the older OAI."},
-{"id":"f040","domain":"secure","lecture":"06-s3","front":"S3 encryption options","back":"SSE-S3 (AES-256, AWS-managed, default). SSE-KMS (your key, CloudTrail audit, rotation — add S3 Bucket Keys to cut KMS calls up to 99%). DSSE-KMS (double). SSE-C (you send the key each request). Client-side.","note":""},
-{"id":"f041","domain":"perf","lecture":"06-s3","front":"S3 request rate limits","back":"3,500 PUT/COPY/POST/DELETE and 5,500 GET/HEAD per second PER PREFIX. Spread keys across more prefixes for more throughput.","note":""},
-{"id":"f042","domain":"perf","lecture":"06-s3","front":"S3 Transfer Acceleration vs CloudFront","back":"Transfer Acceleration speeds UPLOADS from distant clients via edge locations onto the AWS backbone. CloudFront caches DOWNLOADS at the edge.","note":""},
-{"id":"f043","domain":"secure","lecture":"06-s3","front":"Presigned URL vs CloudFront signed URL/cookie","back":"Presigned URL: one object, served from the bucket's Region, simple. CloudFront signed URL: one file at the edge. CloudFront signed COOKIE: many files (a whole video library) with one authorisation.","note":""},
-{"id":"f044","domain":"perf","lecture":"07-block-and-file","front":"EBS volume types","back":"gp3 default (3,000 IOPS/125 MB/s baseline, up to 16,000/1,000, IOPS independent of size, ~20% cheaper than gp2). io2 Block Express up to 256,000 IOPS + Multi-Attach. st1 throughput HDD 500 MB/s. sc1 cold HDD. st1/sc1 cannot boot.","note":"gp2 sized up purely for IOPS → move to gp3."},
-{"id":"f045","domain":"perf","lecture":"07-block-and-file","front":"Multiple instances need the same files concurrently","back":"Amazon EFS (Linux/NFS). Windows/SMB/Active Directory → FSx for Windows File Server. HPC/ML over S3 data → FSx for Lustre.","note":"This cue eliminates EBS immediately."},
-{"id":"f046","domain":"perf","lecture":"07-block-and-file","front":"Instance store — when and when not?","back":"Highest possible IOPS, physically attached NVMe. EPHEMERAL: lost on stop, hibernate or terminate (survives reboot). Use for scratch, caches, buffers, self-replicating distributed systems. Never for persistent data.","note":""},
-{"id":"f047","domain":"cost","lecture":"07-block-and-file","front":"Wire or lorry? Migration rule of thumb","back":"~10 TB per day over a saturated 1 Gbps link. Under ~10 TB or with a fat idle pipe → DataSync. Hundreds of TB or a constrained link → Snowball Edge (~80 TB usable each). Up to 100 PB → Snowmobile.","note":"Exam questions give bandwidth and volume so you can do the arithmetic."},
-{"id":"f048","domain":"perf","lecture":"07-block-and-file","front":"Storage Gateway modes","back":"File (S3 File Gateway): on-prem NFS/SMB share backed by S3. Volume: iSCSI block, cached (primary in AWS) or stored (primary on-prem). Tape: virtual tape library for existing backup software.","note":""},
-{"id":"f049","domain":"secure","lecture":"08-vpc","front":"What makes a subnet 'public'?","back":"Its route table has 0.0.0.0/0 → Internet Gateway. That is the entire definition. The instance also needs a public IP or EIP to be reachable.","note":""},
-{"id":"f050","domain":"secure","lecture":"08-vpc","front":"Security group vs NACL","back":"SG: on the ENI, STATEFUL, ALLOW only, all rules evaluated together, can reference another security group. NACL: on the subnet, STATELESS, allow AND deny, numbered order, CIDR only.","note":"'Block one malicious IP' → NACL (SGs have no deny)."},
-{"id":"f051","domain":"secure","lecture":"08-vpc","front":"Traffic goes one way then hangs. NACL was just changed.","back":"NACLs are stateless — the return traffic must be allowed explicitly on ephemeral ports 1024–65535.","note":""},
-{"id":"f052","domain":"cost","lecture":"08-vpc","front":"NAT Gateway facts","back":"Outbound only, lives in a PUBLIC subnet with an EIP, ZONAL (deploy one per AZ), charged per hour AND per GB processed. Egress-only IGW is the IPv6 equivalent.","note":"One NAT for three AZs = single point of failure + cross-AZ charges."},
-{"id":"f053","domain":"secure","lecture":"08-vpc","front":"How many IPs does AWS reserve per subnet?","back":"Five: network address, VPC router, DNS, future use, broadcast. A /24 gives 251 usable. Smallest subnet is /28, largest VPC is /16.","note":""},
-{"id":"f054","domain":"secure","lecture":"08-vpc","front":"Order to debug 'traffic doesn't flow'","back":"Route table → NACL (both directions) → security group → public IP present / service listening. VPC Reachability Analyzer automates this and names the blocking hop.","note":""},
-{"id":"f055","domain":"secure","lecture":"08-vpc","front":"VPC Flow Logs — what do they capture?","back":"Accepted and REJECTED connection metadata (src/dst, port, protocol, action) per VPC, subnet or ENI. Not payloads — that's Traffic Mirroring.","note":""},
-{"id":"f056","domain":"cost","lecture":"09-vpc-connectivity","front":"Gateway endpoint vs interface endpoint","back":"Gateway: S3 and DynamoDB only, FREE, a route table entry, NOT reachable from on-premises. Interface (PrivateLink): an ENI with a private IP, almost every AWS service plus partner/own services, charged hourly + per GB, IS reachable over VPN/Direct Connect.","note":""},
-{"id":"f057","domain":"resilient","lecture":"09-vpc-connectivity","front":"Three limits of VPC peering","back":"1) NOT transitive (A↔B, B↔C does not give A↔C). 2) CIDRs must not overlap. 3) Route tables must be updated on both sides. n VPCs need n(n−1)/2 connections.","note":"Many VPCs / hub-and-spoke → Transit Gateway."},
-{"id":"f058","domain":"resilient","lecture":"09-vpc-connectivity","front":"VPN vs Direct Connect","back":"VPN: over the internet, IPsec encrypted, minutes to set up, ~1.25 Gbps/tunnel, best-effort. Direct Connect: private fibre, weeks–months to provision, 1/10/100 Gbps, CONSISTENT latency, NOT encrypted by default, much cheaper egress.","note":"HA Direct Connect = second DX at another location, or a VPN as backup (cheaper)."},
-{"id":"f059","domain":"secure","lecture":"09-vpc-connectivity","front":"Overlapping CIDRs, or exposing a service to hundreds of VPCs","back":"AWS PrivateLink — service behind an NLB published as an endpoint service, consumers create interface endpoints. Nothing is routed, so overlaps don't matter.","note":""},
-{"id":"f060","domain":"perf","lecture":"10-edge","front":"CNAME vs Alias record","back":"CNAME cannot be used at the zone apex (example.com). Alias works at the apex, points at AWS resources (ALB, CloudFront, S3 website, API Gateway), tracks their changing IPs, and queries are FREE.","note":"Apex → AWS resource is always an alias record."},
-{"id":"f061","domain":"perf","lecture":"10-edge","front":"Route 53 routing policies","back":"Simple, Weighted (canary/blue-green), Latency-based (fastest for the user), Failover (active-passive), Geolocation (compliance/residency), Geoproximity (distance + bias), Multivalue (up to 8 healthy at random), IP-based.","note":"Latency = speed. Geolocation = legally required location."},
-{"id":"f062","domain":"perf","lecture":"10-edge","front":"CloudFront vs Global Accelerator","back":"CloudFront: HTTP/HTTPS, caches, DNS name, origin groups for failover. Global Accelerator: ANY TCP/UDP, no caching, TWO STATIC ANYCAST IPs, sub-minute failover independent of DNS TTLs.","note":"UDP game / instant regional failover → Global Accelerator."},
-{"id":"f063","domain":"perf","lecture":"10-edge","front":"Cheaper than CloudFront invalidations?","back":"Versioned filenames (app.4f2a.js). Invalidations cost money at scale and are a blunt instrument.","note":""},
-{"id":"f064","domain":"resilient","lecture":"11-rds-aurora","front":"Multi-AZ vs read replica","back":"Multi-AZ: SYNCHRONOUS, automatic failover in 60–120 s, standby NOT readable — availability. Read replica: ASYNCHRONOUS, readable, manual promotion, can be cross-Region — performance.","note":"The most-tested distinction in the data domain."},
-{"id":"f065","domain":"resilient","lecture":"11-rds-aurora","front":"Aurora architecture","back":"Storage: 6 copies across 3 AZs, auto-growing to 128 TB, self-healing. Compute: 1 writer + up to 15 readers on the SAME storage, failover under ~30 s. Endpoints: cluster (writer), reader (load-balanced), custom.","note":"Aurora replicas are read scaling AND failover targets."},
-{"id":"f066","domain":"resilient","lecture":"11-rds-aurora","front":"Cross-Region relational DR with sub-second RPO","back":"Aurora Global Database — up to 5 secondary Regions, typically <1 s replication lag, ~1 minute failover.","note":""},
-{"id":"f067","domain":"perf","lecture":"11-rds-aurora","front":"Lambda exhausting database connections","back":"Amazon RDS Proxy — pools and multiplexes connections, also shortens failover and can enforce IAM auth.","note":""},
-{"id":"f068","domain":"secure","lecture":"11-rds-aurora","front":"Encrypt an existing unencrypted RDS instance","back":"Snapshot → copy the snapshot WITH encryption enabled → restore a new instance from the encrypted copy. Encryption can only be set at creation.","note":"Same pattern for an unencrypted EBS volume."},
-{"id":"f069","domain":"cost","lecture":"11-rds-aurora","front":"Spiky or intermittent relational workload","back":"Aurora Serverless v2 — scales capacity (ACUs) in fine increments within seconds and down when idle.","note":""},
-{"id":"f070","domain":"perf","lecture":"12-dynamodb","front":"DynamoDB throttling with capacity to spare. Why?","back":"A hot partition — the partition key has too few distinct values, so traffic concentrates. Fix with a high-cardinality key or write sharding. (Or an under-provisioned GSI throttling base-table writes.)","note":""},
-{"id":"f071","domain":"perf","lecture":"12-dynamodb","front":"GSI vs LSI","back":"GSI: any attributes as key, creatable ANY TIME, own capacity, eventually consistent, 20 per table. LSI: same partition key + different sort key, ONLY at table creation, shares capacity, can be strongly consistent, 5 per table.","note":"'Add a new query pattern to a live table' → GSI."},
-{"id":"f072","domain":"perf","lecture":"12-dynamodb","front":"Microsecond DynamoDB reads with no code change","back":"DAX (DynamoDB Accelerator) — API-compatible in-memory cache. ElastiCache would require writing cache-aside logic.","note":""},
-{"id":"f073","domain":"resilient","lecture":"12-dynamodb","front":"DynamoDB Streams vs Global Tables vs TTL","back":"Streams: 24-hour ordered change log, triggers Lambda. Global Tables: multi-Region multi-active replication (built on Streams, last-writer-wins). TTL: free asynchronous deletion of expired items.","note":""},
-{"id":"f074","domain":"cost","lecture":"12-dynamodb","front":"DynamoDB capacity modes","back":"On-demand: per request, instant scaling, best for unpredictable/new workloads. Provisioned + auto scaling: much cheaper for steady predictable traffic, and reservable.","note":""},
-{"id":"f075","domain":"perf","lecture":"12-dynamodb","front":"DynamoDB item size limit","back":"400 KB. Larger payloads go to S3 with a pointer stored in the item.","note":""},
-{"id":"f076","domain":"perf","lecture":"13-caching-analytics","front":"Redis vs Memcached","back":"Redis: data structures, persistence, replication, Multi-AZ automatic failover, pub/sub, sorted sets. Memcached: plain key-value, multi-threaded, no persistence, no replication.","note":"Persistence / HA / sorted sets / pub-sub → Redis. In doubt, Redis."},
-{"id":"f077","domain":"perf","lecture":"13-caching-analytics","front":"Kinesis Data Streams vs Data Firehose","back":"Data Streams: ~200 ms, retains 1–365 days, REPLAYABLE, many independent consumers, you size shards. Firehose: 60 s buffer, no storage, fully managed, ONE destination (S3/Redshift/OpenSearch/Splunk).","note":"'Least effort into S3' → Firehose. 'Replay / multiple consumers' → Data Streams."},
-{"id":"f078","domain":"perf","lecture":"13-caching-analytics","front":"Kinesis vs SQS","back":"SQS: work queue, message deleted after processing, one consumer group, no replay. Kinesis: ordered retained log, many independent consumers, replayable.","note":""},
-{"id":"f079","domain":"cost","lecture":"13-caching-analytics","front":"Athena is expensive. What do you change?","back":"Convert to Parquet/ORC (columnar), compress, and PARTITION. Athena bills per TB scanned — this routinely cuts 90%+.","note":""},
-{"id":"f080","domain":"perf","lecture":"13-caching-analytics","front":"Athena vs Redshift","back":"Athena: serverless SQL over S3, pay per scan, ad-hoc, nothing to provision. Redshift: petabyte columnar warehouse for complex joins and high-concurrency BI; Spectrum queries S3 too.","note":""},
-{"id":"f081","domain":"perf","lecture":"13-caching-analytics","front":"Analytics cue words","back":"Kafka → MSK. Spark/Hadoop → EMR. Full-text search / log analytics → OpenSearch. ETL + schema catalog → Glue. Dashboards for business users → QuickSight. Governed data lake → Lake Formation.","note":""},
-{"id":"f082","domain":"resilient","lecture":"14-decoupling","front":"SQS visibility timeout","back":"Default 30 s, max 12 h. If the consumer hasn't deleted the message by then it reappears and may be processed twice. 'Messages processed more than once' → raise it above worst-case processing time.","note":""},
-{"id":"f083","domain":"resilient","lecture":"14-decoupling","front":"Poison messages blocking a queue","back":"Attach a Dead Letter Queue with a maxReceiveCount redrive policy. Failing messages move aside after N attempts.","note":""},
-{"id":"f084","domain":"perf","lecture":"14-decoupling","front":"SQS standard vs FIFO","back":"Standard: near-unlimited throughput, at-least-once, best-effort ordering — consumers must be idempotent. FIFO: exactly-once and strict ordering within a message group, 300 msg/s (3,000 batched), name ends .fifo.","note":"Choose FIFO only when ordering or deduplication is explicitly required."},
-{"id":"f085","domain":"resilient","lecture":"14-decoupling","front":"The SNS fan-out pattern","back":"One event → SNS topic → a separate SQS queue per consumer. Each consumer buffers durably, retries and scales independently, and can replay.","note":"The reliable multi-consumer answer."},
-{"id":"f086","domain":"perf","lecture":"14-decoupling","front":"When is EventBridge the answer?","back":"React to AWS service events (EC2 state change, S3, Health), route by event CONTENT, SaaS partner integrations, and cron/rate SCHEDULES (EventBridge Scheduler).","note":"'Run something every night at 2am' → EventBridge Scheduler."},
-{"id":"f087","domain":"resilient","lecture":"14-decoupling","front":"Step Functions standard vs express","back":"Standard: up to 1 year, exactly-once, full execution history — long workflows and human approval. Express: up to 5 min, at-least-once, very high volume.","note":""},
-{"id":"f088","domain":"perf","lecture":"14-decoupling","front":"When is Amazon MQ the answer?","back":"A migrating application that already speaks JMS, AMQP, MQTT, STOMP or OpenWire and must not be rewritten. Greenfield → SQS/SNS.","note":""},
-{"id":"f089","domain":"secure","lecture":"15-observability","front":"CloudWatch vs CloudTrail vs Config","back":"CloudWatch: is it healthy, how busy (metrics, logs, alarms). CloudTrail: WHO called which API, when, from where. Config: what does this resource's configuration look like, and has it drifted.","note":"Constantly confused — memorise the one-liners."},
-{"id":"f090","domain":"resilient","lecture":"15-observability","front":"EC2 memory or disk metric missing","back":"They are guest-OS metrics the hypervisor cannot see. Install the CloudWatch agent to publish them as custom metrics.","note":""},
-{"id":"f091","domain":"secure","lecture":"15-observability","front":"CloudTrail management vs data events","back":"Management events (control plane) are on by default with 90 days of history. Data events (s3:GetObject, lambda:Invoke) are OFF by default and chargeable.","note":"'Who read that S3 object?' → enable data events."},
-{"id":"f092","domain":"secure","lecture":"15-observability","front":"Detect AND automatically fix a misconfiguration","back":"AWS Config rule + a remediation action (SSM Automation document). Add an SCP to prevent recurrence.","note":""},
-{"id":"f093","domain":"secure","lecture":"15-observability","front":"Systems Manager pieces worth knowing","back":"Session Manager (shell, no bastion), Patch Manager (fleet patching), Run Command (one command everywhere), Parameter Store (free config/secrets, no rotation), Automation (runbooks), Inventory.","note":""},
-{"id":"f094","domain":"secure","lecture":"15-observability","front":"Multi-account governance services","back":"Organizations (accounts, OUs, SCPs, consolidated billing). Control Tower (landing zone + guardrails + Account Factory). IAM Identity Center (SSO). Service Catalog (approved products). CloudFormation StackSets (deploy across accounts/Regions). AWS Backup (central backup policy).","note":""},
-{"id":"f095","domain":"secure","lecture":"16-security-toolbox","front":"Envelope encryption","back":"KMS Encrypt is capped at 4 KB. GenerateDataKey returns {plaintext key, encrypted key}. Encrypt the payload locally with the plaintext key, discard it, store the encrypted key beside the data.","note":""},
-{"id":"f096","domain":"secure","lecture":"16-security-toolbox","front":"KMS vs CloudHSM","back":"KMS: multi-tenant managed, FIPS 140-2 validated, key policies, CloudTrail auditing, automatic yearly rotation. CloudHSM: dedicated SINGLE-TENANT FIPS 140-2 Level 3 hardware, AWS has no access.","note":"'AWS must not be able to access the keys' → CloudHSM."},
-{"id":"f097","domain":"secure","lecture":"16-security-toolbox","front":"Cross-account read of a KMS-encrypted S3 object needs what?","back":"THREE agreements: the bucket policy, the caller's IAM policy, AND the KMS key policy (kms:Decrypt). KMS key policies are the primary control for the key.","note":"Also: KMS keys are Regional."},
-{"id":"f098","domain":"secure","lecture":"16-security-toolbox","front":"Secrets Manager vs Parameter Store","back":"Secrets Manager: per-secret charge, BUILT-IN automatic rotation with native RDS integration, cross-account, replication. Parameter Store: FREE standard tier, SecureString via KMS, no rotation.","note":""},
-{"id":"f099","domain":"secure","lecture":"16-security-toolbox","front":"ACM certificate rules","back":"Free, auto-renewing, usable on ELB, CloudFront, API Gateway, App Runner — NOT installable on EC2. For CloudFront the certificate must be in us-east-1.","note":""},
-{"id":"f100","domain":"secure","lecture":"16-security-toolbox","front":"WAF vs Shield Standard vs Shield Advanced vs Firewall Manager","back":"WAF: layer 7 rules (SQLi, XSS, bots, rate limiting, geo). Shield Standard: free automatic L3/L4 DDoS. Shield Advanced: $3k/mo, response team, cost protection. Firewall Manager: apply WAF/Shield/SG/Network Firewall policies org-wide.","note":""},
-{"id":"f101","domain":"secure","lecture":"16-security-toolbox","front":"The four threat-detection cue words","back":"THREAT → GuardDuty. VULNERABILITY → Inspector. PII → Macie. AGGREGATE findings → Security Hub. (Investigate a finding → Detective.)","note":"Asked almost word-for-word."},
-{"id":"f102","domain":"secure","lecture":"16-security-toolbox","front":"Cognito user pool vs identity pool","back":"User pool: a user directory — sign-up/sign-in, MFA, federation, issues JWTs, integrates with API Gateway and ALB. Identity pool: exchanges an identity for TEMPORARY AWS CREDENTIALS so the app can call S3/DynamoDB directly.","note":""},
-{"id":"f103","domain":"resilient","lecture":"17-resilience-dr","front":"RTO vs RPO","back":"RTO = downtime you can tolerate, bought with PRE-PROVISIONED CAPACITY. RPO = data loss you can tolerate, bought with REPLICATION FREQUENCY.","note":""},
-{"id":"f104","domain":"resilient","lecture":"17-resilience-dr","front":"The four DR strategies, cheapest first","back":"Backup & restore (hours/hours) → Pilot light (tens of min/min) → Warm standby (min/sec) → Multi-site active-active (near zero/near zero).","note":"Pick the CHEAPEST that meets the stated numbers."},
-{"id":"f105","domain":"resilient","lecture":"17-resilience-dr","front":"Pilot light vs warm standby","back":"Pilot light: data replicates, NO application servers running — launch from AMIs at failover. Warm standby: a scaled-down but FULLY RUNNING copy you scale up.","note":"'A scaled-down version is always running' → warm standby."},
-{"id":"f106","domain":"resilient","lecture":"17-resilience-dr","front":"Cross-Region mechanisms by service","back":"S3 → CRR. RDS → cross-Region read replica or snapshot copy. Aurora → Global Database. DynamoDB → Global Tables. EBS/AMI → copy snapshots. Routing → Route 53 failover or Global Accelerator. Infra → StackSets.","note":""},
-{"id":"f107","domain":"resilient","lecture":"17-resilience-dr","front":"Protect backups from ransomware or a malicious admin","back":"AWS Backup Vault Lock in compliance mode, copies in a SEPARATE ACCOUNT and Region, S3 Object Lock compliance mode, MFA delete.","note":""},
-{"id":"f108","domain":"cost","lecture":"18-cost","front":"Which data transfers cost money?","back":"IN: free. OUT to internet: expensive. CROSS-AZ: charged BOTH directions. Cross-Region: charged. Within an AZ over private IPs: free. Through CloudFront or a gateway endpoint: cheaper or free.","note":""},
-{"id":"f109","domain":"cost","lecture":"18-cost","front":"Budgets vs Cost Explorer vs Compute Optimizer","back":"Budgets: ALERT on a threshold (actual or forecast). Cost Explorer: ANALYSE and forecast spend, recommends SP/RI. Compute Optimizer: ML RIGHT-SIZING for EC2, EBS, Lambda.","note":"The word 'notify' or 'alert' → Budgets."},
-{"id":"f110","domain":"cost","lecture":"18-cost","front":"Forgotten costs that accumulate","back":"Unattached EBS volumes, stale snapshots, noncurrent S3 versions, incomplete multipart uploads, unassociated Elastic IPs (and now all public IPv4), CloudWatch Logs with no retention set, idle NAT gateways.","note":""},
-{"id":"f111","domain":"cost","lecture":"18-cost","front":"Dev/test instances running 24/7","back":"Stop them outside working hours on an EventBridge schedule (or the AWS Instance Scheduler). Stopping halts compute charges; EBS storage continues.","note":""},
-{"id":"f112","domain":"cost","lecture":"18-cost","front":"Attribute spend to teams","back":"Cost allocation tags, ACTIVATED in the billing console, then analysed in Cost Explorer or the Cost and Usage Report.","note":"Tags do nothing for billing until activated."},
-{"id":"f113","domain":"cost","lecture":"18-cost","front":"Lambda memory and cost","back":"Billed per GB-second, and CPU scales with memory. More memory can REDUCE total cost by finishing much faster. Use ARM/Graviton where possible.","note":""},
-{"id":"f114","domain":"secure","lecture":"19-exam-playbook","front":"Exam format","back":"65 questions, 130 minutes (~2 min each). Only 50 are scored; 15 are invisible unscored pretest items. Scaled 100–1000, pass at 720. No penalty for wrong answers — never leave a blank.","note":""},
-{"id":"f115","domain":"secure","lecture":"19-exam-playbook","front":"Domain weights","back":"Design Secure Architectures 30%. Design Resilient Architectures 26%. Design High-Performing Architectures 24%. Design Cost-Optimized Architectures 20%.","note":""},
-{"id":"f116","domain":"secure","lecture":"19-exam-playbook","front":"Automatic disqualifiers in an answer option","back":"Hard-coded access keys. 0.0.0.0/0 on port 22. Session state on instances. Public database subnets. Root user for daily work. Making a bucket public to solve an access problem.","note":"An option containing an anti-pattern is wrong even if the rest is right."},
-{"id":"f117","domain":"secure","lecture":"19-exam-playbook","front":"What does the qualifier select for?","back":"MOST cost-effective → serverless/Spot/colder tiers. LEAST operational overhead → managed over self-managed. MOST secure → least privilege, private, encrypted. HIGHEST availability → more redundancy, cost is not the concern. MINIMAL app changes → lift-and-shift friendly (EFS, Amazon MQ, RDS).","note":"Read the qualifier first and last."},
-{"id":"f118","domain":"perf","lecture":"19-exam-playbook","front":"'Real-time' vs 'near real-time'","back":"Real-time → Kinesis Data Streams. Near real-time → Data Firehose. The word 'near' is doing real work in the question.","note":""},
-{"id":"f119","domain":"secure","lecture":"08-vpc","front":"Tier-to-tier access, the right way","back":"The database security group allows the port FROM THE APPLICATION SECURITY GROUP as the source — not from a CIDR. It keeps working as instances come and go.","note":""},
-{"id":"f120","domain":"perf","lecture":"10-edge","front":"Why does DNS failover take so long?","back":"Resolvers cache the answer for the TTL (and some ignore it). Lower the TTL to ~60 s for faster failover, or use Global Accelerator whose IPs never change.","note":""},
-{"id":"f121","domain":"resilient","lecture":"11-rds-aurora","front":"RDS automated backups","back":"Daily snapshot + transaction logs every ~5 minutes, retained 1–35 days, enabling point-in-time recovery to any second in the window. Deleted with the instance unless a final snapshot is taken.","note":"Manual snapshots persist until deleted and can be copied cross-Region and shared."},
-{"id":"f122","domain":"perf","lecture":"11-rds-aurora","front":"Database service by shape","back":"Relational OLTP → RDS/Aurora. Key-value at scale → DynamoDB. Graph → Neptune. Time-series → Timestream. Cassandra → Keyspaces. MongoDB → DocumentDB. Immutable ledger → QLDB. Warehouse → Redshift. Need OS access → EC2 or RDS Custom.","note":""},
-{"id":"f123","domain":"perf","lecture":"11-rds-aurora","front":"Migrate a database with minimal downtime","back":"AWS DMS with ongoing change data capture. Add the Schema Conversion Tool (SCT) when the engine changes (Oracle → Aurora PostgreSQL).","note":""},
-{"id":"f124","domain":"secure","lecture":"06-s3","front":"S3 Block Public Access","back":"On by default at account and bucket level, and it OVERRIDES bucket policies and ACLs. First thing to check for 'why isn't my bucket public', and the control for 'prevent accidental exposure'.","note":""},
-{"id":"f125","domain":"perf","lecture":"06-s3","front":"S3 Select vs Athena","back":"S3 Select: SQL over ONE object, to reduce bytes transferred. Athena: SQL ACROSS many objects in a bucket, with a schema from the Glue Data Catalog.","note":""},
-{"id":"f126","domain":"resilient","lecture":"06-s3","front":"S3 event notifications","back":"Fire on object created/removed/restored to Lambda, SQS or SNS. Route through EventBridge for richer filtering and more targets.","note":""},
-{"id":"f127","domain":"cost","lecture":"06-s3","front":"S3 lifecycle rules can act on what?","back":"Current versions, NONCURRENT versions, expired delete markers, and INCOMPLETE MULTIPART UPLOADS. Transitions only move to colder classes, never back.","note":"Forgetting noncurrent versions and incomplete uploads is a real bill."},
-{"id":"f128","domain":"perf","lecture":"05-serverless","front":"CloudFront Functions vs Lambda@Edge","back":"CloudFront Functions: sub-millisecond, JavaScript, viewer request/response only, header manipulation and redirects. Lambda@Edge: heavier, also origin request/response, can make network calls.","note":""},
-{"id":"f129","domain":"perf","lecture":"05-serverless","front":"When is Elastic Beanstalk the answer?","back":"'Upload my code, AWS handles capacity, load balancing, scaling and health — but I still want access to the EC2 instances.' Free itself; you pay for what it provisions.","note":""},
-{"id":"f130","domain":"secure","lecture":"02-iam","front":"IAM credential report vs Access Advisor","back":"Credential report: account-wide CSV of key age, MFA status, last used. Access Advisor: per-identity view of which services were actually used. Both feed permission trimming.","note":"IAM Access Analyzer finds resources shared outside the account/Org and can generate least-privilege policies from CloudTrail."},
-{"id":"f131","domain":"resilient","lecture":"04-elb-asg","front":"Cross-zone load balancing","back":"Distributes to targets in EVERY enabled AZ, not just the one that received the connection. Always on and free for ALB; off by default and chargeable on NLB.","note":""},
-{"id":"f132","domain":"perf","lecture":"04-elb-asg","front":"Where is the real client IP behind a load balancer?","back":"Behind an ALB: the X-Forwarded-For header. An NLB in instance target mode preserves the client IP natively.","note":""},
-{"id":"f133","domain":"cost","lecture":"03-ec2","front":"Stop vs hibernate vs terminate","back":"Stop: RAM lost, EBS root persists, no compute charge, public IPv4 changes unless it's an EIP. Hibernate: RAM saved to the encrypted root volume and restored. Terminate: root volume deleted by default, extra volumes retained.","note":""},
-{"id":"f134","domain":"secure","lecture":"09-vpc-connectivity","front":"AWS RAM — what is it for?","back":"Sharing resources across accounts in an Organization: subnets (the shared-VPC pattern), Transit Gateways, Route 53 Resolver rules, License Manager configurations.","note":""},
-{"id":"f135","domain":"secure","lecture":"08-vpc","front":"Hybrid DNS: resolving names both ways","back":"Route 53 Resolver INBOUND endpoint lets on-premises resolve AWS private names. OUTBOUND endpoint + forwarding rules lets AWS resolve on-premises names.","note":""},
-{"id":"f136","domain":"perf","lecture":"13-caching-analytics","front":"Lazy loading vs write-through caching","back":"Lazy loading (cache-aside): populate on a read miss — only requested data is cached, but it can be stale. Write-through: update cache on every write — always fresh, but caches data nobody reads. TTLs bound staleness in both.","note":""},
-{"id":"f137","domain":"resilient","lecture":"05-serverless","front":"Lambda async failure handling","back":"Async invokes retry twice, then go to a Dead Letter Queue or an on-failure destination (SQS, SNS, EventBridge, Lambda). Without one, the event is discarded.","note":""},
-{"id":"f138","domain":"secure","lecture":"06-s3","front":"S3 Access Points","back":"Named endpoints, each with its own policy, so 50 teams don't share one enormous bucket policy. Object Lambda Access Points transform data on retrieval (redact PII, resize).","note":""},
-{"id":"f139","domain":"cost","lecture":"18-cost","front":"Consolidated billing benefits","back":"Volume pricing tiers apply across all accounts, and unused Reserved Instance / Savings Plan capacity is shared automatically across the organization.","note":""},
-{"id":"f140","domain":"perf","lecture":"07-block-and-file","front":"EBS snapshot facts","back":"Incremental, stored in S3, REGIONAL, copyable cross-Region (that's EBS DR) and shareable with other accounts. Data Lifecycle Manager automates schedules; Recycle Bin protects against accidental deletion.","note":""},
-{"id":"f141","domain":"secure","lecture":"16-security-toolbox","front":"Encryption at rest, per service","back":"S3: SSE-S3 default, SSE-KMS for control. EBS/RDS/EFS/FSx: KMS AT CREATION (else snapshot → copy encrypted → restore). DynamoDB: encrypted by default. In transit: TLS everywhere, ACM certificates, VPN over Direct Connect.","note":""},
-{"id":"f142","domain":"resilient","lecture":"17-resilience-dr","front":"In-Region resilience checklist","back":"ELB across ≥2 AZs, ASG spanning ≥2 AZs with min ≥ 2, ONE NAT GATEWAY PER AZ, RDS Multi-AZ or Aurora replicas across AZs, EFS Standard not One Zone, ElastiCache Redis Multi-AZ, session state externalised.","note":""},
-{"id":"f143","domain":"perf","lecture":"12-dynamodb","front":"Query vs Scan","back":"Query fetches by partition key (optionally narrowed by sort key) — fast and cheap. Scan reads the ENTIRE table then filters — slow and expensive, and almost always the wrong answer.","note":""},
-{"id":"f144","domain":"secure","lecture":"12-dynamodb","front":"Restrict a DynamoDB user to their own rows","back":"IAM condition dynamodb:LeadingKeys matched against the user identity — fine-grained access control.","note":""},
-{"id":"f145","domain":"cost","lecture":"13-caching-analytics","front":"Cheap EMR","back":"Run TASK nodes on Spot (they hold no HDFS data, so losing one only re-schedules work). Keep master and core nodes On-Demand — losing the master terminates the cluster.","note":""},
-{"id":"f146","domain":"perf","lecture":"05-serverless","front":"Compute decision list","back":"Event-driven and short → Lambda. Over 15 min → Fargate / Batch / Step Functions. Containers without servers → ECS on Fargate. The word Kubernetes → EKS. OS access or licences → EC2. 'Just deploy my code, keep the servers' → Elastic Beanstalk.","note":""},
-{"id":"f147","domain":"secure","lecture":"15-observability","front":"Tamper-evident audit logging","back":"An organization CloudTrail trail → a locked-down S3 bucket, with log file validation enabled, Object Lock and MFA delete on the bucket, ideally in a separate logging account.","note":""},
-{"id":"f148","domain":"resilient","lecture":"19-exam-playbook","front":"The three-pass exam technique","back":"Pass 1: answer everything confident within 90 s, flag the rest, ALWAYS select something. Pass 2: work the flagged questions. Pass 3: change an answer only if you can state a concrete reason.","note":"Milestones: ~Q25 at 50 min, ~Q50 at 100 min."},
-{"id":"f149","domain":"perf","lecture":"09-vpc-connectivity","front":"Direct Connect components","back":"Virtual Private Gateway (VGW) attaches to one VPC. Direct Connect Gateway reaches VPCs in multiple Regions. Private VIF → VPC private IPs. Public VIF → AWS public endpoints (S3, DynamoDB) over the circuit. Customer Gateway = your on-prem device.","note":""},
-{"id":"f150","domain":"cost","lecture":"01-aws-shape","front":"Well-Architected pillars","back":"Operational excellence, Security, Reliability, Performance efficiency, Cost optimisation, Sustainability. The middle four map onto the exam's four domains.","note":""}
+  {
+    "id": "f001",
+    "domain": "resilient",
+    "lecture": "01-aws-shape",
+    "front": "Region vs Availability Zone vs edge location",
+    "back": "Region = independent geography with 3+ AZs. AZ = one or more discrete data centres with independent power/cooling/network, <2 ms apart. Edge = 600+ caching/termination sites used by CloudFront, Route 53, Global Accelerator, WAF.",
+    "note": "Survive an AZ failure → multi-AZ in one Region. Survive a Region failure → second Region."
+  },
+  {
+    "id": "f002",
+    "domain": "resilient",
+    "lecture": "01-aws-shape",
+    "front": "Which services are global, regional, zonal?",
+    "back": "Global: IAM, Route 53, CloudFront, WAF for CloudFront, Organizations, billing. Regional: S3, DynamoDB, SQS, SNS, Lambda, VPC, ELB, KMS. Zonal: EC2 instances, EBS volumes, subnets, NAT gateway, a single RDS instance.",
+    "note": "Picking a service at the wrong scope is a classic distractor."
+  },
+  {
+    "id": "f003",
+    "domain": "resilient",
+    "lecture": "01-aws-shape",
+    "front": "Why can't an EBS volume in eu-west-1a attach to an instance in eu-west-1b?",
+    "back": "EBS is zonal. Snapshot the volume (snapshots are Regional, stored in S3), then create a new volume from the snapshot in the target AZ.",
+    "note": "Same idea for AMIs: they are Regional and must be copied to be launched elsewhere."
+  },
+  {
+    "id": "f004",
+    "domain": "secure",
+    "lecture": "01-aws-shape",
+    "front": "Shared responsibility: what is ALWAYS yours?",
+    "back": "Your data, and your IAM permissions. Everything else moves with how managed the service is.",
+    "note": "Any option claiming AWS configures your security groups or rotates your DB password is wrong."
+  },
+  {
+    "id": "f005",
+    "domain": "resilient",
+    "lecture": "01-aws-shape",
+    "front": "Durability vs availability",
+    "back": "Durability = does the data still exist (S3: 11 nines). Availability = can you reach it right now (S3 Standard: 99.99%). S3 One Zone-IA keeps 11 nines within ONE AZ but drops availability to 99.5% — and losing the AZ loses the data.",
+    "note": ""
+  },
+  {
+    "id": "f006",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "Compute needs to call an AWS service. What do you attach?",
+    "back": "An IAM role (instance profile / execution role / task role). Never access keys, never keys in userdata or an AMI.",
+    "note": "Highest-frequency correct answer on the whole exam."
+  },
+  {
+    "id": "f007",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "IAM policy evaluation order",
+    "back": "1) Any explicit Deny → denied. 2) SCP must permit. 3) Resource-based policy allow. 4) Identity policy / permissions boundary / session policy must all allow. 5) Otherwise implicit deny.",
+    "note": "Explicit Deny always wins. Absence of Allow = deny."
+  },
+  {
+    "id": "f008",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "What does an SCP do?",
+    "back": "Sets the MAXIMUM permissions for accounts in an Organization or OU. It never grants anything — only filters. Does not apply to the management account.",
+    "note": "'Admin cannot remove this guardrail' → SCP, not an IAM policy."
+  },
+  {
+    "id": "f009",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "Trust policy vs permissions policy on a role",
+    "back": "Trust policy = WHO may assume the role (its Principal). Permissions policy = WHAT the role may do once assumed.",
+    "note": ""
+  },
+  {
+    "id": "f010",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "Why does an S3 policy need two ARNs?",
+    "back": "Bucket-level actions (ListBucket) act on arn:aws:s3:::bucket. Object-level actions (GetObject, PutObject) act on arn:aws:s3:::bucket/*.",
+    "note": "Listing works but downloads fail → the /* ARN is missing."
+  },
+  {
+    "id": "f011",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "Third party needs a role in your account. What must the trust policy require?",
+    "back": "An sts:ExternalId — a secret shared only with that vendor. Prevents the confused deputy problem.",
+    "note": ""
+  },
+  {
+    "id": "f012",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "Permissions boundary — what is it for?",
+    "back": "Caps the maximum permissions of one user or role. Standard use: let developers create roles but not roles more powerful than themselves (anti privilege-escalation).",
+    "note": ""
+  },
+  {
+    "id": "f013",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "Cognito vs IAM Identity Center",
+    "back": "Cognito = your application's END USERS. IAM Identity Center (ex AWS SSO) = your WORKFORCE signing into AWS accounts.",
+    "note": ""
+  },
+  {
+    "id": "f014",
+    "domain": "cost",
+    "lecture": "03-ec2",
+    "front": "EC2 family letters",
+    "back": "t burstable, m general purpose, c compute optimised, r/x/z memory optimised, i/d storage optimised (instance store), p/g/inf/trn accelerated. Suffix g = Graviton (ARM, ~20% better price/perf), n = network, d = local NVMe, a = AMD.",
+    "note": ""
+  },
+  {
+    "id": "f015",
+    "domain": "cost",
+    "lecture": "03-ec2",
+    "front": "When is Spot the answer?",
+    "back": "Fault-tolerant + stateless + interruptible + flexible start/end. Batch, CI, rendering, big-data workers, EMR task nodes. Up to 90% off, 2-minute interruption notice.",
+    "note": "Never for something needing a guaranteed uninterrupted window."
+  },
+  {
+    "id": "f016",
+    "domain": "cost",
+    "lecture": "03-ec2",
+    "front": "Compute Savings Plan vs EC2 Instance Savings Plan vs RI",
+    "back": "Compute SP: any family/size/Region/OS PLUS Fargate and Lambda — most flexible, usually the right answer. EC2 Instance SP: one family in one Region, slightly cheaper. Standard RI: fixed config, biggest discount, sellable; zonal RIs also reserve capacity. Convertible RI: exchangeable.",
+    "note": "'We may migrate to Fargate/Lambda' → Compute Savings Plan."
+  },
+  {
+    "id": "f017",
+    "domain": "cost",
+    "lecture": "03-ec2",
+    "front": "Dedicated Host vs Dedicated Instance",
+    "back": "Dedicated Host: you get the physical server, see sockets and cores, control placement — required for per-socket/per-core BYOL (Oracle, Windows). Dedicated Instance: isolated hardware but no socket visibility or placement control.",
+    "note": "'Licences tied to physical cores' → Dedicated Host."
+  },
+  {
+    "id": "f018",
+    "domain": "perf",
+    "lecture": "03-ec2",
+    "front": "Three placement groups",
+    "back": "Cluster: one rack, one AZ, lowest latency — HPC. Spread: distinct hardware, max 7 per AZ — critical isolated instances. Partition: rack groups — HDFS, Cassandra, Kafka.",
+    "note": ""
+  },
+  {
+    "id": "f019",
+    "domain": "perf",
+    "lecture": "03-ec2",
+    "front": "Scale-out is slow because user data installs dependencies. Fix?",
+    "back": "Bake a golden AMI (EC2 Image Builder). Optionally add an ASG warm pool. User data should only do per-instance config.",
+    "note": ""
+  },
+  {
+    "id": "f020",
+    "domain": "secure",
+    "lecture": "03-ec2",
+    "front": "Shell into a private instance with no bastion and no open ports",
+    "back": "AWS Systems Manager Session Manager (SSM agent + instance role). Sessions can be logged to S3 or CloudWatch Logs.",
+    "note": ""
+  },
+  {
+    "id": "f021",
+    "domain": "secure",
+    "lecture": "03-ec2",
+    "front": "IMDSv2 — why does it matter?",
+    "back": "Requires a session token (PUT) and a low IP hop limit, which blocks SSRF attacks that read IAM credentials from 169.254.169.254 via a vulnerable app.",
+    "note": ""
+  },
+  {
+    "id": "f022",
+    "domain": "perf",
+    "lecture": "04-elb-asg",
+    "front": "ALB vs NLB vs GWLB",
+    "back": "ALB: layer 7, path/host/header routing, targets can include Lambda. NLB: layer 4 TCP/UDP, millions of req/s, STATIC IP per AZ. GWLB: layer 3, inserts third-party firewall/IDS appliances (GENEVE 6081).",
+    "note": "'Static IP to whitelist' → NLB. 'Route /api vs /images' → ALB."
+  },
+  {
+    "id": "f023",
+    "domain": "resilient",
+    "lecture": "04-elb-asg",
+    "front": "Why set the ASG health check type to ELB?",
+    "back": "EC2 health checks only see hypervisor status. ELB health checks test the application, so an instance that boots but returns 500s gets replaced.",
+    "note": ""
+  },
+  {
+    "id": "f024",
+    "domain": "resilient",
+    "lecture": "04-elb-asg",
+    "front": "Users logged out at random after scaling. Best fix?",
+    "back": "Move session state off the instances into ElastiCache for Redis or DynamoDB. Sticky sessions are a workaround that still loses sessions when an instance is replaced.",
+    "note": ""
+  },
+  {
+    "id": "f025",
+    "domain": "perf",
+    "lecture": "04-elb-asg",
+    "front": "Auto Scaling policies",
+    "back": "Target tracking (default, 'keep CPU at 60%'), step scaling (different response per severity), simple (legacy), scheduled (known recurring load), predictive (ML forecast, pre-warms capacity).",
+    "note": "'Traffic triples at 09:00 every weekday' → scheduled or predictive."
+  },
+  {
+    "id": "f026",
+    "domain": "resilient",
+    "lecture": "04-elb-asg",
+    "front": "How do you scale a worker fleet reading from SQS?",
+    "back": "Target tracking on backlog per instance, derived from the ApproximateNumberOfMessagesVisible metric. Queue depth is a leading indicator; CPU is lagging.",
+    "note": ""
+  },
+  {
+    "id": "f027",
+    "domain": "resilient",
+    "lecture": "04-elb-asg",
+    "front": "Lifecycle hooks",
+    "back": "Pause an instance in Pending:Wait (bootstrap it) or Terminating:Wait (drain, copy logs off) before Auto Scaling proceeds.",
+    "note": ""
+  },
+  {
+    "id": "f028",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "front": "Lambda's hard limits",
+    "back": "15 min max execution, 128 MB–10 GB memory (CPU scales with it), 512 MB–10 GB /tmp, 50 MB zipped / 250 MB unzipped / 10 GB container image, 6 MB sync payload, 1,000 default concurrency.",
+    "note": "The 15-minute ceiling is the single most useful elimination rule."
+  },
+  {
+    "id": "f029",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "front": "Provisioned vs reserved concurrency",
+    "back": "Provisioned: keeps N environments warm — kills cold starts. Reserved: caps and guarantees a slice of the account concurrency pool — protects other functions or a downstream database.",
+    "note": ""
+  },
+  {
+    "id": "f030",
+    "domain": "secure",
+    "lecture": "05-serverless",
+    "front": "A VPC-attached Lambda cannot reach the internet. Why?",
+    "back": "VPC-attached Lambdas get no public IP. Put them in private subnets routing 0.0.0.0/0 to a NAT gateway, and use VPC endpoints for AWS services.",
+    "note": "A public subnet does NOT give a Lambda internet access."
+  },
+  {
+    "id": "f031",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "front": "ECS task execution role vs task role",
+    "back": "Execution role: ECS/Fargate pulls the image from ECR and writes logs. Task role: your application code's credentials for calling AWS services.",
+    "note": "Task won't start (image pull) → execution role. App gets AccessDenied → task role."
+  },
+  {
+    "id": "f032",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "front": "HTTP API vs REST API",
+    "back": "HTTP API: ~70% cheaper, lower latency, JWT authorizers, Lambda proxy. REST API: API keys + usage plans, request/response transformation, caching, resource policies, private endpoints, direct WAF.",
+    "note": ""
+  },
+  {
+    "id": "f033",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "front": "Job runs longer than 15 minutes. Where does it go?",
+    "back": "ECS/Fargate, AWS Batch, Step Functions orchestrating shorter steps, or EC2.",
+    "note": ""
+  },
+  {
+    "id": "f034",
+    "domain": "cost",
+    "lecture": "06-s3",
+    "front": "S3 storage class minimum durations",
+    "back": "Standard-IA and One Zone-IA: 30 days. Glacier Instant and Flexible: 90 days. Deep Archive: 180 days. Express One Zone: 1 hour. Objects under 128 KB are not transitioned to IA by default.",
+    "note": "This is why 'transition to IA after 3 days' is a wrong answer."
+  },
+  {
+    "id": "f035",
+    "domain": "cost",
+    "lecture": "06-s3",
+    "front": "Unknown or changing S3 access patterns. Which class?",
+    "back": "S3 Intelligent-Tiering. Small monitoring fee per object, automatic tiering, no retrieval charges, milliseconds in the instant tiers.",
+    "note": ""
+  },
+  {
+    "id": "f036",
+    "domain": "cost",
+    "lecture": "06-s3",
+    "front": "Glacier retrieval times",
+    "back": "Instant Retrieval: milliseconds. Flexible Retrieval: expedited 1–5 min, standard 3–5 h, bulk 5–12 h (free). Deep Archive: standard 12 h, bulk 48 h.",
+    "note": "'Must be available in milliseconds' rules out everything except Instant Retrieval."
+  },
+  {
+    "id": "f037",
+    "domain": "secure",
+    "lecture": "06-s3",
+    "front": "Data must be impossible to delete, even by root",
+    "back": "S3 Object Lock in COMPLIANCE mode with a retention period (requires versioning). Governance mode can be overridden by a privileged principal.",
+    "note": ""
+  },
+  {
+    "id": "f038",
+    "domain": "resilient",
+    "lecture": "06-s3",
+    "front": "S3 replication facts",
+    "back": "Needs versioning on both buckets + an IAM role. Asynchronous. Only replicates NEW objects — use S3 Batch Replication to backfill. Not chained (A→B→C doesn't reach C from A). RTC gives a 15-minute SLA.",
+    "note": ""
+  },
+  {
+    "id": "f039",
+    "domain": "secure",
+    "lecture": "06-s3",
+    "front": "Serve a private S3 site over HTTPS on a custom domain",
+    "back": "CloudFront + Origin Access Control (OAC) + an ACM certificate in us-east-1 + Route 53 alias. Block Public Access stays fully on.",
+    "note": "OAC replaces the older OAI."
+  },
+  {
+    "id": "f040",
+    "domain": "secure",
+    "lecture": "06-s3",
+    "front": "S3 encryption options",
+    "back": "SSE-S3 (AES-256, AWS-managed, default). SSE-KMS (your key, CloudTrail audit, rotation — add S3 Bucket Keys to cut KMS calls up to 99%). DSSE-KMS (double). SSE-C (you send the key each request). Client-side.",
+    "note": ""
+  },
+  {
+    "id": "f041",
+    "domain": "perf",
+    "lecture": "06-s3",
+    "front": "S3 request rate limits",
+    "back": "3,500 PUT/COPY/POST/DELETE and 5,500 GET/HEAD per second PER PREFIX. Spread keys across more prefixes for more throughput.",
+    "note": ""
+  },
+  {
+    "id": "f042",
+    "domain": "perf",
+    "lecture": "06-s3",
+    "front": "S3 Transfer Acceleration vs CloudFront",
+    "back": "Transfer Acceleration speeds UPLOADS from distant clients via edge locations onto the AWS backbone. CloudFront caches DOWNLOADS at the edge.",
+    "note": ""
+  },
+  {
+    "id": "f043",
+    "domain": "secure",
+    "lecture": "06-s3",
+    "front": "Presigned URL vs CloudFront signed URL/cookie",
+    "back": "Presigned URL: one object, served from the bucket's Region, simple. CloudFront signed URL: one file at the edge. CloudFront signed COOKIE: many files (a whole video library) with one authorisation.",
+    "note": ""
+  },
+  {
+    "id": "f044",
+    "domain": "perf",
+    "lecture": "07-block-and-file",
+    "front": "EBS volume types",
+    "back": "gp3 default (3,000 IOPS/125 MB/s baseline, up to 16,000/1,000, IOPS independent of size, ~20% cheaper than gp2). io2 Block Express up to 256,000 IOPS + Multi-Attach. st1 throughput HDD 500 MB/s. sc1 cold HDD. st1/sc1 cannot boot.",
+    "note": "gp2 sized up purely for IOPS → move to gp3."
+  },
+  {
+    "id": "f045",
+    "domain": "perf",
+    "lecture": "07-block-and-file",
+    "front": "Multiple instances need the same files concurrently",
+    "back": "Amazon EFS (Linux/NFS). Windows/SMB/Active Directory → FSx for Windows File Server. HPC/ML over S3 data → FSx for Lustre.",
+    "note": "This cue eliminates EBS immediately."
+  },
+  {
+    "id": "f046",
+    "domain": "perf",
+    "lecture": "07-block-and-file",
+    "front": "Instance store — when and when not?",
+    "back": "Highest possible IOPS, physically attached NVMe. EPHEMERAL: lost on stop, hibernate or terminate (survives reboot). Use for scratch, caches, buffers, self-replicating distributed systems. Never for persistent data.",
+    "note": ""
+  },
+  {
+    "id": "f047",
+    "domain": "cost",
+    "lecture": "07-block-and-file",
+    "front": "Wire or lorry? Migration rule of thumb",
+    "back": "~10 TB per day over a saturated 1 Gbps link. Under ~10 TB or with a fat idle pipe → DataSync. Hundreds of TB or a constrained link → Snowball Edge (~80 TB usable each). Up to 100 PB → Snowmobile.",
+    "note": "Exam questions give bandwidth and volume so you can do the arithmetic."
+  },
+  {
+    "id": "f048",
+    "domain": "perf",
+    "lecture": "07-block-and-file",
+    "front": "Storage Gateway modes",
+    "back": "File (S3 File Gateway): on-prem NFS/SMB share backed by S3. Volume: iSCSI block, cached (primary in AWS) or stored (primary on-prem). Tape: virtual tape library for existing backup software.",
+    "note": ""
+  },
+  {
+    "id": "f049",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "front": "What makes a subnet 'public'?",
+    "back": "Its route table has 0.0.0.0/0 → Internet Gateway. That is the entire definition. The instance also needs a public IP or EIP to be reachable.",
+    "note": ""
+  },
+  {
+    "id": "f050",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "front": "Security group vs NACL",
+    "back": "SG: on the ENI, STATEFUL, ALLOW only, all rules evaluated together, can reference another security group. NACL: on the subnet, STATELESS, allow AND deny, numbered order, CIDR only.",
+    "note": "'Block one malicious IP' → NACL (SGs have no deny)."
+  },
+  {
+    "id": "f051",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "front": "Traffic goes one way then hangs. NACL was just changed.",
+    "back": "NACLs are stateless — the return traffic must be allowed explicitly on ephemeral ports 1024–65535.",
+    "note": ""
+  },
+  {
+    "id": "f052",
+    "domain": "cost",
+    "lecture": "08-vpc",
+    "front": "NAT Gateway facts",
+    "back": "Outbound only, lives in a PUBLIC subnet with an EIP, ZONAL (deploy one per AZ), charged per hour AND per GB processed. Egress-only IGW is the IPv6 equivalent.",
+    "note": "One NAT for three AZs = single point of failure + cross-AZ charges."
+  },
+  {
+    "id": "f053",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "front": "How many IPs does AWS reserve per subnet?",
+    "back": "Five: network address, VPC router, DNS, future use, broadcast. A /24 gives 251 usable. Smallest subnet is /28, largest VPC is /16.",
+    "note": ""
+  },
+  {
+    "id": "f054",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "front": "Order to debug 'traffic doesn't flow'",
+    "back": "Route table → NACL (both directions) → security group → public IP present / service listening. VPC Reachability Analyzer automates this and names the blocking hop.",
+    "note": ""
+  },
+  {
+    "id": "f055",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "front": "VPC Flow Logs — what do they capture?",
+    "back": "Accepted and REJECTED connection metadata (src/dst, port, protocol, action) per VPC, subnet or ENI. Not payloads — that's Traffic Mirroring.",
+    "note": ""
+  },
+  {
+    "id": "f056",
+    "domain": "cost",
+    "lecture": "09-vpc-connectivity",
+    "front": "Gateway endpoint vs interface endpoint",
+    "back": "Gateway: S3 and DynamoDB only, FREE, a route table entry, NOT reachable from on-premises. Interface (PrivateLink): an ENI with a private IP, almost every AWS service plus partner/own services, charged hourly + per GB, IS reachable over VPN/Direct Connect.",
+    "note": ""
+  },
+  {
+    "id": "f057",
+    "domain": "resilient",
+    "lecture": "09-vpc-connectivity",
+    "front": "Three limits of VPC peering",
+    "back": "1) NOT transitive (A↔B, B↔C does not give A↔C). 2) CIDRs must not overlap. 3) Route tables must be updated on both sides. n VPCs need n(n−1)/2 connections.",
+    "note": "Many VPCs / hub-and-spoke → Transit Gateway."
+  },
+  {
+    "id": "f058",
+    "domain": "resilient",
+    "lecture": "09-vpc-connectivity",
+    "front": "VPN vs Direct Connect",
+    "back": "VPN: over the internet, IPsec encrypted, minutes to set up, ~1.25 Gbps/tunnel, best-effort. Direct Connect: private fibre, weeks–months to provision, 1/10/100 Gbps, CONSISTENT latency, NOT encrypted by default, much cheaper egress.",
+    "note": "HA Direct Connect = second DX at another location, or a VPN as backup (cheaper)."
+  },
+  {
+    "id": "f059",
+    "domain": "secure",
+    "lecture": "09-vpc-connectivity",
+    "front": "Overlapping CIDRs, or exposing a service to hundreds of VPCs",
+    "back": "AWS PrivateLink — service behind an NLB published as an endpoint service, consumers create interface endpoints. Nothing is routed, so overlaps don't matter.",
+    "note": ""
+  },
+  {
+    "id": "f060",
+    "domain": "perf",
+    "lecture": "10-edge",
+    "front": "CNAME vs Alias record",
+    "back": "CNAME cannot be used at the zone apex (example.com). Alias works at the apex, points at AWS resources (ALB, CloudFront, S3 website, API Gateway), tracks their changing IPs, and queries are FREE.",
+    "note": "Apex → AWS resource is always an alias record."
+  },
+  {
+    "id": "f061",
+    "domain": "perf",
+    "lecture": "10-edge",
+    "front": "Route 53 routing policies",
+    "back": "Simple, Weighted (canary/blue-green), Latency-based (fastest for the user), Failover (active-passive), Geolocation (compliance/residency), Geoproximity (distance + bias), Multivalue (up to 8 healthy at random), IP-based.",
+    "note": "Latency = speed. Geolocation = legally required location."
+  },
+  {
+    "id": "f062",
+    "domain": "perf",
+    "lecture": "10-edge",
+    "front": "CloudFront vs Global Accelerator",
+    "back": "CloudFront: HTTP/HTTPS, caches, DNS name, origin groups for failover. Global Accelerator: ANY TCP/UDP, no caching, TWO STATIC ANYCAST IPs, sub-minute failover independent of DNS TTLs.",
+    "note": "UDP game / instant regional failover → Global Accelerator."
+  },
+  {
+    "id": "f063",
+    "domain": "perf",
+    "lecture": "10-edge",
+    "front": "Cheaper than CloudFront invalidations?",
+    "back": "Versioned filenames (app.4f2a.js). Invalidations cost money at scale and are a blunt instrument.",
+    "note": ""
+  },
+  {
+    "id": "f064",
+    "domain": "resilient",
+    "lecture": "11-rds-aurora",
+    "front": "Multi-AZ vs read replica",
+    "back": "Multi-AZ: SYNCHRONOUS, automatic failover in 60–120 s, standby NOT readable — availability. Read replica: ASYNCHRONOUS, readable, manual promotion, can be cross-Region — performance.",
+    "note": "The most-tested distinction in the data domain."
+  },
+  {
+    "id": "f065",
+    "domain": "resilient",
+    "lecture": "11-rds-aurora",
+    "front": "Aurora architecture",
+    "back": "Storage: 6 copies across 3 AZs, auto-growing to 128 TB, self-healing. Compute: 1 writer + up to 15 readers on the SAME storage, failover under ~30 s. Endpoints: cluster (writer), reader (load-balanced), custom.",
+    "note": "Aurora replicas are read scaling AND failover targets."
+  },
+  {
+    "id": "f066",
+    "domain": "resilient",
+    "lecture": "11-rds-aurora",
+    "front": "Cross-Region relational DR with sub-second RPO",
+    "back": "Aurora Global Database — up to 5 secondary Regions, typically <1 s replication lag, ~1 minute failover.",
+    "note": ""
+  },
+  {
+    "id": "f067",
+    "domain": "perf",
+    "lecture": "11-rds-aurora",
+    "front": "Lambda exhausting database connections",
+    "back": "Amazon RDS Proxy — pools and multiplexes connections, also shortens failover and can enforce IAM auth.",
+    "note": ""
+  },
+  {
+    "id": "f068",
+    "domain": "secure",
+    "lecture": "11-rds-aurora",
+    "front": "Encrypt an existing unencrypted RDS instance",
+    "back": "Snapshot → copy the snapshot WITH encryption enabled → restore a new instance from the encrypted copy. Encryption can only be set at creation.",
+    "note": "Same pattern for an unencrypted EBS volume."
+  },
+  {
+    "id": "f069",
+    "domain": "cost",
+    "lecture": "11-rds-aurora",
+    "front": "Spiky or intermittent relational workload",
+    "back": "Aurora Serverless v2 — scales capacity (ACUs) in fine increments within seconds and down when idle.",
+    "note": ""
+  },
+  {
+    "id": "f070",
+    "domain": "perf",
+    "lecture": "12-dynamodb",
+    "front": "DynamoDB throttling with capacity to spare. Why?",
+    "back": "A hot partition — the partition key has too few distinct values, so traffic concentrates. Fix with a high-cardinality key or write sharding. (Or an under-provisioned GSI throttling base-table writes.)",
+    "note": ""
+  },
+  {
+    "id": "f071",
+    "domain": "perf",
+    "lecture": "12-dynamodb",
+    "front": "GSI vs LSI",
+    "back": "GSI: any attributes as key, creatable ANY TIME, own capacity, eventually consistent, 20 per table. LSI: same partition key + different sort key, ONLY at table creation, shares capacity, can be strongly consistent, 5 per table.",
+    "note": "'Add a new query pattern to a live table' → GSI."
+  },
+  {
+    "id": "f072",
+    "domain": "perf",
+    "lecture": "12-dynamodb",
+    "front": "Microsecond DynamoDB reads with no code change",
+    "back": "DAX (DynamoDB Accelerator) — API-compatible in-memory cache. ElastiCache would require writing cache-aside logic.",
+    "note": ""
+  },
+  {
+    "id": "f073",
+    "domain": "resilient",
+    "lecture": "12-dynamodb",
+    "front": "DynamoDB Streams vs Global Tables vs TTL",
+    "back": "Streams: 24-hour ordered change log, triggers Lambda. Global Tables: multi-Region multi-active replication (built on Streams, last-writer-wins). TTL: free asynchronous deletion of expired items.",
+    "note": ""
+  },
+  {
+    "id": "f074",
+    "domain": "cost",
+    "lecture": "12-dynamodb",
+    "front": "DynamoDB capacity modes",
+    "back": "On-demand: per request, instant scaling, best for unpredictable/new workloads. Provisioned + auto scaling: much cheaper for steady predictable traffic, and reservable.",
+    "note": ""
+  },
+  {
+    "id": "f075",
+    "domain": "perf",
+    "lecture": "12-dynamodb",
+    "front": "DynamoDB item size limit",
+    "back": "400 KB. Larger payloads go to S3 with a pointer stored in the item.",
+    "note": ""
+  },
+  {
+    "id": "f076",
+    "domain": "perf",
+    "lecture": "13-caching-analytics",
+    "front": "Redis vs Memcached",
+    "back": "Redis: data structures, persistence, replication, Multi-AZ automatic failover, pub/sub, sorted sets. Memcached: plain key-value, multi-threaded, no persistence, no replication.",
+    "note": "Persistence / HA / sorted sets / pub-sub → Redis. In doubt, Redis."
+  },
+  {
+    "id": "f077",
+    "domain": "perf",
+    "lecture": "13-caching-analytics",
+    "front": "Kinesis Data Streams vs Data Firehose",
+    "back": "Data Streams: ~200 ms, retains 1–365 days, REPLAYABLE, many independent consumers, you size shards. Firehose: 60 s buffer, no storage, fully managed, ONE destination (S3/Redshift/OpenSearch/Splunk).",
+    "note": "'Least effort into S3' → Firehose. 'Replay / multiple consumers' → Data Streams."
+  },
+  {
+    "id": "f078",
+    "domain": "perf",
+    "lecture": "13-caching-analytics",
+    "front": "Kinesis vs SQS",
+    "back": "SQS: work queue, message deleted after processing, one consumer group, no replay. Kinesis: ordered retained log, many independent consumers, replayable.",
+    "note": ""
+  },
+  {
+    "id": "f079",
+    "domain": "cost",
+    "lecture": "13-caching-analytics",
+    "front": "Athena is expensive. What do you change?",
+    "back": "Convert to Parquet/ORC (columnar), compress, and PARTITION. Athena bills per TB scanned — this routinely cuts 90%+.",
+    "note": ""
+  },
+  {
+    "id": "f080",
+    "domain": "perf",
+    "lecture": "13-caching-analytics",
+    "front": "Athena vs Redshift",
+    "back": "Athena: serverless SQL over S3, pay per scan, ad-hoc, nothing to provision. Redshift: petabyte columnar warehouse for complex joins and high-concurrency BI; Spectrum queries S3 too.",
+    "note": ""
+  },
+  {
+    "id": "f081",
+    "domain": "perf",
+    "lecture": "13-caching-analytics",
+    "front": "Analytics cue words",
+    "back": "Kafka → MSK. Spark/Hadoop → EMR. Full-text search / log analytics → OpenSearch. ETL + schema catalog → Glue. Dashboards for business users → QuickSight. Governed data lake → Lake Formation.",
+    "note": ""
+  },
+  {
+    "id": "f082",
+    "domain": "resilient",
+    "lecture": "14-decoupling",
+    "front": "SQS visibility timeout",
+    "back": "Default 30 s, max 12 h. If the consumer hasn't deleted the message by then it reappears and may be processed twice. 'Messages processed more than once' → raise it above worst-case processing time.",
+    "note": ""
+  },
+  {
+    "id": "f083",
+    "domain": "resilient",
+    "lecture": "14-decoupling",
+    "front": "Poison messages blocking a queue",
+    "back": "Attach a Dead Letter Queue with a maxReceiveCount redrive policy. Failing messages move aside after N attempts.",
+    "note": ""
+  },
+  {
+    "id": "f084",
+    "domain": "perf",
+    "lecture": "14-decoupling",
+    "front": "SQS standard vs FIFO",
+    "back": "Standard: near-unlimited throughput, at-least-once, best-effort ordering — consumers must be idempotent. FIFO: exactly-once and strict ordering within a message group, 300 msg/s (3,000 batched), name ends .fifo.",
+    "note": "Choose FIFO only when ordering or deduplication is explicitly required."
+  },
+  {
+    "id": "f085",
+    "domain": "resilient",
+    "lecture": "14-decoupling",
+    "front": "The SNS fan-out pattern",
+    "back": "One event → SNS topic → a separate SQS queue per consumer. Each consumer buffers durably, retries and scales independently, and can replay.",
+    "note": "The reliable multi-consumer answer."
+  },
+  {
+    "id": "f086",
+    "domain": "perf",
+    "lecture": "14-decoupling",
+    "front": "When is EventBridge the answer?",
+    "back": "React to AWS service events (EC2 state change, S3, Health), route by event CONTENT, SaaS partner integrations, and cron/rate SCHEDULES (EventBridge Scheduler).",
+    "note": "'Run something every night at 2am' → EventBridge Scheduler."
+  },
+  {
+    "id": "f087",
+    "domain": "resilient",
+    "lecture": "14-decoupling",
+    "front": "Step Functions standard vs express",
+    "back": "Standard: up to 1 year, exactly-once, full execution history — long workflows and human approval. Express: up to 5 min, at-least-once, very high volume.",
+    "note": ""
+  },
+  {
+    "id": "f088",
+    "domain": "perf",
+    "lecture": "14-decoupling",
+    "front": "When is Amazon MQ the answer?",
+    "back": "A migrating application that already speaks JMS, AMQP, MQTT, STOMP or OpenWire and must not be rewritten. Greenfield → SQS/SNS.",
+    "note": ""
+  },
+  {
+    "id": "f089",
+    "domain": "secure",
+    "lecture": "15-observability",
+    "front": "CloudWatch vs CloudTrail vs Config",
+    "back": "CloudWatch: is it healthy, how busy (metrics, logs, alarms). CloudTrail: WHO called which API, when, from where. Config: what does this resource's configuration look like, and has it drifted.",
+    "note": "Constantly confused — memorise the one-liners."
+  },
+  {
+    "id": "f090",
+    "domain": "resilient",
+    "lecture": "15-observability",
+    "front": "EC2 memory or disk metric missing",
+    "back": "They are guest-OS metrics the hypervisor cannot see. Install the CloudWatch agent to publish them as custom metrics.",
+    "note": ""
+  },
+  {
+    "id": "f091",
+    "domain": "secure",
+    "lecture": "15-observability",
+    "front": "CloudTrail management vs data events",
+    "back": "Management events (control plane) are on by default with 90 days of history. Data events (s3:GetObject, lambda:Invoke) are OFF by default and chargeable.",
+    "note": "'Who read that S3 object?' → enable data events."
+  },
+  {
+    "id": "f092",
+    "domain": "secure",
+    "lecture": "15-observability",
+    "front": "Detect AND automatically fix a misconfiguration",
+    "back": "AWS Config rule + a remediation action (SSM Automation document). Add an SCP to prevent recurrence.",
+    "note": ""
+  },
+  {
+    "id": "f093",
+    "domain": "secure",
+    "lecture": "15-observability",
+    "front": "Systems Manager pieces worth knowing",
+    "back": "Session Manager (shell, no bastion), Patch Manager (fleet patching), Run Command (one command everywhere), Parameter Store (free config/secrets, no rotation), Automation (runbooks), Inventory.",
+    "note": ""
+  },
+  {
+    "id": "f094",
+    "domain": "secure",
+    "lecture": "15-observability",
+    "front": "Multi-account governance services",
+    "back": "Organizations (accounts, OUs, SCPs, consolidated billing). Control Tower (landing zone + guardrails + Account Factory). IAM Identity Center (SSO). Service Catalog (approved products). CloudFormation StackSets (deploy across accounts/Regions). AWS Backup (central backup policy).",
+    "note": ""
+  },
+  {
+    "id": "f095",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "Envelope encryption",
+    "back": "KMS Encrypt is capped at 4 KB. GenerateDataKey returns {plaintext key, encrypted key}. Encrypt the payload locally with the plaintext key, discard it, store the encrypted key beside the data.",
+    "note": ""
+  },
+  {
+    "id": "f096",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "KMS vs CloudHSM",
+    "back": "KMS: multi-tenant managed, FIPS 140-2 validated, key policies, CloudTrail auditing, automatic yearly rotation. CloudHSM: dedicated SINGLE-TENANT FIPS 140-2 Level 3 hardware, AWS has no access.",
+    "note": "'AWS must not be able to access the keys' → CloudHSM."
+  },
+  {
+    "id": "f097",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "Cross-account read of a KMS-encrypted S3 object needs what?",
+    "back": "THREE agreements: the bucket policy, the caller's IAM policy, AND the KMS key policy (kms:Decrypt). KMS key policies are the primary control for the key.",
+    "note": "Also: KMS keys are Regional."
+  },
+  {
+    "id": "f098",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "Secrets Manager vs Parameter Store",
+    "back": "Secrets Manager: per-secret charge, BUILT-IN automatic rotation with native RDS integration, cross-account, replication. Parameter Store: FREE standard tier, SecureString via KMS, no rotation.",
+    "note": ""
+  },
+  {
+    "id": "f099",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "ACM certificate rules",
+    "back": "Free, auto-renewing, usable on ELB, CloudFront, API Gateway, App Runner — NOT installable on EC2. For CloudFront the certificate must be in us-east-1.",
+    "note": ""
+  },
+  {
+    "id": "f100",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "WAF vs Shield Standard vs Shield Advanced vs Firewall Manager",
+    "back": "WAF: layer 7 rules (SQLi, XSS, bots, rate limiting, geo). Shield Standard: free automatic L3/L4 DDoS. Shield Advanced: $3k/mo, response team, cost protection. Firewall Manager: apply WAF/Shield/SG/Network Firewall policies org-wide.",
+    "note": ""
+  },
+  {
+    "id": "f101",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "The four threat-detection cue words",
+    "back": "THREAT → GuardDuty. VULNERABILITY → Inspector. PII → Macie. AGGREGATE findings → Security Hub. (Investigate a finding → Detective.)",
+    "note": "Asked almost word-for-word."
+  },
+  {
+    "id": "f102",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "Cognito user pool vs identity pool",
+    "back": "User pool: a user directory — sign-up/sign-in, MFA, federation, issues JWTs, integrates with API Gateway and ALB. Identity pool: exchanges an identity for TEMPORARY AWS CREDENTIALS so the app can call S3/DynamoDB directly.",
+    "note": ""
+  },
+  {
+    "id": "f103",
+    "domain": "resilient",
+    "lecture": "17-resilience-dr",
+    "front": "RTO vs RPO",
+    "back": "RTO = downtime you can tolerate, bought with PRE-PROVISIONED CAPACITY. RPO = data loss you can tolerate, bought with REPLICATION FREQUENCY.",
+    "note": ""
+  },
+  {
+    "id": "f104",
+    "domain": "resilient",
+    "lecture": "17-resilience-dr",
+    "front": "The four DR strategies, cheapest first",
+    "back": "Backup & restore (hours/hours) → Pilot light (tens of min/min) → Warm standby (min/sec) → Multi-site active-active (near zero/near zero).",
+    "note": "Pick the CHEAPEST that meets the stated numbers."
+  },
+  {
+    "id": "f105",
+    "domain": "resilient",
+    "lecture": "17-resilience-dr",
+    "front": "Pilot light vs warm standby",
+    "back": "Pilot light: data replicates, NO application servers running — launch from AMIs at failover. Warm standby: a scaled-down but FULLY RUNNING copy you scale up.",
+    "note": "'A scaled-down version is always running' → warm standby."
+  },
+  {
+    "id": "f106",
+    "domain": "resilient",
+    "lecture": "17-resilience-dr",
+    "front": "Cross-Region mechanisms by service",
+    "back": "S3 → CRR. RDS → cross-Region read replica or snapshot copy. Aurora → Global Database. DynamoDB → Global Tables. EBS/AMI → copy snapshots. Routing → Route 53 failover or Global Accelerator. Infra → StackSets.",
+    "note": ""
+  },
+  {
+    "id": "f107",
+    "domain": "resilient",
+    "lecture": "17-resilience-dr",
+    "front": "Protect backups from ransomware or a malicious admin",
+    "back": "AWS Backup Vault Lock in compliance mode, copies in a SEPARATE ACCOUNT and Region, S3 Object Lock compliance mode, MFA delete.",
+    "note": ""
+  },
+  {
+    "id": "f108",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "front": "Which data transfers cost money?",
+    "back": "IN: free. OUT to internet: expensive. CROSS-AZ: charged BOTH directions. Cross-Region: charged. Within an AZ over private IPs: free. Through CloudFront or a gateway endpoint: cheaper or free.",
+    "note": ""
+  },
+  {
+    "id": "f109",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "front": "Budgets vs Cost Explorer vs Compute Optimizer",
+    "back": "Budgets: ALERT on a threshold (actual or forecast). Cost Explorer: ANALYSE and forecast spend, recommends SP/RI. Compute Optimizer: ML RIGHT-SIZING for EC2, EBS, Lambda.",
+    "note": "The word 'notify' or 'alert' → Budgets."
+  },
+  {
+    "id": "f110",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "front": "Forgotten costs that accumulate",
+    "back": "Unattached EBS volumes, stale snapshots, noncurrent S3 versions, incomplete multipart uploads, unassociated Elastic IPs (and now all public IPv4), CloudWatch Logs with no retention set, idle NAT gateways.",
+    "note": ""
+  },
+  {
+    "id": "f111",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "front": "Dev/test instances running 24/7",
+    "back": "Stop them outside working hours on an EventBridge schedule (or the AWS Instance Scheduler). Stopping halts compute charges; EBS storage continues.",
+    "note": ""
+  },
+  {
+    "id": "f112",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "front": "Attribute spend to teams",
+    "back": "Cost allocation tags, ACTIVATED in the billing console, then analysed in Cost Explorer or the Cost and Usage Report.",
+    "note": "Tags do nothing for billing until activated."
+  },
+  {
+    "id": "f113",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "front": "Lambda memory and cost",
+    "back": "Billed per GB-second, and CPU scales with memory. More memory can REDUCE total cost by finishing much faster. Use ARM/Graviton where possible.",
+    "note": ""
+  },
+  {
+    "id": "f114",
+    "domain": "secure",
+    "lecture": "19-exam-playbook",
+    "front": "Exam format",
+    "back": "65 questions, 130 minutes (~2 min each). Only 50 are scored; 15 are invisible unscored pretest items. Scaled 100–1000, pass at 720. No penalty for wrong answers — never leave a blank.",
+    "note": ""
+  },
+  {
+    "id": "f115",
+    "domain": "secure",
+    "lecture": "19-exam-playbook",
+    "front": "Domain weights",
+    "back": "Design Secure Architectures 30%. Design Resilient Architectures 26%. Design High-Performing Architectures 24%. Design Cost-Optimized Architectures 20%.",
+    "note": ""
+  },
+  {
+    "id": "f116",
+    "domain": "secure",
+    "lecture": "19-exam-playbook",
+    "front": "Automatic disqualifiers in an answer option",
+    "back": "Hard-coded access keys. 0.0.0.0/0 on port 22. Session state on instances. Public database subnets. Root user for daily work. Making a bucket public to solve an access problem.",
+    "note": "An option containing an anti-pattern is wrong even if the rest is right."
+  },
+  {
+    "id": "f117",
+    "domain": "secure",
+    "lecture": "19-exam-playbook",
+    "front": "What does the qualifier select for?",
+    "back": "MOST cost-effective → serverless/Spot/colder tiers. LEAST operational overhead → managed over self-managed. MOST secure → least privilege, private, encrypted. HIGHEST availability → more redundancy, cost is not the concern. MINIMAL app changes → lift-and-shift friendly (EFS, Amazon MQ, RDS).",
+    "note": "Read the qualifier first and last."
+  },
+  {
+    "id": "f118",
+    "domain": "perf",
+    "lecture": "19-exam-playbook",
+    "front": "'Real-time' vs 'near real-time'",
+    "back": "Real-time → Kinesis Data Streams. Near real-time → Data Firehose. The word 'near' is doing real work in the question.",
+    "note": ""
+  },
+  {
+    "id": "f119",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "front": "Tier-to-tier access, the right way",
+    "back": "The database security group allows the port FROM THE APPLICATION SECURITY GROUP as the source — not from a CIDR. It keeps working as instances come and go.",
+    "note": ""
+  },
+  {
+    "id": "f120",
+    "domain": "perf",
+    "lecture": "10-edge",
+    "front": "Why does DNS failover take so long?",
+    "back": "Resolvers cache the answer for the TTL (and some ignore it). Lower the TTL to ~60 s for faster failover, or use Global Accelerator whose IPs never change.",
+    "note": ""
+  },
+  {
+    "id": "f121",
+    "domain": "resilient",
+    "lecture": "11-rds-aurora",
+    "front": "RDS automated backups",
+    "back": "Daily snapshot + transaction logs every ~5 minutes, retained 1–35 days, enabling point-in-time recovery to any second in the window. Deleted with the instance unless a final snapshot is taken.",
+    "note": "Manual snapshots persist until deleted and can be copied cross-Region and shared."
+  },
+  {
+    "id": "f122",
+    "domain": "perf",
+    "lecture": "11-rds-aurora",
+    "front": "Database service by shape",
+    "back": "Relational OLTP → RDS/Aurora. Key-value at scale → DynamoDB. Graph → Neptune. Time-series → Timestream. Cassandra → Keyspaces. MongoDB → DocumentDB. Immutable ledger → QLDB. Warehouse → Redshift. Need OS access → EC2 or RDS Custom.",
+    "note": ""
+  },
+  {
+    "id": "f123",
+    "domain": "perf",
+    "lecture": "11-rds-aurora",
+    "front": "Migrate a database with minimal downtime",
+    "back": "AWS DMS with ongoing change data capture. Add the Schema Conversion Tool (SCT) when the engine changes (Oracle → Aurora PostgreSQL).",
+    "note": ""
+  },
+  {
+    "id": "f124",
+    "domain": "secure",
+    "lecture": "06-s3",
+    "front": "S3 Block Public Access",
+    "back": "On by default at account and bucket level, and it OVERRIDES bucket policies and ACLs. First thing to check for 'why isn't my bucket public', and the control for 'prevent accidental exposure'.",
+    "note": ""
+  },
+  {
+    "id": "f125",
+    "domain": "perf",
+    "lecture": "06-s3",
+    "front": "S3 Select vs Athena",
+    "back": "S3 Select: SQL over ONE object, to reduce bytes transferred. Athena: SQL ACROSS many objects in a bucket, with a schema from the Glue Data Catalog.",
+    "note": ""
+  },
+  {
+    "id": "f126",
+    "domain": "resilient",
+    "lecture": "06-s3",
+    "front": "S3 event notifications",
+    "back": "Fire on object created/removed/restored to Lambda, SQS or SNS. Route through EventBridge for richer filtering and more targets.",
+    "note": ""
+  },
+  {
+    "id": "f127",
+    "domain": "cost",
+    "lecture": "06-s3",
+    "front": "S3 lifecycle rules can act on what?",
+    "back": "Current versions, NONCURRENT versions, expired delete markers, and INCOMPLETE MULTIPART UPLOADS. Transitions only move to colder classes, never back.",
+    "note": "Forgetting noncurrent versions and incomplete uploads is a real bill."
+  },
+  {
+    "id": "f128",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "front": "CloudFront Functions vs Lambda@Edge",
+    "back": "CloudFront Functions: sub-millisecond, JavaScript, viewer request/response only, header manipulation and redirects. Lambda@Edge: heavier, also origin request/response, can make network calls.",
+    "note": ""
+  },
+  {
+    "id": "f129",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "front": "When is Elastic Beanstalk the answer?",
+    "back": "'Upload my code, AWS handles capacity, load balancing, scaling and health — but I still want access to the EC2 instances.' Free itself; you pay for what it provisions.",
+    "note": ""
+  },
+  {
+    "id": "f130",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "front": "IAM credential report vs Access Advisor",
+    "back": "Credential report: account-wide CSV of key age, MFA status, last used. Access Advisor: per-identity view of which services were actually used. Both feed permission trimming.",
+    "note": "IAM Access Analyzer finds resources shared outside the account/Org and can generate least-privilege policies from CloudTrail."
+  },
+  {
+    "id": "f131",
+    "domain": "resilient",
+    "lecture": "04-elb-asg",
+    "front": "Cross-zone load balancing",
+    "back": "Distributes to targets in EVERY enabled AZ, not just the one that received the connection. Always on and free for ALB; off by default and chargeable on NLB.",
+    "note": ""
+  },
+  {
+    "id": "f132",
+    "domain": "perf",
+    "lecture": "04-elb-asg",
+    "front": "Where is the real client IP behind a load balancer?",
+    "back": "Behind an ALB: the X-Forwarded-For header. An NLB in instance target mode preserves the client IP natively.",
+    "note": ""
+  },
+  {
+    "id": "f133",
+    "domain": "cost",
+    "lecture": "03-ec2",
+    "front": "Stop vs hibernate vs terminate",
+    "back": "Stop: RAM lost, EBS root persists, no compute charge, public IPv4 changes unless it's an EIP. Hibernate: RAM saved to the encrypted root volume and restored. Terminate: root volume deleted by default, extra volumes retained.",
+    "note": ""
+  },
+  {
+    "id": "f134",
+    "domain": "secure",
+    "lecture": "09-vpc-connectivity",
+    "front": "AWS RAM — what is it for?",
+    "back": "Sharing resources across accounts in an Organization: subnets (the shared-VPC pattern), Transit Gateways, Route 53 Resolver rules, License Manager configurations.",
+    "note": ""
+  },
+  {
+    "id": "f135",
+    "domain": "secure",
+    "lecture": "08-vpc",
+    "front": "Hybrid DNS: resolving names both ways",
+    "back": "Route 53 Resolver INBOUND endpoint lets on-premises resolve AWS private names. OUTBOUND endpoint + forwarding rules lets AWS resolve on-premises names.",
+    "note": ""
+  },
+  {
+    "id": "f136",
+    "domain": "perf",
+    "lecture": "13-caching-analytics",
+    "front": "Lazy loading vs write-through caching",
+    "back": "Lazy loading (cache-aside): populate on a read miss — only requested data is cached, but it can be stale. Write-through: update cache on every write — always fresh, but caches data nobody reads. TTLs bound staleness in both.",
+    "note": ""
+  },
+  {
+    "id": "f137",
+    "domain": "resilient",
+    "lecture": "05-serverless",
+    "front": "Lambda async failure handling",
+    "back": "Async invokes retry twice, then go to a Dead Letter Queue or an on-failure destination (SQS, SNS, EventBridge, Lambda). Without one, the event is discarded.",
+    "note": ""
+  },
+  {
+    "id": "f138",
+    "domain": "secure",
+    "lecture": "06-s3",
+    "front": "S3 Access Points",
+    "back": "Named endpoints, each with its own policy, so 50 teams don't share one enormous bucket policy. Object Lambda Access Points transform data on retrieval (redact PII, resize).",
+    "note": ""
+  },
+  {
+    "id": "f139",
+    "domain": "cost",
+    "lecture": "18-cost",
+    "front": "Consolidated billing benefits",
+    "back": "Volume pricing tiers apply across all accounts, and unused Reserved Instance / Savings Plan capacity is shared automatically across the organization.",
+    "note": ""
+  },
+  {
+    "id": "f140",
+    "domain": "perf",
+    "lecture": "07-block-and-file",
+    "front": "EBS snapshot facts",
+    "back": "Incremental, stored in S3, REGIONAL, copyable cross-Region (that's EBS DR) and shareable with other accounts. Data Lifecycle Manager automates schedules; Recycle Bin protects against accidental deletion.",
+    "note": ""
+  },
+  {
+    "id": "f141",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "front": "Encryption at rest, per service",
+    "back": "S3: SSE-S3 default, SSE-KMS for control. EBS/RDS/EFS/FSx: KMS AT CREATION (else snapshot → copy encrypted → restore). DynamoDB: encrypted by default. In transit: TLS everywhere, ACM certificates, VPN over Direct Connect.",
+    "note": ""
+  },
+  {
+    "id": "f142",
+    "domain": "resilient",
+    "lecture": "17-resilience-dr",
+    "front": "In-Region resilience checklist",
+    "back": "ELB across ≥2 AZs, ASG spanning ≥2 AZs with min ≥ 2, ONE NAT GATEWAY PER AZ, RDS Multi-AZ or Aurora replicas across AZs, EFS Standard not One Zone, ElastiCache Redis Multi-AZ, session state externalised.",
+    "note": ""
+  },
+  {
+    "id": "f143",
+    "domain": "perf",
+    "lecture": "12-dynamodb",
+    "front": "Query vs Scan",
+    "back": "Query fetches by partition key (optionally narrowed by sort key) — fast and cheap. Scan reads the ENTIRE table then filters — slow and expensive, and almost always the wrong answer.",
+    "note": ""
+  },
+  {
+    "id": "f144",
+    "domain": "secure",
+    "lecture": "12-dynamodb",
+    "front": "Restrict a DynamoDB user to their own rows",
+    "back": "IAM condition dynamodb:LeadingKeys matched against the user identity — fine-grained access control.",
+    "note": ""
+  },
+  {
+    "id": "f145",
+    "domain": "cost",
+    "lecture": "13-caching-analytics",
+    "front": "Cheap EMR",
+    "back": "Run TASK nodes on Spot (they hold no HDFS data, so losing one only re-schedules work). Keep master and core nodes On-Demand — losing the master terminates the cluster.",
+    "note": ""
+  },
+  {
+    "id": "f146",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "front": "Compute decision list",
+    "back": "Event-driven and short → Lambda. Over 15 min → Fargate / Batch / Step Functions. Containers without servers → ECS on Fargate. The word Kubernetes → EKS. OS access or licences → EC2. 'Just deploy my code, keep the servers' → Elastic Beanstalk.",
+    "note": ""
+  },
+  {
+    "id": "f147",
+    "domain": "secure",
+    "lecture": "15-observability",
+    "front": "Tamper-evident audit logging",
+    "back": "An organization CloudTrail trail → a locked-down S3 bucket, with log file validation enabled, Object Lock and MFA delete on the bucket, ideally in a separate logging account.",
+    "note": ""
+  },
+  {
+    "id": "f148",
+    "domain": "resilient",
+    "lecture": "19-exam-playbook",
+    "front": "The three-pass exam technique",
+    "back": "Pass 1: answer everything confident within 90 s, flag the rest, ALWAYS select something. Pass 2: work the flagged questions. Pass 3: change an answer only if you can state a concrete reason.",
+    "note": "Milestones: ~Q25 at 50 min, ~Q50 at 100 min."
+  },
+  {
+    "id": "f149",
+    "domain": "perf",
+    "lecture": "09-vpc-connectivity",
+    "front": "Direct Connect components",
+    "back": "Virtual Private Gateway (VGW) attaches to one VPC. Direct Connect Gateway reaches VPCs in multiple Regions. Private VIF → VPC private IPs. Public VIF → AWS public endpoints (S3, DynamoDB) over the circuit. Customer Gateway = your on-prem device.",
+    "note": ""
+  },
+  {
+    "id": "f150",
+    "domain": "cost",
+    "lecture": "01-aws-shape",
+    "front": "Well-Architected pillars",
+    "back": "Operational excellence, Security, Reliability, Performance efficiency, Cost optimisation, Sustainability. The middle four map onto the exam's four domains.",
+    "note": ""
+  },
+  {
+    "id": "f151",
+    "domain": "cost",
+    "lecture": "19-migration-hybrid",
+    "front": "How much data can you move per day over a link?",
+    "back": "Rule of thumb: 100 Mbps ≈ 1 TB per day at full utilisation. So 1 Gbps ≈ 10 TB/day, and a shared link gives you less.",
+    "note": "If the scenario gives a link speed and a deadline, do this sum first — it eliminates half the options before you read them."
+  },
+  {
+    "id": "f152",
+    "domain": "cost",
+    "lecture": "19-migration-hybrid",
+    "front": "DataSync vs Storage Gateway vs Transfer Family vs Snow",
+    "back": "DataSync = online file/object transfer, one-off or scheduled, incremental and verified. Storage Gateway = on-premises servers keep reading and writing data that lives in AWS, permanently. Transfer Family = managed SFTP/FTPS/FTP/AS2 endpoint for third parties pushing files into S3 or EFS. Snow = offline, by courier.",
+    "note": "\"Partners upload over SFTP\" is always Transfer Family. \"Keep using it from on-prem\" is always Storage Gateway."
+  },
+  {
+    "id": "f153",
+    "domain": "perf",
+    "lecture": "19-migration-hybrid",
+    "front": "Snowball Edge: Storage Optimized or Compute Optimized?",
+    "back": "Storage Optimized = bulk data transfer only. Compute Optimized = fewer TB but EC2 instances and optional GPU, for processing data at the remote site.",
+    "note": "Any mention of running, filtering or inferencing at a disconnected site → Compute Optimized. Snowmobile only at exabyte scale."
+  },
+  {
+    "id": "f154",
+    "domain": "perf",
+    "lecture": "19-migration-hybrid",
+    "front": "Homogeneous vs heterogeneous database migration",
+    "back": "Same engine either side (MySQL → Aurora MySQL): DMS alone. Different engine (Oracle → Aurora PostgreSQL): Schema Conversion Tool first to convert schema and stored code, then DMS for the data.",
+    "note": "DMS change data capture is what buys \"minimal downtime\" — full load, then replicate changes, then a short cutover."
+  },
+  {
+    "id": "f155",
+    "domain": "perf",
+    "lecture": "19-migration-hybrid",
+    "front": "Outposts vs Local Zones vs Wavelength vs VMware Cloud on AWS",
+    "back": "Outposts = AWS hardware in your data centre, for data residency or on-prem latency. Local Zones = AWS site in a metro, low latency to users in that city. Wavelength = inside a 5G carrier network, low latency to mobile devices. VMware Cloud on AWS = keep vSphere and vCenter.",
+    "note": "\"Data must not leave the premises\" is Outposts and nothing else — Local Zones and Wavelength are AWS-operated sites."
+  },
+  {
+    "id": "f156",
+    "domain": "cost",
+    "lecture": "19-migration-hybrid",
+    "front": "Rehost, replatform, refactor — which does the exam want?",
+    "back": "Rehost (MGN → EC2) when the cue is speed or no code changes. Replatform (containerise → ECS on Fargate) when the cue is reducing operational overhead without rewriting. Refactor (Lambda, Step Functions) only when there is no time pressure.",
+    "note": "Default container target is ECS on Fargate. Pick EKS only if Kubernetes is named; ECS/EKS Anywhere if the containers must stay on-premises."
+  },
+  {
+    "id": "f157",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "front": "The AI services, grouped by input",
+    "back": "Images/video: Rekognition. Scanned documents: Textract. Speech→text: Transcribe. Text→speech: Polly. Text meaning (sentiment, entities, PII): Comprehend. Languages: Translate. Document Q&A: Kendra. Bots: Lex. Time-series prediction: Forecast. Transaction fraud: Fraud Detector.",
+    "note": "SageMaker is only right when nothing purpose-built fits, or the scenario says custom model."
+  },
+  {
+    "id": "f158",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "front": "Textract vs Rekognition, Transcribe vs Polly, Kendra vs OpenSearch",
+    "back": "Scanned document → Textract; photo or video frame → Rekognition. Transcribe listens (audio→text); Polly speaks (text→audio). Kendra answers natural-language questions over documents; OpenSearch is a search/log-analytics engine you operate.",
+    "note": "These three pairs are the swaps the exam relies on."
+  },
+  {
+    "id": "f159",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "front": "CloudWatch vs CloudTrail vs X-Ray",
+    "back": "CloudWatch = is it healthy, and what did it log (metrics, alarms, logs). CloudTrail = who called which API and when (audit). X-Ray = where in the chain of services the latency went (distributed tracing).",
+    "note": "\"Every service reports healthy but requests are slow and we cannot tell which one\" → X-Ray, always."
+  },
+  {
+    "id": "f160",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "front": "Purpose-built databases by data shape",
+    "back": "Time-stamped metrics → Timestream. Relationships and multi-hop traversal → Neptune. Immutable, cryptographically verifiable history → QLDB. MongoDB app → DocumentDB. Cassandra workload → Keyspaces. Warehouse SQL at petabyte scale → Redshift. Ad-hoc SQL over S3 files → Athena.",
+    "note": "QLDB questions describe an audit requirement — \"prove nobody altered the record\". Versioning and backups prove nothing about tampering."
+  },
+  {
+    "id": "f161",
+    "domain": "secure",
+    "lecture": "20-managed-services",
+    "front": "Service Catalog vs SCPs",
+    "back": "Service Catalog publishes approved products that users launch through a launch constraint role, so they deploy stacks without holding the underlying resource permissions. SCPs set the outer boundary of what an account may do, but hand nobody a menu.",
+    "note": "\"Developers may deploy only pre-approved stacks, without direct permissions\" → Service Catalog."
+  },
+  {
+    "id": "f162",
+    "domain": "perf",
+    "lecture": "20-managed-services",
+    "front": "The governance odds and ends, by the question they answer",
+    "back": "Compute Optimizer = right-size from real utilisation. Trusted Advisor = broad cost/security/limits checks. Proton = templated environments for developers. License Manager = BYOL tracking. Personal Health Dashboard = AWS events affecting your resources. Managed Grafana/Prometheus = keep the tooling, drop the operations. AppFlow = SaaS↔AWS no-code transfer. AppSync = managed GraphQL. Pinpoint = customer campaigns.",
+    "note": "SNS notifies systems and operators; Pinpoint markets to customers. That swap appears often."
+  }
 ]

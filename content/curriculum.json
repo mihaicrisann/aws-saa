@@ -12,39 +12,464 @@
     "note": "50 of the 65 questions are scored; 15 are unscored pretest items you cannot identify. Scoring is scaled 100–1000, pass at 720. Domain weights are identical in C03 and C04."
   },
   "domains": [
-    { "id": "secure",  "n": 1, "name": "Design Secure Architectures",         "weight": 30, "color": "signal" },
-    { "id": "resilient","n": 2, "name": "Design Resilient Architectures",      "weight": 26, "color": "violet" },
-    { "id": "perf",    "n": 3, "name": "Design High-Performing Architectures", "weight": 24, "color": "amber"  },
-    { "id": "cost",    "n": 4, "name": "Design Cost-Optimized Architectures",  "weight": 20, "color": "coral"  }
+    {
+      "id": "secure",
+      "n": 1,
+      "name": "Design Secure Architectures",
+      "weight": 30,
+      "color": "signal"
+    },
+    {
+      "id": "resilient",
+      "n": 2,
+      "name": "Design Resilient Architectures",
+      "weight": 26,
+      "color": "violet"
+    },
+    {
+      "id": "perf",
+      "n": 3,
+      "name": "Design High-Performing Architectures",
+      "weight": 24,
+      "color": "amber"
+    },
+    {
+      "id": "cost",
+      "n": 4,
+      "name": "Design Cost-Optimized Architectures",
+      "weight": 20,
+      "color": "coral"
+    }
   ],
   "modules": [
-    { "id": "m0", "name": "Ground rules",        "blurb": "The mental model everything else hangs off." },
-    { "id": "m1", "name": "Compute",             "blurb": "Where your code actually runs, and how it scales." },
-    { "id": "m2", "name": "Storage",             "blurb": "Object, block, file — and picking correctly under pressure." },
-    { "id": "m3", "name": "Networking",          "blurb": "The domain that decides most exam questions." },
-    { "id": "m4", "name": "Data",                "blurb": "Relational, NoSQL, cache, analytics." },
-    { "id": "m5", "name": "Integration & ops",   "blurb": "Decoupling, observability, and the security toolbox." },
-    { "id": "m6", "name": "Architecting",        "blurb": "Putting it together the way the exam grades it." }
+    {
+      "id": "m0",
+      "name": "Ground rules",
+      "blurb": "The mental model everything else hangs off."
+    },
+    {
+      "id": "m1",
+      "name": "Compute",
+      "blurb": "Where your code actually runs, and how it scales."
+    },
+    {
+      "id": "m2",
+      "name": "Storage",
+      "blurb": "Object, block, file — and picking correctly under pressure."
+    },
+    {
+      "id": "m3",
+      "name": "Networking",
+      "blurb": "The domain that decides most exam questions."
+    },
+    {
+      "id": "m4",
+      "name": "Data",
+      "blurb": "Relational, NoSQL, cache, analytics."
+    },
+    {
+      "id": "m5",
+      "name": "Integration & ops",
+      "blurb": "Decoupling, observability, and the security toolbox."
+    },
+    {
+      "id": "m6",
+      "name": "Architecting",
+      "blurb": "Putting it together the way the exam grades it."
+    }
   ],
   "lectures": [
-    { "id": "01-aws-shape",        "n": 1,  "module": "m0", "title": "The shape of AWS",                     "standfirst": "Regions, Availability Zones, edge locations, and who is responsible for what. Every later answer is a consequence of this geometry.", "minutes": 12, "domains": ["resilient","secure"], "tags": ["Global infrastructure","Shared responsibility","Well-Architected"] },
-    { "id": "02-iam",              "n": 2,  "module": "m0", "title": "IAM: who may do what",                 "standfirst": "Users, roles, policies, and the evaluation logic that decides every API call in AWS. The single most-tested topic on the exam.", "minutes": 18, "domains": ["secure"], "tags": ["IAM","STS","SCP","Policy evaluation"] },
-    { "id": "03-ec2",              "n": 3,  "module": "m1", "title": "EC2 and what it costs",                "standfirst": "Instance families, the five purchasing models, placement groups, and instance metadata. Most cost questions on the exam live here.", "minutes": 16, "domains": ["cost","perf"], "tags": ["EC2","Savings Plans","Spot","Placement groups"] },
-    { "id": "04-elb-asg",          "n": 4,  "module": "m1", "title": "Load balancing and auto scaling",      "standfirst": "ALB vs NLB vs GWLB, target groups, health checks, and the scaling policies that make an architecture 'resilient' in exam language.", "minutes": 16, "domains": ["resilient","perf"], "tags": ["ALB","NLB","Auto Scaling","Health checks"] },
-    { "id": "05-serverless",       "n": 5,  "module": "m1", "title": "Serverless and containers",            "standfirst": "Lambda's real limits, ECS vs EKS vs Fargate, API Gateway, and the question the exam is really asking when it says 'no servers to manage'.", "minutes": 18, "domains": ["perf","cost"], "tags": ["Lambda","Fargate","ECS","API Gateway"] },
-    { "id": "06-s3",               "n": 6,  "module": "m2", "title": "S3, properly",                          "standfirst": "Storage classes, lifecycle, versioning, encryption, access control, and performance. Expect S3 in a fifth of your questions.", "minutes": 22, "domains": ["cost","secure","perf"], "tags": ["S3","Glacier","Lifecycle","Bucket policy"] },
-    { "id": "07-block-and-file",   "n": 7,  "module": "m2", "title": "Block and file storage",                "standfirst": "EBS volume types and their IOPS ceilings, instance store, EFS, the FSx family, and how data gets in from on-premises.", "minutes": 16, "domains": ["perf","resilient"], "tags": ["EBS","EFS","FSx","DataSync","Snow"] },
-    { "id": "08-vpc",              "n": 8,  "module": "m3", "title": "VPC from first principles",             "standfirst": "Subnets, route tables, internet and NAT gateways, security groups versus NACLs. Build the mental picture once and networking questions become mechanical.", "minutes": 20, "domains": ["secure","resilient"], "tags": ["VPC","Subnets","NAT","Security groups","NACL"] },
-    { "id": "09-vpc-connectivity", "n": 9,  "module": "m3", "title": "Connecting VPCs and data centres",      "standfirst": "Peering, Transit Gateway, Site-to-Site VPN, Direct Connect, VPC endpoints and PrivateLink — and the exact cue that selects each one.", "minutes": 18, "domains": ["secure","resilient","cost"], "tags": ["Peering","Transit Gateway","Direct Connect","PrivateLink","Endpoints"] },
-    { "id": "10-edge",             "n": 10, "module": "m3", "title": "The edge: DNS, CDN, anycast",           "standfirst": "Route 53 routing policies, CloudFront behaviours and origin protection, and when Global Accelerator beats a CDN.", "minutes": 16, "domains": ["perf","resilient"], "tags": ["Route 53","CloudFront","OAC","Global Accelerator"] },
-    { "id": "11-rds-aurora",       "n": 11, "module": "m4", "title": "Relational: RDS and Aurora",            "standfirst": "Multi-AZ versus read replicas — the distinction the exam tests over and over — plus Aurora's architecture, backups, and failover behaviour.", "minutes": 18, "domains": ["resilient","perf"], "tags": ["RDS","Aurora","Multi-AZ","Read replicas"] },
-    { "id": "12-dynamodb",         "n": 12, "module": "m4", "title": "DynamoDB",                              "standfirst": "Partition keys, capacity modes, GSIs versus LSIs, DAX, Streams and Global Tables. Single-digit millisecond latency at any scale — with rules.", "minutes": 18, "domains": ["perf","cost"], "tags": ["DynamoDB","GSI","DAX","Streams"] },
-    { "id": "13-caching-analytics","n": 13, "module": "m4", "title": "Caching and analytics",                 "standfirst": "ElastiCache Redis vs Memcached, Redshift, Athena, Glue, Kinesis, EMR, OpenSearch. Mostly a service-recognition exercise — learn the cues.", "minutes": 18, "domains": ["perf","cost"], "tags": ["ElastiCache","Redshift","Athena","Kinesis","Glue"] },
-    { "id": "14-decoupling",       "n": 14, "module": "m5", "title": "Decoupling: queues, topics, events",    "standfirst": "SQS, SNS, EventBridge, Step Functions and Amazon MQ. 'Decouple' is exam code for a specific short list of answers.", "minutes": 16, "domains": ["resilient","perf"], "tags": ["SQS","SNS","EventBridge","Step Functions"] },
-    { "id": "15-observability",    "n": 15, "module": "m5", "title": "Observability and governance",          "standfirst": "CloudWatch vs CloudTrail vs Config — three services people confuse — plus X-Ray, Systems Manager, Organizations and Control Tower.", "minutes": 16, "domains": ["secure","resilient"], "tags": ["CloudWatch","CloudTrail","Config","SSM","Organizations"] },
-    { "id": "16-security-toolbox", "n": 16, "module": "m5", "title": "The security toolbox",                  "standfirst": "KMS and envelope encryption, Secrets Manager vs Parameter Store, ACM, WAF, Shield, GuardDuty, Inspector, Macie, and Cognito.", "minutes": 20, "domains": ["secure"], "tags": ["KMS","Secrets Manager","WAF","Shield","GuardDuty","Cognito"] },
-    { "id": "17-resilience-dr",    "n": 17, "module": "m6", "title": "Resilience and disaster recovery",      "standfirst": "RTO and RPO, the four DR strategies and their cost order, and how to read a resilience question in ten seconds.", "minutes": 14, "domains": ["resilient","cost"], "tags": ["RTO","RPO","Pilot light","Warm standby","Multi-region"] },
-    { "id": "18-cost",             "n": 18, "module": "m6", "title": "Designing for cost",                    "standfirst": "Where the money actually goes, the levers per service, and the cost-management tools the exam names by title.", "minutes": 14, "domains": ["cost"], "tags": ["Savings Plans","Data transfer","Cost Explorer","Budgets","S3 lifecycle"] },
-    { "id": "19-exam-playbook",    "n": 19, "module": "m6", "title": "The exam playbook",                     "standfirst": "How the questions are built, the keyword-to-service map, elimination tactics, timing, and what to do in the last ten minutes.", "minutes": 16, "domains": ["secure","resilient","perf","cost"], "tags": ["Strategy","Keywords","Elimination","Timing"] }
+    {
+      "id": "01-aws-shape",
+      "n": 1,
+      "module": "m0",
+      "title": "The shape of AWS",
+      "standfirst": "Regions, Availability Zones, edge locations, and who is responsible for what. Every later answer is a consequence of this geometry.",
+      "minutes": 12,
+      "domains": [
+        "resilient",
+        "secure"
+      ],
+      "tags": [
+        "Global infrastructure",
+        "Shared responsibility",
+        "Well-Architected"
+      ]
+    },
+    {
+      "id": "02-iam",
+      "n": 2,
+      "module": "m0",
+      "title": "IAM: who may do what",
+      "standfirst": "Users, roles, policies, and the evaluation logic that decides every API call in AWS. The single most-tested topic on the exam.",
+      "minutes": 18,
+      "domains": [
+        "secure"
+      ],
+      "tags": [
+        "IAM",
+        "STS",
+        "SCP",
+        "Policy evaluation"
+      ]
+    },
+    {
+      "id": "03-ec2",
+      "n": 3,
+      "module": "m1",
+      "title": "EC2 and what it costs",
+      "standfirst": "Instance families, the five purchasing models, placement groups, and instance metadata. Most cost questions on the exam live here.",
+      "minutes": 16,
+      "domains": [
+        "cost",
+        "perf"
+      ],
+      "tags": [
+        "EC2",
+        "Savings Plans",
+        "Spot",
+        "Placement groups"
+      ]
+    },
+    {
+      "id": "04-elb-asg",
+      "n": 4,
+      "module": "m1",
+      "title": "Load balancing and auto scaling",
+      "standfirst": "ALB vs NLB vs GWLB, target groups, health checks, and the scaling policies that make an architecture 'resilient' in exam language.",
+      "minutes": 16,
+      "domains": [
+        "resilient",
+        "perf"
+      ],
+      "tags": [
+        "ALB",
+        "NLB",
+        "Auto Scaling",
+        "Health checks"
+      ]
+    },
+    {
+      "id": "05-serverless",
+      "n": 5,
+      "module": "m1",
+      "title": "Serverless and containers",
+      "standfirst": "Lambda's real limits, ECS vs EKS vs Fargate, API Gateway, and the question the exam is really asking when it says 'no servers to manage'.",
+      "minutes": 18,
+      "domains": [
+        "perf",
+        "cost"
+      ],
+      "tags": [
+        "Lambda",
+        "Fargate",
+        "ECS",
+        "API Gateway"
+      ]
+    },
+    {
+      "id": "06-s3",
+      "n": 6,
+      "module": "m2",
+      "title": "S3, properly",
+      "standfirst": "Storage classes, lifecycle, versioning, encryption, access control, and performance. Expect S3 in a fifth of your questions.",
+      "minutes": 22,
+      "domains": [
+        "cost",
+        "secure",
+        "perf"
+      ],
+      "tags": [
+        "S3",
+        "Glacier",
+        "Lifecycle",
+        "Bucket policy"
+      ]
+    },
+    {
+      "id": "07-block-and-file",
+      "n": 7,
+      "module": "m2",
+      "title": "Block and file storage",
+      "standfirst": "EBS volume types and their IOPS ceilings, instance store, EFS, the FSx family, and how data gets in from on-premises.",
+      "minutes": 16,
+      "domains": [
+        "perf",
+        "resilient"
+      ],
+      "tags": [
+        "EBS",
+        "EFS",
+        "FSx",
+        "DataSync",
+        "Snow"
+      ]
+    },
+    {
+      "id": "08-vpc",
+      "n": 8,
+      "module": "m3",
+      "title": "VPC from first principles",
+      "standfirst": "Subnets, route tables, internet and NAT gateways, security groups versus NACLs. Build the mental picture once and networking questions become mechanical.",
+      "minutes": 20,
+      "domains": [
+        "secure",
+        "resilient"
+      ],
+      "tags": [
+        "VPC",
+        "Subnets",
+        "NAT",
+        "Security groups",
+        "NACL"
+      ]
+    },
+    {
+      "id": "09-vpc-connectivity",
+      "n": 9,
+      "module": "m3",
+      "title": "Connecting VPCs and data centres",
+      "standfirst": "Peering, Transit Gateway, Site-to-Site VPN, Direct Connect, VPC endpoints and PrivateLink — and the exact cue that selects each one.",
+      "minutes": 18,
+      "domains": [
+        "secure",
+        "resilient",
+        "cost"
+      ],
+      "tags": [
+        "Peering",
+        "Transit Gateway",
+        "Direct Connect",
+        "PrivateLink",
+        "Endpoints"
+      ]
+    },
+    {
+      "id": "10-edge",
+      "n": 10,
+      "module": "m3",
+      "title": "The edge: DNS, CDN, anycast",
+      "standfirst": "Route 53 routing policies, CloudFront behaviours and origin protection, and when Global Accelerator beats a CDN.",
+      "minutes": 16,
+      "domains": [
+        "perf",
+        "resilient"
+      ],
+      "tags": [
+        "Route 53",
+        "CloudFront",
+        "OAC",
+        "Global Accelerator"
+      ]
+    },
+    {
+      "id": "11-rds-aurora",
+      "n": 11,
+      "module": "m4",
+      "title": "Relational: RDS and Aurora",
+      "standfirst": "Multi-AZ versus read replicas — the distinction the exam tests over and over — plus Aurora's architecture, backups, and failover behaviour.",
+      "minutes": 18,
+      "domains": [
+        "resilient",
+        "perf"
+      ],
+      "tags": [
+        "RDS",
+        "Aurora",
+        "Multi-AZ",
+        "Read replicas"
+      ]
+    },
+    {
+      "id": "12-dynamodb",
+      "n": 12,
+      "module": "m4",
+      "title": "DynamoDB",
+      "standfirst": "Partition keys, capacity modes, GSIs versus LSIs, DAX, Streams and Global Tables. Single-digit millisecond latency at any scale — with rules.",
+      "minutes": 18,
+      "domains": [
+        "perf",
+        "cost"
+      ],
+      "tags": [
+        "DynamoDB",
+        "GSI",
+        "DAX",
+        "Streams"
+      ]
+    },
+    {
+      "id": "13-caching-analytics",
+      "n": 13,
+      "module": "m4",
+      "title": "Caching and analytics",
+      "standfirst": "ElastiCache Redis vs Memcached, Redshift, Athena, Glue, Kinesis, EMR, OpenSearch. Mostly a service-recognition exercise — learn the cues.",
+      "minutes": 18,
+      "domains": [
+        "perf",
+        "cost"
+      ],
+      "tags": [
+        "ElastiCache",
+        "Redshift",
+        "Athena",
+        "Kinesis",
+        "Glue"
+      ]
+    },
+    {
+      "id": "14-decoupling",
+      "n": 14,
+      "module": "m5",
+      "title": "Decoupling: queues, topics, events",
+      "standfirst": "SQS, SNS, EventBridge, Step Functions and Amazon MQ. 'Decouple' is exam code for a specific short list of answers.",
+      "minutes": 16,
+      "domains": [
+        "resilient",
+        "perf"
+      ],
+      "tags": [
+        "SQS",
+        "SNS",
+        "EventBridge",
+        "Step Functions"
+      ]
+    },
+    {
+      "id": "15-observability",
+      "n": 15,
+      "module": "m5",
+      "title": "Observability and governance",
+      "standfirst": "CloudWatch vs CloudTrail vs Config — three services people confuse — plus X-Ray, Systems Manager, Organizations and Control Tower.",
+      "minutes": 16,
+      "domains": [
+        "secure",
+        "resilient"
+      ],
+      "tags": [
+        "CloudWatch",
+        "CloudTrail",
+        "Config",
+        "SSM",
+        "Organizations"
+      ]
+    },
+    {
+      "id": "16-security-toolbox",
+      "n": 16,
+      "module": "m5",
+      "title": "The security toolbox",
+      "standfirst": "KMS and envelope encryption, Secrets Manager vs Parameter Store, ACM, WAF, Shield, GuardDuty, Inspector, Macie, and Cognito.",
+      "minutes": 20,
+      "domains": [
+        "secure"
+      ],
+      "tags": [
+        "KMS",
+        "Secrets Manager",
+        "WAF",
+        "Shield",
+        "GuardDuty",
+        "Cognito"
+      ]
+    },
+    {
+      "id": "17-resilience-dr",
+      "n": 17,
+      "module": "m6",
+      "title": "Resilience and disaster recovery",
+      "standfirst": "RTO and RPO, the four DR strategies and their cost order, and how to read a resilience question in ten seconds.",
+      "minutes": 14,
+      "domains": [
+        "resilient",
+        "cost"
+      ],
+      "tags": [
+        "RTO",
+        "RPO",
+        "Pilot light",
+        "Warm standby",
+        "Multi-region"
+      ]
+    },
+    {
+      "id": "18-cost",
+      "n": 18,
+      "module": "m6",
+      "title": "Designing for cost",
+      "standfirst": "Where the money actually goes, the levers per service, and the cost-management tools the exam names by title.",
+      "minutes": 14,
+      "domains": [
+        "cost"
+      ],
+      "tags": [
+        "Savings Plans",
+        "Data transfer",
+        "Cost Explorer",
+        "Budgets",
+        "S3 lifecycle"
+      ]
+    },
+    {
+      "id": "19-migration-hybrid",
+      "n": 19,
+      "module": "m6",
+      "title": "Migration and hybrid",
+      "standfirst": "Getting servers, databases and petabytes onto AWS, and what to do when the workload cannot come at all.",
+      "minutes": 16,
+      "domains": [
+        "cost",
+        "perf",
+        "resilient"
+      ],
+      "tags": [
+        "DMS",
+        "SCT",
+        "Snow Family",
+        "Outposts",
+        "DataSync",
+        "Wavelength"
+      ]
+    },
+    {
+      "id": "20-managed-services",
+      "n": 20,
+      "module": "m6",
+      "title": "Services you only need to recognise",
+      "standfirst": "The recognition half of the paper: a job described in plain English, and the one AWS service built for it. Free marks if the map is memorised.",
+      "minutes": 14,
+      "domains": [
+        "perf",
+        "secure"
+      ],
+      "tags": [
+        "Rekognition",
+        "Textract",
+        "Comprehend",
+        "X-Ray",
+        "Timestream",
+        "Service Catalog"
+      ]
+    },
+    {
+      "id": "19-exam-playbook",
+      "n": 21,
+      "module": "m6",
+      "title": "The exam playbook",
+      "standfirst": "How the questions are built, the keyword-to-service map, elimination tactics, timing, and what to do in the last ten minutes.",
+      "minutes": 16,
+      "domains": [
+        "secure",
+        "resilient",
+        "perf",
+        "cost"
+      ],
+      "tags": [
+        "Strategy",
+        "Keywords",
+        "Elimination",
+        "Timing"
+      ]
+    }
   ]
 }

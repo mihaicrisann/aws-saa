@@ -54,8 +54,10 @@ try {
   await page.getByRole('button', { name: 'Start' }).click()
   await page.keyboard.press('Space'); await page.waitForTimeout(400)
   check(await page.getByRole('button', { name: /Good/ }).isVisible(), 'cards: space did not flip')
+  const beforeGrade = Number((await page.locator('text=/\\d+ left/').first().textContent()).match(/\d+/)[0])
   await page.keyboard.press('3'); await page.waitForTimeout(200)
-  check((await page.locator('text=/149 left/').count()) === 1, 'cards: grade key did not advance')
+  const afterGrade = Number((await page.locator('text=/\\d+ left/').first().textContent()).match(/\d+/)[0])
+  check(afterGrade === beforeGrade - 1, `cards: grade key did not advance (${beforeGrade} → ${afterGrade})`)
 
   // exam: quick mode, answer all, submit, review
   await page.goto(base + '/exam', { waitUntil: 'networkidle' })
