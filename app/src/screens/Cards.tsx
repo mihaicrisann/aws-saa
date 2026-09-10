@@ -9,7 +9,6 @@ import { useHotkeys } from '@/lib/hotkeys'
 import { Field, DomainPicker, LecturePicker } from '@/components/Filters'
 import { PageHeader, DomainBadge, Nothing, Meter, QuietLink, Choice } from '@/components/parts'
 import { Button } from '@/components/ui/button'
-import { Frame, FramePanel } from '@/components/ui/frame'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
 
@@ -86,27 +85,28 @@ export default function Cards() {
   if (!queue) {
     return (
       <div className="mx-auto max-w-2xl">
-        <PageHeader title="Cards" description={`Recall, then rate yourself honestly — the rating decides when the card comes back. ${dueTotal} of ${flashcards.length} due.`} />
-        <Frame>
-          <FramePanel className="grid gap-5">
-            <Field label="Domain"><DomainPicker value={domain} onChange={(v) => { setDomain(v); syncParams(v, lecture) }} /></Field>
-            <Field label="Lecture"><LecturePicker value={lecture} onChange={(v) => { setLecture(v); syncParams(domain, v) }} /></Field>
-            <Field label="Scope">
-              <Choice
-                value={dueOnly ? 'due' : 'all'}
-                onChange={(v) => v && setDueOnly(v === 'due')}
-                options={[
-                  { value: 'due', label: 'Due now' },
-                  { value: 'all', label: 'Everything' },
-                ]}
-              />
-            </Field>
-          </FramePanel>
-          <FramePanel className="flex items-center justify-between px-5 py-3">
-            <span className="text-sm text-muted-foreground">{pool.length} cards</span>
+        <PageHeader
+          title="Cards"
+          description={<>Recall, then rate yourself honestly. The rating decides when the card comes back. <span className="mono text-xs">{dueTotal}/{flashcards.length}</span> due.</>}
+        />
+        <div className="overflow-hidden rounded-xl border bg-card">
+          <Field label="Domain"><DomainPicker value={domain} onChange={(v) => { setDomain(v); syncParams(v, lecture) }} /></Field>
+          <Field label="Lecture"><LecturePicker value={lecture} onChange={(v) => { setLecture(v); syncParams(domain, v) }} /></Field>
+          <Field label="Scope">
+            <Choice
+              value={dueOnly ? 'due' : 'all'}
+              onChange={(v) => v && setDueOnly(v === 'due')}
+              options={[
+                { value: 'due', label: 'Due now' },
+                { value: 'all', label: 'Everything' },
+              ]}
+            />
+          </Field>
+          <div className="flex items-center justify-between border-t bg-muted/40 px-5 py-3">
+            <span className="mono text-xs text-muted-foreground">{pool.length} cards</span>
             <Button disabled={!pool.length} onClick={start}>Start</Button>
-          </FramePanel>
-        </Frame>
+          </div>
+        </div>
         {!pool.length && (
           <div className="mt-4">
             <Nothing title="Nothing due here">Come back tomorrow, or switch to "Everything" to work ahead.</Nothing>
@@ -119,7 +119,11 @@ export default function Cards() {
   if (!current) {
     return (
       <div className="mx-auto max-w-2xl">
-        <PageHeader title={`${done} card${done === 1 ? '' : 's'} reviewed`} description="Cards rated Good or Easy come back in days, not minutes, so the deck shrinks as things stick." />
+        <PageHeader
+          eyebrow="Deck done"
+          title={<><span className="mono">{done}</span> card{done === 1 ? '' : 's'} reviewed</>}
+          description="Cards rated Good or Easy come back in days, not minutes, so the deck shrinks as things stick."
+        />
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setQueue(null)}>Pick another slice</Button>
           <Button render={<Link to="/drill" />}>Drill questions</Button>
@@ -132,65 +136,66 @@ export default function Cards() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-5 flex items-center gap-4 text-sm">
-        <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setQueue(null)}>End</button>
+      <div className="mb-6 flex items-center gap-4">
+        <button type="button" className="pressable text-[13px] text-muted-foreground hover:text-foreground" onClick={() => setQueue(null)}>End</button>
         <Meter value={done / (done + queue.length)} className="flex-1" />
-        <span className="text-muted-foreground tabular-nums">{queue.length} left</span>
+        <span className="mono text-xs text-muted-foreground">{queue.length} left</span>
       </div>
 
-      <Frame style={{ perspective: 1400 }}>
+      <div style={{ perspective: 1600 }}>
         <div
-          className="relative transition-transform duration-500 ease-[cubic-bezier(.22,.61,.36,1)] motion-reduce:transition-none"
+          className="relative transition-transform duration-500 ease-(--ease-in-out) motion-reduce:transition-none"
           style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateX(180deg)' : 'none' }}
         >
-          <FramePanel className="p-0" style={{ backfaceVisibility: 'hidden' }}>
+          <div className="rounded-xl border bg-card" style={{ backfaceVisibility: 'hidden' }}>
             <button
               type="button"
               onClick={() => setFlipped(true)}
-              className="flex min-h-64 w-full flex-col justify-center px-8 py-8 text-left"
+              className="flex min-h-72 w-full flex-col justify-between px-7 py-6 text-left"
             >
-              <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
                 <DomainBadge id={current.domain} />
-                <span>Lecture {lectureNo(current.lecture)}</span>
-                {state.reps > 0 && <span>· seen {state.reps}×</span>}
+                <span className="mono text-[11px] text-muted-foreground">Lecture {lectureNo(current.lecture)}</span>
+                {state.reps > 0 && <span className="mono ml-auto text-[11px] text-faint-foreground">seen {state.reps}×</span>}
               </div>
-              <div className="text-xl leading-snug font-medium">{current.front}</div>
+              <div className="my-8 text-[22px] leading-snug font-medium tracking-tight">{current.front}</div>
+              <div className="eyebrow flex items-center gap-1.5"><Kbd>Space</Kbd> reveal</div>
             </button>
-          </FramePanel>
+          </div>
 
-          <FramePanel
-            className="absolute inset-0 flex flex-col justify-center overflow-y-auto px-8 py-8"
+          <div
+            className="quiet-scroll absolute inset-0 flex flex-col overflow-y-auto rounded-xl border bg-card px-7 py-6"
             style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}
             aria-hidden={!flipped}
           >
-            <div className="mb-2 text-xs text-muted-foreground">{current.front}</div>
+            <div className="eyebrow mb-4 line-clamp-2 normal-case tracking-normal">{current.front}</div>
             <div className="text-[15px] leading-relaxed whitespace-pre-line">{current.back}</div>
             {current.note && (
-              <div className="mt-4 rounded-xl border-l-2 border-foreground/40 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              <div className="mt-5 rounded-lg border border-l-2 border-l-foreground/60 bg-muted/40 px-3.5 py-2.5 text-[13px] leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground">Exam note. </span>{current.note}
               </div>
             )}
-          </FramePanel>
+          </div>
         </div>
-      </Frame>
+      </div>
 
-      <div className="mt-4">
+      <div className="mt-3">
         {flipped ? (
-          <div className="rise grid grid-cols-4 gap-2">
+          <div className="rise grid grid-cols-4 gap-1.5">
             {GRADES.map((g) => (
-              <Button key={g.g} variant="outline" className={cn('h-auto flex-col gap-0 py-2')} onClick={() => grade(g.g)}>
-                <span className="text-sm">{g.label}</span>
-                <span className="text-xs text-muted-foreground">{describeInterval(state, g.g)}</span>
+              <Button key={g.g} variant="outline" className={cn('h-auto flex-col gap-0.5 py-2.5')} onClick={() => grade(g.g)}>
+                <span className="flex items-center gap-1.5 text-[13px]"><Kbd>{g.key}</Kbd>{g.label}</span>
+                <span className="mono text-[11px] text-muted-foreground">{describeInterval(state, g.g)}</span>
               </Button>
             ))}
           </div>
         ) : (
-          <Button className="w-full" onClick={() => setFlipped(true)}>Show answer <Kbd className="ml-1">Space</Kbd></Button>
+          <Button className="w-full" onClick={() => setFlipped(true)}>Show answer</Button>
         )}
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-        <QuietLink to={`/learn/${current.lecture}`}>Read the lecture</QuietLink>
+      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+        <QuietLink to={`/learn/${current.lecture}`} className="text-xs">Read the lecture</QuietLink>
         <span className="flex items-center gap-1">
           {flipped ? <><Kbd>1</Kbd><Kbd>2</Kbd><Kbd>3</Kbd><Kbd>4</Kbd> rate</> : <><Kbd>Space</Kbd> flip</>}
         </span>

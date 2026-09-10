@@ -80,7 +80,7 @@ export default function Search({ open, onOpenChange }: { open: boolean; onOpenCh
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandDialogPopup aria-label="Search lectures and the cheat sheet">
         <Command mode="none" value={q} onValueChange={setQ}>
-          <CommandInput placeholder="Search lectures and cheat sheet — object lock, transit gateway, ExternalId…" />
+          <CommandInput placeholder="object lock, transit gateway, ExternalId…" />
           <CommandPanel>
             <CommandList>
               {terms.length > 0 && !results.sections.length && !results.cheats.length && <CommandEmpty>Nothing found.</CommandEmpty>}
@@ -90,7 +90,7 @@ export default function Search({ open, onOpenChange }: { open: boolean; onOpenCh
                   {results.sections.map((e) => (
                     <CommandItem key={`${e.lecture}#${e.id}`} value={`${e.lecture}#${e.id}`} onClick={() => go(`/learn/${e.lecture}#${e.id}`)} className="flex-col items-start gap-0.5 py-2">
                       <span className="text-sm">
-                        <span className="mr-2 text-muted-foreground tabular-nums">{lectureNo(e.lecture)}</span>
+                        <span className="mono mr-2 text-xs text-faint-foreground">{lectureNo(e.lecture)}</span>
                         {e.title}
                         <span className="ml-2 text-xs text-muted-foreground">{e.lectureTitle}</span>
                       </span>

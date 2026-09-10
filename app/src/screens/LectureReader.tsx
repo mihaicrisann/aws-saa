@@ -2,15 +2,48 @@
 
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from '@/lib/navigation'
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
-import { lectures, lectureById, questionsByLecture, cardsByLecture, lectureNo } from '@/lib/content'
+import { ArrowLeft, ArrowRight, Check, NotebookPen } from 'lucide-react'
+import { lectures, lectureById, questionsByLecture, cardsByLecture, lectureNo, shortDomain } from '@/lib/content'
 import { useStore, markLectureRead } from '@/lib/store'
 import Notes from '@/components/Notes'
 import { useHotkeys } from '@/lib/hotkeys'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
-import { Badge } from '@/components/ui/badge'
-import { DomainBadge, QuietLink } from '@/components/parts'
+import { DomainDot, QuietLink } from '@/components/parts'
+import { cn } from '@/lib/utils'
+
+function useActiveSection(ids: string[]) {
+  const [active, setActive] = useState<string | null>(null)
+  useEffect(() => {
+    const els = ids.map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el)
+    if (!els.length) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        if (visible[0]) setActive(visible[0].target.id)
+      },
+      { rootMargin: '-10% 0px -70% 0px', threshold: 0 },
+    )
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [ids.join('|')])
+  return active
+}
+
+function useReadProgress(key: string) {
+  const [p, setP] = useState(0)
+  useEffect(() => {
+    const onScroll = () => {
+      const doc = document.documentElement
+      const max = doc.scrollHeight - doc.clientHeight
+      setP(max > 0 ? Math.min(1, window.scrollY / max) : 0)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [key])
+  return p
+}
 
 export default function LectureReader({ html, sections }: { html: string; sections: { id: string; title: string }[] }) {
   const { id = '' } = useParams()
@@ -23,6 +56,8 @@ export default function LectureReader({ html, sections }: { html: string; sectio
   const note = useStore((s) => s.notes[id] ?? '')
   const readAt = useStore((s) => s.lectureRead[id])
   const [notesOpen, setNotesOpen] = useState(false)
+  const activeSection = useActiveSection(sections.map((s) => s.id))
+  const progress = useReadProgress(id)
 
   const markAndAdvance = () => {
     markLectureRead(id)
@@ -60,39 +95,28 @@ export default function LectureReader({ html, sections }: { html: string; sectio
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-        <QuietLink to="/learn">Learn</QuietLink>
-        <span className="text-muted-foreground">/</span>
-        <span className="text-muted-foreground">{lectureNo(id)}</span>
-        <span className="font-medium">{lec.title}</span>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => setNotesOpen((v) => !v)}>
-            Notes{note.trim() ? ' •' : ''}
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5">
+        <div className="h-full bg-foreground/70 transition-[width] duration-100 ease-linear" style={{ width: `${progress * 100}%` }} />
+      </div>
+
+      <div className="mb-8 flex flex-wrap items-center gap-2">
+        <QuietLink to="/learn" className="flex items-center gap-1"><ArrowLeft className="size-3" /> Learn</QuietLink>
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
+            <NotebookPen /> Notes{note.trim() ? <span className="ml-0.5 size-1.5 rounded-full bg-foreground" aria-label="has notes" /> : null}
           </Button>
-          {qCount > 0 && (
-            <Button render={<Link to={`/drill?lecture=${id}`} />} variant="outline" size="sm">Drill {qCount}</Button>
-          )}
-          {hardCount > 0 && (
-            <Button render={<Link to={`/drill?lecture=${id}&bank=v2`} />} variant="outline" size="sm">Hard {hardCount}</Button>
-          )}
-          {cCount > 0 && (
-            <Button render={<Link to={`/cards?lecture=${id}`} />} variant="outline" size="sm">Cards {cCount}</Button>
-          )}
+          {qCount > 0 && <Button render={<Link to={`/drill?lecture=${id}`} />} variant="outline" size="sm">Drill <span className="mono text-muted-foreground">{qCount}</span></Button>}
+          {hardCount > 0 && <Button render={<Link to={`/drill?lecture=${id}&bank=v2`} />} variant="outline" size="sm">Hard <span className="mono text-muted-foreground">{hardCount}</span></Button>}
+          {cCount > 0 && <Button render={<Link to={`/cards?lecture=${id}`} />} variant="outline" size="sm">Cards <span className="mono text-muted-foreground">{cCount}</span></Button>}
           <Button size="sm" variant={readAt ? 'secondary' : 'default'} onClick={markAndAdvance}>
             {readAt ? <><Check /> Read</> : next ? 'Mark read, next' : 'Mark read'}
-            <Kbd className="ml-1">n</Kbd>
+            <Kbd className="ml-0.5 bg-transparent text-current opacity-70 dark:bg-transparent">n</Kbd>
           </Button>
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {lec.domains.map((d) => <DomainBadge key={d} id={d} />)}
-        {lec.tags.map((t) => <Badge key={t} variant="secondary" className="font-normal">{t}</Badge>)}
-        <span className="ml-auto text-xs text-muted-foreground">{lec.minutes} min</span>
-      </div>
-
       {notesOpen && (
-        <div className="rise mb-4">
+        <div className="rise mb-8">
           <Notes
             noteKey={id}
             label={`Notes on ${lec.title}`}
@@ -102,30 +126,67 @@ export default function LectureReader({ html, sections }: { html: string; sectio
         </div>
       )}
 
-      <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_180px]">
+      <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_200px]">
         <article className="min-w-0">
-          <header className="border-b pb-6">
-            <h1 className="text-3xl font-semibold tracking-tight">{lec.title}</h1>
-            <p className="mt-3 text-base leading-relaxed text-muted-foreground">{lec.standfirst}</p>
+          <header className="border-b pb-8">
+            <div className="eyebrow flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-faint-foreground">Lecture {lectureNo(id)}</span>
+              <span>{lec.minutes} min</span>
+              {lec.domains.map((d) => (
+                <span key={d} className="flex items-center gap-1.5"><DomainDot id={d} />{shortDomain(d)}</span>
+              ))}
+            </div>
+            <h1 className="display-lg mt-5">{lec.title}</h1>
+            <p className="mt-5 max-w-2xl text-[17px] leading-relaxed text-muted-foreground">{lec.standfirst}</p>
+            {lec.tags.length > 0 && (
+              <div className="mt-5 flex flex-wrap gap-1.5">
+                {lec.tags.map((t) => <span key={t} className="rounded-md border px-1.5 py-0.5 text-[11px] text-muted-foreground">{t}</span>)}
+              </div>
+            )}
           </header>
           <div className="lecture-prose" dangerouslySetInnerHTML={{ __html: html }} />
         </article>
-        <aside className="sticky top-6 hidden xl:block">
-          <p className="mb-3 text-xs font-medium text-muted-foreground">In this lecture</p>
-          <nav aria-label="Lecture sections" className="space-y-2 border-l pl-3">
-            {sections.map((section) => <a key={section.id} href={`#${section.id}`} className="block text-xs leading-relaxed text-muted-foreground hover:text-foreground">{section.title}</a>)}
+
+        <aside className="sticky top-8 hidden xl:block">
+          <p className="eyebrow mb-3">On this page</p>
+          <nav aria-label="Lecture sections" className="grid gap-px">
+            {sections.map((section, i) => {
+              const on = activeSection === section.id
+              return (
+                <a
+                  key={section.id}
+                  href={`#${section.id}`}
+                  className={cn(
+                    'grid grid-cols-[20px_1fr] gap-2 rounded-md px-2 py-1.5 text-xs leading-snug transition-colors duration-100',
+                    on ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <span className={cn('mono', on ? 'text-foreground' : 'text-faint-foreground')}>{String(i + 1).padStart(2, '0')}</span>
+                  {section.title}
+                </a>
+              )
+            })}
           </nav>
         </aside>
       </div>
 
-      <nav className="mt-6 flex items-center justify-between gap-3">
+      <nav className="mt-12 grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2">
         {prev ? (
-          <Button render={<Link to={`/learn/${prev.id}`} />} variant="ghost" className="max-w-[48%]"><ArrowLeft /> <span className="truncate">{prev.title}</span></Button>
-        ) : <span />}
+          <Link to={`/learn/${prev.id}`} className="group bg-card px-5 py-4 transition-colors duration-100 hover:bg-accent/50">
+            <div className="eyebrow flex items-center gap-1.5"><ArrowLeft className="size-3 transition-transform duration-200 ease-(--ease-out) group-hover:-translate-x-0.5" /> Previous</div>
+            <div className="mt-2 truncate text-sm font-medium">{lectureNo(prev.id)} {prev.title}</div>
+          </Link>
+        ) : <span className="hidden bg-card sm:block" />}
         {next ? (
-          <Button render={<Link to={`/learn/${next.id}`} />} variant="ghost" className="max-w-[48%]"><span className="truncate">{next.title}</span> <ArrowRight /></Button>
+          <Link to={`/learn/${next.id}`} className="group bg-card px-5 py-4 text-right transition-colors duration-100 hover:bg-accent/50">
+            <div className="eyebrow flex items-center justify-end gap-1.5">Next <ArrowRight className="size-3 transition-transform duration-200 ease-(--ease-out) group-hover:translate-x-0.5" /></div>
+            <div className="mt-2 truncate text-sm font-medium">{lectureNo(next.id)} {next.title}</div>
+          </Link>
         ) : (
-          <Button render={<Link to="/exam" />}>Sit a mock exam <ArrowRight /></Button>
+          <Link to="/exam" className="group bg-card px-5 py-4 text-right transition-colors duration-100 hover:bg-accent/50">
+            <div className="eyebrow flex items-center justify-end gap-1.5">Done <ArrowRight className="size-3" /></div>
+            <div className="mt-2 text-sm font-medium">Sit a mock exam</div>
+          </Link>
         )}
       </nav>
     </div>

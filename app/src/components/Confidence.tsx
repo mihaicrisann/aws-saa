@@ -11,8 +11,8 @@ export const CONFIDENCE: { id: Confidence; label: string; key: string }[] = [
 
 export function ConfidencePicker({ value, onChange }: { value?: Confidence; onChange: (c: Confidence | undefined) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 text-sm">
-      <span className="text-muted-foreground">How sure?</span>
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="eyebrow">How sure</span>
       <Choice
         allowEmpty
         value={value ?? ''}

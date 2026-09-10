@@ -24,50 +24,31 @@ import {
   type Confidence,
   type ActiveDrill,
 } from '@/lib/store'
-import {
-  ConfidencePicker,
-  useTicker,
-  fmtSeconds,
-} from '@/components/Confidence'
+import { ConfidencePicker, useTicker, fmtSeconds } from '@/components/Confidence'
 import { useHotkeys } from '@/lib/hotkeys'
 import QuestionView from '@/components/QuestionView'
-import {
-  Field,
-  DomainPicker,
-  LecturePicker,
-  toggleChoice,
-} from '@/components/Filters'
-import { PageHeader, Nothing, Meter, Rows, Choice } from '@/components/parts'
+import { Field, DomainPicker, LecturePicker, toggleChoice } from '@/components/Filters'
+import { PageHeader, Nothing, Meter, Rows, Choice, StatRow, Stat, SectionTitle } from '@/components/parts'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
-import { Frame, FramePanel } from '@/components/ui/frame'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Kbd } from '@/components/ui/kbd'
+import { cn } from '@/lib/utils'
 
 export default function Drill() {
   const [params, setParams] = useSearchParams()
   const attempts = useStore((s) => s.attempts)
 
-  const [domain, setDomain] = useState<DomainId | 'all'>(
-    (params.get('domain') as DomainId) ?? 'all',
-  )
+  const [domain, setDomain] = useState<DomainId | 'all'>((params.get('domain') as DomainId) ?? 'all')
   const [lecture, setLecture] = useState(params.get('lecture') ?? 'all')
-  const [bank, setBank] = useState<QuestionBank>(
-    params.get('bank') === 'v2' ? 'v2' : 'original',
-  )
+  const [bank, setBank] = useState<QuestionBank>(params.get('bank') === 'v2' ? 'v2' : 'original')
   const [count, setCount] = useState(10)
   const [unseen, setUnseen] = useState(false)
 
   const active = useStore((s) => s.activeDrill)
   const activeIds = active?.ids
   const set = useMemo(
-    () =>
-      activeIds
-        ? activeIds
-            .map(findQuestion)
-            .filter((q): q is Question => !!q)
-        : null,
+    () => (activeIds ? activeIds.map(findQuestion).filter((q): q is Question => !!q) : null),
     [activeIds],
   )
   const i = active?.index ?? 0
@@ -87,10 +68,8 @@ export default function Drill() {
     const current = getStore().activeDrill
     if (current) setActiveDrill(fn(current))
   }
-  const setChosen = (fn: (c: number[]) => number[]) =>
-    edit((s) => ({ ...s, chosen: fn(s.chosen) }))
-  const setConfidence = (value: Confidence | undefined) =>
-    edit((s) => ({ ...s, confidence: value }))
+  const setChosen = (fn: (c: number[]) => number[]) => edit((s) => ({ ...s, chosen: fn(s.chosen) }))
+  const setConfidence = (value: Confidence | undefined) => edit((s) => ({ ...s, confidence: value }))
   const setSet = (_value: null) => setActiveDrill(null)
 
   const seen = useMemo(() => new Set(attempts.map((a) => a.qid)), [attempts])
@@ -117,9 +96,7 @@ export default function Drill() {
   const start = () => {
     setActiveDrill({
       id: crypto.randomUUID(),
-      ids: shuffle(pool)
-        .slice(0, count)
-        .map((q) => q.id),
+      ids: shuffle(pool).slice(0, count).map((q) => q.id),
       index: 0,
       chosen: [],
       revealed: false,
@@ -138,8 +115,7 @@ export default function Drill() {
 
   const check = useCallback(() => {
     const session = getStore().activeDrill
-    if (!current || !session || session.revealed || !session.chosen.length)
-      return
+    if (!current || !session || session.revealed || !session.chosen.length) return
     const ok = sameSet(session.chosen, current.correct)
     const seconds = Math.round((Date.now() - session.shownAt) / 1000)
     recordDrillAttempt(
@@ -160,10 +136,7 @@ export default function Drill() {
       {
         ...session,
         revealed: true,
-        log: [
-          ...session.log,
-          { qid: current.id, ok, confidence: session.confidence, seconds },
-        ],
+        log: [...session.log, { qid: current.id, ok, confidence: session.confidence, seconds }],
       },
     )
   }, [current])
@@ -179,7 +152,7 @@ export default function Drill() {
       confidence: undefined,
       shownAt: Date.now(),
     })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    window.scrollTo({ top: 0 })
   }, [])
 
   useHotkeys(
@@ -192,8 +165,7 @@ export default function Drill() {
         return
       }
       const n = Number(e.key)
-      if (!revealed && n >= 1 && n <= current.options.length)
-        setChosen((c) => toggleChoice(c, n - 1, isMulti(current)))
+      if (!revealed && n >= 1 && n <= current.options.length) setChosen((c) => toggleChoice(c, n - 1, isMulti(current)))
       if (!revealed && e.key === 's') setConfidence('sure')
       if (!revealed && e.key === 'u') setConfidence('unsure')
       if (!revealed && e.key === 'g') setConfidence('guess')
@@ -208,75 +180,47 @@ export default function Drill() {
           title="Drill"
           description="Short sets with the reasoning right after each answer. Attack one domain or one lecture at a time."
         />
-        <Frame>
-          <FramePanel className="grid gap-5">
-            <Field label="Bank">
-              <Choice
-                value={bank}
-                onChange={(v) => {
-                  if (!v) return
-                  const next = v as QuestionBank
-                  setBank(next)
-                  syncParams(domain, lecture, next)
-                }}
-                options={banks.map((b) => ({ value: b.id, label: b.label }))}
-              />
-              <p className="mt-2 text-xs text-muted-foreground">
-                {banks.find((b) => b.id === bank)?.blurb}
-              </p>
-            </Field>
-            <Field label="Domain">
-              <DomainPicker
-                value={domain}
-                onChange={(v) => {
-                  setDomain(v)
-                  syncParams(v, lecture, bank)
-                }}
-              />
-            </Field>
-            <Field label="Lecture">
-              <LecturePicker
-                value={lecture}
-                onChange={(v) => {
-                  setLecture(v)
-                  syncParams(domain, v, bank)
-                }}
-              />
-            </Field>
-            <Field label="Length">
-              <Choice
-                value={String(count)}
-                onChange={(v) => v && setCount(Number(v))}
-                options={[5, 10, 20, 40].map((c) => ({
-                  value: String(c),
-                  label: c,
-                }))}
-              />
-            </Field>
-            <Field label="Scope">
-              <Label className="flex items-center gap-2 text-sm font-normal">
-                <Checkbox
-                  checked={unseen}
-                  onCheckedChange={(v) => setUnseen(v === true)}
-                />
-                Only questions I haven't seen
-              </Label>
-            </Field>
-          </FramePanel>
-          <FramePanel className="flex items-center justify-between px-5 py-3">
-            <span className="text-sm text-muted-foreground">
-              {pool.length} match
-            </span>
-            <Button disabled={!pool.length} onClick={start}>
-              Start
-            </Button>
-          </FramePanel>
-        </Frame>
+        <div className="overflow-hidden rounded-xl border bg-card">
+          <Field label="Bank">
+            <Choice
+              value={bank}
+              onChange={(v) => {
+                if (!v) return
+                const next = v as QuestionBank
+                setBank(next)
+                syncParams(domain, lecture, next)
+              }}
+              options={banks.map((b) => ({ value: b.id, label: b.label }))}
+            />
+            <p className="basis-full text-xs text-muted-foreground sm:basis-auto">{banks.find((b) => b.id === bank)?.blurb}</p>
+          </Field>
+          <Field label="Domain">
+            <DomainPicker value={domain} onChange={(v) => { setDomain(v); syncParams(v, lecture, bank) }} />
+          </Field>
+          <Field label="Lecture">
+            <LecturePicker value={lecture} onChange={(v) => { setLecture(v); syncParams(domain, v, bank) }} />
+          </Field>
+          <Field label="Length">
+            <Choice
+              value={String(count)}
+              onChange={(v) => v && setCount(Number(v))}
+              options={[5, 10, 20, 40].map((c) => ({ value: String(c), label: <span className="mono">{c}</span> }))}
+            />
+          </Field>
+          <Field label="Scope">
+            <Label className="flex items-center gap-2 text-[13px] font-normal">
+              <Checkbox checked={unseen} onCheckedChange={(v) => setUnseen(v === true)} />
+              Only questions I haven't seen
+            </Label>
+          </Field>
+          <div className="flex items-center justify-between border-t bg-muted/40 px-5 py-3">
+            <span className="mono text-xs text-muted-foreground">{pool.length} match</span>
+            <Button disabled={!pool.length} onClick={start}>Start</Button>
+          </div>
+        </div>
         {!pool.length && (
           <div className="mt-4">
-            <Nothing title="Nothing matches">
-              Loosen the filters, or untick "only unseen".
-            </Nothing>
+            <Nothing title="Nothing matches">Loosen the filters, or untick "only unseen".</Nothing>
           </div>
         )}
       </div>
@@ -289,55 +233,33 @@ export default function Drill() {
     const missed = log.filter((l) => !l.ok)
     const confidentWrong = missed.filter((l) => l.confidence === 'sure').length
     const avg = Math.round(log.reduce((a, l) => a + l.seconds, 0) / log.length)
+    const verdict = p >= 85 ? 'Solid. Move on.' : p >= 72 ? 'Around the pass line. Work the misses before adding new material.' : 'Below the pass line. Re-read the lectures behind the misses rather than doing more questions.'
     return (
       <div className="mx-auto max-w-2xl">
         <PageHeader
-          title={`${right} of ${log.length} correct`}
-          description={
-            p >= 85
-              ? 'Solid. Move on.'
-              : p >= 72
-                ? 'Around the pass line. Work the misses before adding new material.'
-                : 'Below the pass line. Re-read the lectures behind the misses rather than doing more questions.'
-          }
+          eyebrow="Set complete"
+          title={<><span className={cn('mono', p >= 72 ? 'text-good' : 'text-bad')}>{right}</span><span className="text-faint-foreground"> / {log.length}</span> correct</>}
+          description={verdict}
         />
-        <p className="-mt-6 mb-6 text-sm text-muted-foreground">
-          {fmtSeconds(avg)} per question on average
-          {confidentWrong
-            ? ` · ${confidentWrong} answered "sure" and wrong — those first`
-            : ''}
-          .
-        </p>
-        <div className="flex gap-2">
+        <StatRow className="grid-cols-3 sm:grid-cols-3">
+          <Stat label="Accuracy" value={`${p}%`} tone={p >= 72 ? 'good' : 'bad'} />
+          <Stat label="Per question" value={fmtSeconds(avg)} hint="exam allows 2:00" />
+          <Stat label="Sure, wrong" value={confidentWrong} hint={confidentWrong ? 'those first' : 'none'} tone={confidentWrong ? 'bad' : undefined} />
+        </StatRow>
+        <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={start}>Another {count}</Button>
-          <Button variant="outline" onClick={() => setSet(null)}>
-            Change filters
-          </Button>
-          <Button render={<Link to="/mistakes" />} variant="ghost">
-            Mistake log
-          </Button>
+          <Button variant="outline" onClick={() => setSet(null)}>Change filters</Button>
+          <Button render={<Link to="/mistakes" />} variant="ghost" className="text-muted-foreground">Mistake log</Button>
         </div>
         {missed.length > 0 && (
-          <div className="mt-8">
-            <h2 className="mb-2 text-sm font-medium">Missed</h2>
+          <div className="mt-10">
+            <SectionTitle>Missed</SectionTitle>
             <Rows>
               {missed.map(({ q, confidence: c }) => (
-                <Link
-                  key={q.id}
-                  to={questionHref(q)}
-                  className="flex items-start gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50"
-                >
-                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {lectureNo(q.lecture)}
-                  </span>
-                  <span className="line-clamp-2 text-muted-foreground">
-                    {q.stem}
-                  </span>
-                  {c === 'sure' && (
-                    <span className="ml-auto shrink-0 text-xs text-bad">
-                      sure
-                    </span>
-                  )}
+                <Link key={q.id} to={questionHref(q)} className="flex items-start gap-3 px-4 py-3 text-[13px] transition-colors duration-100 hover:bg-accent/50">
+                  <span className="mono mt-0.5 shrink-0 text-xs text-faint-foreground">{lectureNo(q.lecture)}</span>
+                  <span className="line-clamp-2 text-muted-foreground">{q.stem}</span>
+                  {c === 'sure' && <span className="eyebrow ml-auto mt-0.5 shrink-0 text-bad">sure</span>}
                 </Link>
               ))}
             </Rows>
@@ -350,47 +272,34 @@ export default function Drill() {
   const rightSoFar = log.filter((l) => l.ok).length
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-5 flex items-center gap-4 text-sm">
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground"
-          onClick={() => setSet(null)}
-        >
-          End
-        </button>
+      <div className="mb-6 flex items-center gap-4">
+        <button type="button" className="pressable text-[13px] text-muted-foreground hover:text-foreground" onClick={() => setSet(null)}>End</button>
         <Meter value={i / set.length} className="flex-1" />
-        <span className="text-muted-foreground tabular-nums">
+        <span className="mono text-xs text-muted-foreground">
           {i + 1}/{set.length} · {rightSoFar} right · {fmtSeconds(elapsed)}
         </span>
       </div>
 
-      <Card key={current.id} className="rise">
-        <CardContent>
+      <div key={current.id} className="rise overflow-hidden rounded-xl border bg-card">
+        <div className="p-5 sm:p-6">
           <QuestionView
-            q={current!}
+            q={current}
             chosen={chosen}
             revealed={revealed}
-            onToggle={(idx) =>
-              setChosen((c) => toggleChoice(c, idx, isMulti(current!)))
-            }
+            onToggle={(idx) => setChosen((c) => toggleChoice(c, idx, isMulti(current)))}
           />
           {!revealed && chosen.length > 0 && (
-            <div className="rise mt-4">
+            <div className="rise mt-5">
               <ConfidencePicker value={confidence} onChange={setConfidence} />
             </div>
           )}
-        </CardContent>
-        <CardFooter className="justify-between border-t">
-          <span className="text-xs text-muted-foreground">
+        </div>
+        <div className="flex items-center justify-between border-t bg-muted/40 px-5 py-3">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
             {revealed ? (
-              <>
-                <Kbd>Enter</Kbd> next
-              </>
+              <><Kbd>↵</Kbd> next</>
             ) : (
-              <>
-                <Kbd>1</Kbd>–<Kbd>{current!.options.length}</Kbd> pick ·{' '}
-                <Kbd>Enter</Kbd> check
-              </>
+              <><Kbd>1</Kbd>–<Kbd>{current.options.length}</Kbd> pick <span className="mx-1 text-faint-foreground">·</span> <Kbd>↵</Kbd> check</>
             )}
           </span>
           {revealed ? (
@@ -398,12 +307,10 @@ export default function Drill() {
               {i + 1 === set.length ? 'Results' : 'Next'} <ArrowRight />
             </Button>
           ) : (
-            <Button disabled={!chosen.length} onClick={check}>
-              Check
-            </Button>
+            <Button disabled={!chosen.length} onClick={check}>Check</Button>
           )}
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

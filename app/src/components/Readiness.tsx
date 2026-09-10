@@ -7,11 +7,11 @@ export interface DomainStat {
   correct: number
 }
 
-const SIZE = 220
+const SIZE = 208
 const C = SIZE / 2
-const R = 92
-const W = 12
-const GAP = 5
+const R = 88
+const W = 9
+const GAP = 7
 const PASS_ACC = (exam.passingScore - exam.scaleMin) / (exam.scaleMax - exam.scaleMin)
 
 const polar = (deg: number, r = R) => {
@@ -29,7 +29,7 @@ function arcPath(from: number, to: number) {
 export default function Readiness({ stats, hideScore = false }: { stats: DomainStat[]; hideScore?: boolean }) {
   const [drawn, setDrawn] = useState(false)
   useEffect(() => {
-    const t = setTimeout(() => setDrawn(true), 50)
+    const t = setTimeout(() => setDrawn(true), 40)
     return () => clearTimeout(t)
   }, [])
 
@@ -41,6 +41,7 @@ export default function Readiness({ stats, hideScore = false }: { stats: DomainS
     return acc + (d.weight / 100) * (s && s.total ? s.correct / s.total : 0)
   }, 0)
   const score = scaledScore(weighted)
+  const passed = answered > 0 && score >= exam.passingScore
 
   let cursor = 0
   const arcs = domains.map((d) => {
@@ -52,15 +53,15 @@ export default function Readiness({ stats, hideScore = false }: { stats: DomainS
   })
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} role="img" aria-label={`Estimated score ${score}`}>
+    <div className="flex flex-col items-center gap-5">
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} role="img" aria-label={`Estimated score ${score}`} className="max-w-full">
         {arcs.map(({ d, from, to, span, acc }) => {
           const len = (span / 360) * 2 * Math.PI * R
-          const tickOut = polar(from + span * PASS_ACC, R + W / 2 + 3)
-          const tickIn = polar(from + span * PASS_ACC, R - W / 2 - 3)
+          const tickOut = polar(from + span * PASS_ACC, R + W / 2 + 4)
+          const tickIn = polar(from + span * PASS_ACC, R - W / 2 - 4)
           return (
             <g key={d.id}>
-              <path d={arcPath(from, to)} fill="none" stroke="var(--muted)" strokeWidth={W} />
+              <path d={arcPath(from, to)} fill="none" stroke="var(--border)" strokeWidth={W} strokeLinecap="butt" />
               <path
                 d={arcPath(from, to)}
                 fill="none"
@@ -68,35 +69,35 @@ export default function Readiness({ stats, hideScore = false }: { stats: DomainS
                 strokeWidth={W}
                 strokeDasharray={`${len} ${len}`}
                 strokeDashoffset={drawn ? len * (1 - acc) : len}
-                style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.22,.61,.36,1)' }}
+                style={{ transition: 'stroke-dashoffset 900ms var(--ease-out)' }}
               />
-              <line x1={tickIn.x} y1={tickIn.y} x2={tickOut.x} y2={tickOut.y} stroke="var(--muted-foreground)" strokeWidth="1.5" />
+              <line x1={tickIn.x} y1={tickIn.y} x2={tickOut.x} y2={tickOut.y} stroke="var(--muted-foreground)" strokeWidth="1" />
             </g>
           )
         })}
         {hideScore ? (
-          <text x={C} y={C + 4} textAnchor="middle" fontSize="12" fill="var(--muted-foreground)">
+          <text x={C} y={C + 4} textAnchor="middle" fontSize="12" fill="var(--muted-foreground)" fontFamily="var(--font-mono)">
             {answered} answered
           </text>
         ) : (
           <>
-            <text x={C} y={C - 2} textAnchor="middle" fontSize="40" fontWeight="600" fill="currentColor" letterSpacing="-0.03em">
+            <text x={C} y={C + 2} textAnchor="middle" fontSize="42" fontWeight="500" fill={passed ? 'var(--good)' : 'currentColor'} fontFamily="var(--font-mono)" letterSpacing="-0.04em">
               {answered ? score : '—'}
             </text>
-            <text x={C} y={C + 20} textAnchor="middle" fontSize="11" fill="var(--muted-foreground)">
-              estimated · pass {exam.passingScore}
+            <text x={C} y={C + 22} textAnchor="middle" fontSize="10" fill="var(--muted-foreground)" fontFamily="var(--font-mono)" letterSpacing="0.08em">
+              PASS {exam.passingScore}
             </text>
           </>
         )}
       </svg>
 
-      <div className="grid w-full gap-1.5 text-sm">
+      <div className="grid w-full gap-1.5 text-[13px]">
         {arcs.map(({ d, acc, total }) => (
-          <div key={d.id} className="grid grid-cols-[8px_1fr_36px_44px] items-center gap-2">
-            <span className="size-2 rounded-full" style={{ background: domainVar(d.id) }} />
+          <div key={d.id} className="grid grid-cols-[6px_1fr_36px_44px] items-center gap-2">
+            <span className="size-1.5 rounded-full" style={{ background: domainVar(d.id) }} />
             <span className="truncate text-muted-foreground">{shortDomain(d.id)}</span>
-            <span className="text-right text-xs text-muted-foreground tabular-nums">{d.weight}%</span>
-            <span className="text-right tabular-nums">{total ? `${Math.round(acc * 100)}%` : '—'}</span>
+            <span className="mono text-right text-xs text-faint-foreground">{d.weight}%</span>
+            <span className="mono text-right text-xs">{total ? `${Math.round(acc * 100)}%` : '—'}</span>
           </div>
         ))}
       </div>

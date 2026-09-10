@@ -14,6 +14,8 @@ import { MIN_PASSWORD_LENGTH } from '@/lib/password'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 import {
   Menu,
   MenuItem,
@@ -39,54 +41,39 @@ function download(name: string, contents: string) {
   a.click()
   URL.revokeObjectURL(a.href)
 }
+const SYNC_LABEL = { synced: 'Saved', saving: 'Saving', error: 'Not saved', conflict: 'Conflict' } as const
 export function SyncStatus() {
   const status = useMirror(),
     detail = useSyncMessage()
+  const label = SYNC_LABEL[status as keyof typeof SYNC_LABEL] ?? ''
+  const bad = status === 'error' || status === 'conflict'
   return (
-    <div aria-live="polite" className="text-xs text-muted-foreground">
-      {status === 'synced'
-        ? 'Saved'
-        : status === 'saving'
-          ? 'Saving…'
-          : status === 'error'
-            ? 'Not saved'
-            : status === 'conflict'
-              ? 'Save conflict'
-              : ''}
-      {(status === 'error' || status === 'conflict') && (
+    <div aria-live="polite" className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <span
+        aria-hidden
+        className={cn(
+          'size-1.5 rounded-full transition-colors duration-300',
+          status === 'synced' && 'bg-good',
+          status === 'saving' && 'animate-pulse bg-muted-foreground',
+          bad && 'bg-bad',
+          !label && 'bg-border-strong',
+        )}
+      />
+      <span className="mono">{label}</span>
+      {bad && (
         <div
           role="alert"
-          className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-xl rounded-xl border bg-background p-4 shadow-lg"
+          className="rise fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-xl rounded-xl border bg-popover p-4 text-sm text-foreground shadow-lg/10"
         >
-          <p className="mb-3 text-sm">{detail}</p>
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="underline"
-              onClick={() => download('saa-recovery.json', exportStore())}
-            >
-              Export this device
-            </button>
+          <p className="mb-3">{detail}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => download('saa-recovery.json', exportStore())}>Export this device</Button>
             {status === 'error' ? (
-              <button
-                className="underline"
-                onClick={() => void flushProgress()}
-              >
-                Retry save
-              </button>
+              <Button size="sm" onClick={() => void flushProgress()}>Retry save</Button>
             ) : (
               <>
-                <button
-                  className="underline"
-                  onClick={() => resolveConflict(true)}
-                >
-                  Keep this device’s changes
-                </button>
-                <button
-                  className="underline"
-                  onClick={() => resolveConflict(false)}
-                >
-                  Load saved progress
-                </button>
+                <Button size="sm" onClick={() => resolveConflict(true)}>Keep this device's changes</Button>
+                <Button size="sm" variant="outline" onClick={() => resolveConflict(false)}>Load saved progress</Button>
               </>
             )}
           </div>
@@ -230,20 +217,23 @@ function PasswordDialog({
 }
 export function AccountMenu() {
   const status = useMirror()
+  const { data: session } = client.useSession()
   const [password, setPassword] = useState(false)
+  const name = session?.user.name || session?.user.email || ''
+  const initial = name.trim().charAt(0).toUpperCase() || '·'
   return (
     <>
       <Menu>
         <MenuTrigger
-          render={<Button variant="ghost" size="xs" />}
-          className="text-muted-foreground"
+          aria-label="Account"
+          className="pressable grid size-6 place-items-center rounded-full border border-border-strong bg-background text-[11px] font-medium text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Account
+          {initial}
         </MenuTrigger>
-        <MenuPopup align="end">
-          <MenuItem onClick={() => setPassword(true)}>
-            Change password
-          </MenuItem>
+        <MenuPopup align="end" className="min-w-48">
+          {name && <div className="truncate px-2 py-1.5 text-xs text-muted-foreground">{name}</div>}
+          {name && <MenuSeparator />}
+          <MenuItem onClick={() => setPassword(true)}>Change password</MenuItem>
           <MenuSeparator />
           <MenuItem
             disabled={status !== 'synced'}
@@ -307,74 +297,43 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   }
   if (session && loaded === session.user.id) return children
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-8">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground">
-            AWS SAA
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold">Your study space</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to pick up where you left off.
-          </p>
+    <main className="grid min-h-svh place-items-center bg-canvas px-6">
+      <div className="w-full max-w-[22rem]">
+        <div className="mb-10">
+          <div className="eyebrow flex items-center gap-2">
+            <span aria-hidden className="grid size-5 place-items-center rounded-[5px] bg-foreground text-[10px] font-semibold text-background">S</span>
+            AWS SAA · C03
+          </div>
+          <h1 className="display-lg mt-6">Study<br />workspace.</h1>
+          <p className="mt-4 text-sm text-muted-foreground">Sign in to pick up where you left off.</p>
         </div>
         {isPending || session ? (
-          <div>
-            <p className="text-sm">
-              {error
-                ? 'Progress could not be loaded.'
-                : 'Loading your saved progress…'}
-            </p>
-            {error && (
-              <>
-                <p role="alert" className="mt-3 text-sm text-bad">
-                  {error}
-                </p>
-                <button
-                  className="mt-4 underline"
-                  onClick={() => setRetry((n) => n + 1)}
-                >
-                  Retry
-                </button>
-              </>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+            {error ? (
+              <div>
+                <p className="text-foreground">Progress could not be loaded.</p>
+                <p role="alert" className="mt-2 text-bad">{error}</p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={() => setRetry((n) => n + 1)}>Retry</Button>
+              </div>
+            ) : (
+              <><Spinner className="size-3.5" /> Loading your saved progress</>
             )}
           </div>
         ) : (
           <form onSubmit={login} className="grid gap-4">
-            <label className="grid gap-1 text-sm">
-              Email
-              <input
-                name="email"
-                type="email"
-                autoComplete="username"
-                required
-                className="rounded-lg border bg-background px-3 py-2"
-              />
-            </label>
-            <label className="grid gap-1 text-sm">
-              Password
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="rounded-lg border bg-background px-3 py-2"
-              />
-            </label>
+            <div className="grid gap-1.5">
+              <Label htmlFor="login-email">Email</Label>
+              <Input id="login-email" name="email" type="email" autoComplete="username" required />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="login-password">Password</Label>
+              <Input id="login-password" name="password" type="password" autoComplete="current-password" required />
+            </div>
             {error && (
-              <p role="alert" className="text-sm text-bad">
-                {error}
-              </p>
+              <p role="alert" className="text-sm text-bad">{error}</p>
             )}
-            <button
-              disabled={busy}
-              className="rounded-lg bg-foreground px-4 py-2 text-background disabled:opacity-50"
-            >
-              {busy ? 'Signing in…' : 'Sign in'}
-            </button>
-            <p className="text-xs text-muted-foreground">
-              Private study app. Accounts are managed by the owner.
-            </p>
+            <Button type="submit" loading={busy} className="mt-1">Sign in</Button>
+            <p className="mt-2 text-xs text-muted-foreground">Private study app. Accounts are managed by the owner.</p>
           </form>
         )}
       </div>

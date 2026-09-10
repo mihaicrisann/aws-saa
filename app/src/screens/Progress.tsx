@@ -7,9 +7,8 @@ import { bankOf, type QuestionBank } from '@/lib/progress'
 import { useStore, useMirror, resetProgress, exportStore, importStore, studyStreak, today } from '@/lib/store'
 import { isDue } from '@/lib/srs'
 import Readiness from '@/components/Readiness'
-import { PageHeader, Stat, StatRow, Rows, Meter, Nothing, Choice } from '@/components/parts'
+import { PageHeader, Stat, StatRow, Rows, Meter, Nothing, Choice, Panel, SectionTitle } from '@/components/parts'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   AlertDialog, AlertDialogClose, AlertDialogPopup, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
@@ -22,14 +21,8 @@ export default function Progress() {
   const [view, setView] = useState<QuestionBank>('original')
 
   // Results are read one bank at a time: easy practice must not flatter hard-mode readiness.
-  const attempts = useMemo(
-    () => store.attempts.filter((a) => bankOf(a) === view),
-    [store.attempts, view],
-  )
-  const exams = useMemo(
-    () => store.exams.filter((e) => bankOf(e) === view),
-    [store.exams, view],
-  )
+  const attempts = useMemo(() => store.attempts.filter((a) => bankOf(a) === view), [store.attempts, view])
+  const exams = useMemo(() => store.exams.filter((e) => bankOf(e) === view), [store.exams, view])
 
   const stats = domains.map((d) => {
     const rel = attempts.filter((a) => a.domain === d.id)
@@ -75,6 +68,7 @@ export default function Progress() {
   const acc = total ? attempts.filter((a) => a.correct).length / total : 0
   const dueCards = flashcards.filter((c) => isDue(store.cards[c.id])).length
   const maxDay = Math.max(1, ...days.map((w) => w.n))
+  const activeDays = days.filter((w) => w.n > 0).length
 
   const download = () => {
     const a = document.createElement('a')
@@ -84,6 +78,13 @@ export default function Progress() {
     URL.revokeObjectURL(a.href)
   }
 
+  const sure = calibration[0]
+  const calibrationNote = sure.n < 5
+    ? 'Well-calibrated means "sure" lands near 90%+ and "guessing" near 25–50%.'
+    : sure.acc! < 0.85
+      ? `"Sure" is only ${Math.round(sure.acc! * 100)}% right. You are over-confident: slow down on the qualifier before committing.`
+      : '"Sure" holds up. Trust it in the exam and spend your time on the rest.'
+
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader
@@ -91,6 +92,12 @@ export default function Progress() {
         description="Where you stand, and which lectures your wrong answers keep pointing at."
         actions={
           <>
+            <Choice
+              value={view}
+              onChange={(v) => v && setView(v as QuestionBank)}
+              options={banks.map((b) => ({ value: b.id, label: b.label }))}
+            />
+            <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
             <Button variant="outline" size="sm" onClick={download}>Export</Button>
             <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>Import</Button>
             <input
@@ -109,125 +116,98 @@ export default function Progress() {
         }
       />
 
-      <div className="mb-4">
-        <Choice
-          value={view}
-          onChange={(v) => v && setView(v as QuestionBank)}
-          options={banks.map((b) => ({ value: b.id, label: b.label }))}
-        />
-      </div>
-
       <StatRow>
-        <Stat label="Accuracy" value={total ? `${Math.round(acc * 100)}%` : '—'} hint={total ? `≈ ${scaledScore(acc)} scaled` : 'no data yet'} />
+        <Stat label="Accuracy" value={total ? `${Math.round(acc * 100)}%` : '—'} hint={total ? `≈ ${scaledScore(acc)} scaled` : 'no data yet'} tone={total ? (acc >= 0.72 ? 'good' : 'bad') : undefined} />
         <Stat label="Answered" value={total} hint={`of ${bankQuestions(view).length}`} />
         <Stat label="Cards due" value={dueCards} hint={`${Object.keys(store.cards).length} started`} />
         <Stat label="Streak" value={studyStreak(store.activity)} hint="days" />
       </StatRow>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-[260px_1fr]">
-        <Card>
-          <CardHeader><CardTitle>All-time readiness</CardTitle></CardHeader>
-          <CardContent><Readiness stats={stats} /></CardContent>
-        </Card>
+      <div className="mt-3 grid gap-3 md:grid-cols-[272px_1fr]">
+        <Panel title="All-time readiness" bodyClassName="p-4 pt-5">
+          <Readiness stats={stats} />
+        </Panel>
 
-        <div className="grid content-start gap-4">
-          <Card>
-            <CardHeader><CardTitle>Last 12 weeks</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-flow-col grid-rows-7 gap-[3px]">
-                {days.map((w) => (
-                  <div
-                    key={w.key}
-                    title={`${w.key}: ${w.n}`}
-                    className="size-2.5 rounded-[3px] bg-foreground"
-                    style={{ opacity: w.n === 0 ? 0.06 : 0.25 + (w.n / maxDay) * 0.75 }}
-                  />
+        <div className="grid content-start gap-3">
+          <Panel title="Last 12 weeks" hint={`${activeDays} active day${activeDays === 1 ? '' : 's'}`}>
+            <div className="grid w-fit grid-flow-col grid-rows-7 gap-[3px]">
+              {days.map((w) => (
+                <div
+                  key={w.key}
+                  title={`${w.key}: ${w.n}`}
+                  className={cn('size-2.5 rounded-[2px]', w.n === 0 ? 'bg-muted' : 'bg-foreground')}
+                  style={w.n ? { opacity: 0.3 + (w.n / maxDay) * 0.7 } : undefined}
+                />
+              ))}
+            </div>
+          </Panel>
+
+          <Panel title="Calibration" hint="Whether your confidence is worth anything.">
+            {rated.length === 0 ? (
+              <p className="text-[13px] leading-relaxed text-muted-foreground">Rate how sure you are before checking in a drill, and this shows whether your confidence is worth anything.</p>
+            ) : (
+              <div className="grid gap-2.5">
+                {calibration.map(({ c, n, acc }) => (
+                  <div key={c} className="grid grid-cols-[72px_1fr_90px] items-center gap-3 text-[13px]">
+                    <span className="text-muted-foreground">{c === 'sure' ? 'Sure' : c === 'unsure' ? 'Think so' : 'Guessing'}</span>
+                    <Meter value={acc ?? 0} color={c === 'sure' && acc != null && acc < 0.85 ? 'var(--bad)' : undefined} />
+                    <span className="mono text-right text-xs text-muted-foreground">{acc == null ? '—' : `${Math.round(acc * 100)}%`} · {n}</span>
+                  </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Calibration</CardTitle></CardHeader>
-            <CardContent>
-              {rated.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Rate how sure you are before checking in a drill, and this shows whether your confidence is worth anything.</p>
-              ) : (
-                <div className="grid gap-2 text-sm">
-                  {calibration.map(({ c, n, acc }) => (
-                    <div key={c} className="grid grid-cols-[72px_1fr_90px] items-center gap-3">
-                      <span className="text-muted-foreground">{c === 'sure' ? 'Sure' : c === 'unsure' ? 'Think so' : 'Guessing'}</span>
-                      <Meter value={acc ?? 0} color={c === 'sure' && acc != null && acc < 0.85 ? 'var(--bad)' : undefined} />
-                      <span className="text-right text-xs text-muted-foreground tabular-nums">{acc == null ? '—' : `${Math.round(acc * 100)}%`} · {n}</span>
-                    </div>
-                  ))}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {(() => {
-                      const sure = calibration[0]
-                      if (sure.n < 5) return 'Well-calibrated means "sure" lands near 90%+ and "guessing" near 25–50%.'
-                      return sure.acc! < 0.85 ? `"Sure" is only ${Math.round(sure.acc! * 100)}% right — you are over-confident. Slow down on the qualifier before committing.` : '"Sure" holds up. Trust it in the exam and spend your time on the rest.'
-                    })()}
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{calibrationNote}</p>
+                {(avgSeconds('drill') != null || avgSeconds('exam') != null) && (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Pace: {avgSeconds('drill') != null && <span className="mono">{avgSeconds('drill')}s</span>}{avgSeconds('drill') != null && ' per drill question'}{avgSeconds('drill') != null && avgSeconds('exam') != null && ' · '}{avgSeconds('exam') != null && <span className="mono">{avgSeconds('exam')}s</span>}{avgSeconds('exam') != null && ' per exam question'}. The exam allows 120.
                   </p>
-                  {(avgSeconds('drill') != null || avgSeconds('exam') != null) && (
-                    <p className="text-xs text-muted-foreground">
-                      Pace: {avgSeconds('drill') != null && `${avgSeconds('drill')} s per drill question`}{avgSeconds('drill') != null && avgSeconds('exam') != null && ' · '}{avgSeconds('exam') != null && `${avgSeconds('exam')} s per exam question`} — the exam allows 120.
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </div>
+            )}
+          </Panel>
 
-          <Card>
-            <CardHeader><CardTitle>Mock exams</CardTitle></CardHeader>
-            <CardContent>
-              {exams.length === 0 ? (
-                <p className="text-sm text-muted-foreground">None yet. <Link to="/exam" className="underline underline-offset-4">Sit one</Link> after module 3.</p>
-              ) : (
-                <div className="grid gap-2">
-                  {exams.slice().reverse().map((e, i) => {
-                    const a = e.correct / e.total
-                    const score = scaledScore(a)
-                    const passed = score >= exam.passingScore
-                    return (
-                      <div key={i} className="grid grid-cols-[84px_1fr_90px] items-center gap-3 text-sm">
-                        <span className="text-xs text-muted-foreground">{new Date(e.at).toLocaleDateString()}</span>
-                        <Meter value={a} color={passed ? 'var(--good)' : 'var(--bad)'} />
-                        <span className={cn('text-right tabular-nums', passed ? 'text-good' : 'text-bad')}>{score} · {e.correct}/{e.total}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <Panel title="Mock exams" bodyClassName={exams.length ? 'p-0' : undefined}>
+            {exams.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground">None yet. <Link to="/exam" className="underline underline-offset-4">Sit one</Link> after module 3.</p>
+            ) : (
+              exams.slice().reverse().map((e, i) => {
+                const a = e.correct / e.total
+                const score = scaledScore(a)
+                const passed = score >= exam.passingScore
+                return (
+                  <div key={i} className="grid grid-cols-[84px_1fr_96px] items-center gap-3 border-b px-4 py-2.5 text-[13px] last:border-b-0">
+                    <span className="mono text-xs text-muted-foreground">{new Date(e.at).toLocaleDateString()}</span>
+                    <Meter value={a} color={passed ? 'var(--good)' : 'var(--bad)'} />
+                    <span className={cn('mono text-right text-xs', passed ? 'text-good' : 'text-bad')}>{score} · {e.correct}/{e.total}</span>
+                  </div>
+                )
+              })
+            )}
+          </Panel>
         </div>
       </div>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-medium">Accuracy by lecture</h2>
-        <p className="mt-0.5 mb-3 text-sm text-muted-foreground">Worst first. This is your re-reading order.</p>
+      <section className="mt-10">
+        <SectionTitle hint="Worst first. This is your re-reading order.">Accuracy by lecture</SectionTitle>
         {perLecture.length === 0 ? (
           <Nothing title="Nothing measured yet">Answer some questions in a <Link to="/drill" className="underline underline-offset-4">drill</Link> first.</Nothing>
         ) : (
           <Rows>
             {perLecture.map(({ l, total, correct, acc }) => (
-              <Link key={l.id} to={`/learn/${l.id}`} className="grid grid-cols-[28px_1fr_120px_56px] items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted/50">
-                <span className="text-xs text-muted-foreground tabular-nums">{lectureNo(l.id)}</span>
+              <Link key={l.id} to={`/learn/${l.id}`} className="grid grid-cols-[28px_1fr_120px_56px] items-center gap-3 px-4 py-2.5 text-[13px] transition-colors duration-100 hover:bg-accent/50">
+                <span className="mono text-xs text-faint-foreground">{lectureNo(l.id)}</span>
                 <span className="truncate">{l.title}</span>
                 <Meter value={acc} color={acc >= 0.72 ? 'var(--good)' : acc >= 0.5 ? 'var(--domain-perf)' : 'var(--bad)'} />
-                <span className="text-right text-xs text-muted-foreground tabular-nums">{correct}/{total}</span>
+                <span className="mono text-right text-xs text-muted-foreground">{correct}/{total}</span>
               </Link>
             ))}
           </Rows>
         )}
       </section>
 
-      <section className="mt-10 border-t pt-5">
-        <p className="mb-3 max-w-lg text-sm text-muted-foreground">
-          Your progress is stored on your account, not in this browser.{' '}
+      <section className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t pt-6">
+        <p className="max-w-lg text-[13px] leading-relaxed text-muted-foreground">
+          Progress is stored on your account, not in this browser.{' '}
           {mirror === 'error'
-            ? 'The last save failed. Unsaved answers are held on this device until it succeeds — export a copy before clearing site data.'
+            ? 'The last save failed. Unsaved answers are held on this device until it succeeds. Export a copy before clearing site data.'
             : mirror === 'conflict'
               ? 'Another device changed the same progress. Resolve that before relying on these numbers.'
               : mirror === 'saving'
@@ -235,7 +215,7 @@ export default function Progress() {
                 : 'Everything here is saved and will follow you to another browser.'}
         </p>
         <AlertDialog>
-          <AlertDialogTrigger render={<Button variant="destructive" size="sm" />}>Reset all progress</AlertDialogTrigger>
+          <AlertDialogTrigger render={<Button variant="destructive-outline" size="sm" />}>Reset all progress</AlertDialogTrigger>
           <AlertDialogPopup>
             <AlertDialogHeader>
               <AlertDialogTitle>Erase everything?</AlertDialogTitle>

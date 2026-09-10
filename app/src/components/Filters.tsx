@@ -5,9 +5,9 @@ import type { ReactNode } from 'react'
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-[100px_1fr] sm:items-center">
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="flex flex-wrap items-center gap-2">{children}</div>
+    <div className="grid gap-2 border-b px-5 py-4 last:border-b-0 sm:grid-cols-[96px_1fr] sm:items-center">
+      <div className="eyebrow">{label}</div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 *:data-[slot=toggle-group]:max-w-full *:data-[slot=toggle-group]:overflow-x-auto *:data-[slot=toggle-group]:[scrollbar-width:none]">{children}</div>
     </div>
   )
 }
@@ -33,7 +33,7 @@ const LECTURE_ITEMS = [
 export function LecturePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <Select items={LECTURE_ITEMS} value={value} onValueChange={(v) => onChange(v ?? 'all')}>
-      <SelectTrigger className="w-full sm:w-80">
+      <SelectTrigger className="w-full sm:w-72">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

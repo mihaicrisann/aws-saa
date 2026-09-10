@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from '@/lib/navigation'
 import { Check, X, Copy, ArrowUpRight } from 'lucide-react'
 import { isMulti, lectureNo, questionHref, type Question } from '@/lib/content'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DomainBadge } from './parts'
 import { cn } from '@/lib/utils'
@@ -36,16 +35,16 @@ export default function QuestionView({
   return (
     <div>
       {showMeta && (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <DomainBadge id={q.domain} />
-          <span className="text-xs text-muted-foreground">Lecture {lectureNo(q.lecture)}</span>
-          {multi && <Badge variant="secondary">Choose {q.correct.length}</Badge>}
+          <span className="mono text-[11px] text-muted-foreground">Lecture {lectureNo(q.lecture)}</span>
+          {multi && <span className="eyebrow ml-auto text-foreground">Choose {q.correct.length}</span>}
         </div>
       )}
 
-      <p className="text-base leading-relaxed font-medium">{q.stem}</p>
+      <p className="text-[15px] leading-relaxed font-medium tracking-tight">{q.stem}</p>
 
-      <div className="mt-5 grid gap-2" role={multi ? 'group' : 'radiogroup'}>
+      <div className="mt-5 grid gap-1.5" role={multi ? 'group' : 'radiogroup'}>
         {q.options.map((opt, i) => {
           const picked = chosen.includes(i)
           const right = q.correct.includes(i)
@@ -59,31 +58,31 @@ export default function QuestionView({
               disabled={revealed}
               onClick={() => onToggle(i)}
               className={cn(
-                'flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left text-sm leading-relaxed transition-colors',
+                'pressable flex w-full items-start gap-3 rounded-lg border px-3.5 py-3 text-left text-[13.5px] leading-relaxed',
                 'disabled:cursor-default',
-                tone === 'idle' && !revealed && 'hover:bg-muted/60',
-                tone === 'picked' && 'border-foreground bg-muted/40',
-                tone === 'right' && 'border-good/60 bg-good/8',
-                tone === 'wrong' && 'border-bad/60 bg-bad/8',
-                revealed && tone === 'idle' && 'opacity-60',
+                tone === 'idle' && !revealed && 'hover:border-border-strong hover:bg-accent/40',
+                tone === 'picked' && 'border-foreground bg-accent/50',
+                tone === 'right' && 'border-good bg-good/6 shadow-[inset_0_0_0_1px_var(--good)]',
+                tone === 'wrong' && 'border-bad bg-bad/6 shadow-[inset_0_0_0_1px_var(--bad)]',
+                revealed && tone === 'idle' && 'opacity-50',
               )}
             >
               <span
                 className={cn(
-                  'mt-0.5 flex size-5 shrink-0 items-center justify-center border text-[11px] font-medium',
-                  multi ? 'rounded-md' : 'rounded-full',
+                  'mono mt-0.5 flex size-5 shrink-0 items-center justify-center border text-[11px] font-medium transition-colors duration-100',
+                  multi ? 'rounded-[5px]' : 'rounded-full',
                   tone === 'picked' && 'border-foreground bg-foreground text-background',
                   tone === 'right' && 'border-good bg-good text-white',
                   tone === 'wrong' && 'border-bad bg-bad text-white',
-                  tone === 'idle' && 'text-muted-foreground',
+                  tone === 'idle' && 'border-border-strong text-muted-foreground',
                 )}
               >
-                {tone === 'right' ? <Check className="size-3" /> : tone === 'wrong' ? <X className="size-3" /> : i + 1}
+                {tone === 'right' ? <Check className="size-3" strokeWidth={3} /> : tone === 'wrong' ? <X className="size-3" strokeWidth={3} /> : i + 1}
               </span>
               <span className="min-w-0 flex-1">{opt}</span>
               {revealed && (picked || right) && (
-                <span className={cn('shrink-0 text-xs', picked ? (right ? 'text-good' : 'text-bad') : 'text-muted-foreground')}>
-                  {picked ? 'your answer' : 'missed'}
+                <span className={cn('eyebrow mt-1 shrink-0', picked ? (right ? 'text-good' : 'text-bad') : 'text-muted-foreground')}>
+                  {picked ? 'yours' : 'missed'}
                 </span>
               )}
             </button>
@@ -92,21 +91,21 @@ export default function QuestionView({
       </div>
 
       {revealed && (
-        <div className="rise mt-5 grid gap-3">
-          <div className="rounded-2xl border-l-2 border-good bg-muted/40 px-4 py-3">
-            <div className="text-xs font-medium text-good">
+        <div className="rise mt-6 grid gap-3">
+          <div className="rounded-lg border border-good/40 bg-good/5 px-4 py-3">
+            <div className="eyebrow text-good">
               Why {q.correct.map((i) => i + 1).join(' + ')}
             </div>
-            <p className="mt-1 text-sm leading-relaxed">{q.explanation}</p>
+            <p className="mt-2 text-[13.5px] leading-relaxed">{q.explanation}</p>
           </div>
           {q.distractors?.some(Boolean) && (
-            <div className="rounded-2xl border px-4 py-3">
-              <div className="text-xs font-medium text-muted-foreground">Why the others are wrong</div>
-              <ul className="mt-2 grid gap-1.5">
+            <div className="rounded-lg border px-4 py-3">
+              <div className="eyebrow">Why the others are wrong</div>
+              <ul className="mt-2.5 grid gap-1.5">
                 {q.distractors.map((d, i) =>
                   d ? (
-                    <li key={i} className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
-                      <span className="w-4 shrink-0 font-medium text-foreground">{i + 1}</span>
+                    <li key={i} className="grid grid-cols-[16px_1fr] gap-2 text-[13px] leading-relaxed text-muted-foreground">
+                      <span className="mono text-foreground">{i + 1}</span>
                       <span>{d}</span>
                     </li>
                   ) : null,
@@ -131,10 +130,10 @@ function Footer({ q, chosen }: { q: Question; chosen: number[] }) {
     } catch { /* clipboard blocked; nothing to do */ }
   }
   return (
-    <div className="flex flex-wrap items-center gap-1 text-xs">
-      <Button render={<Link to={questionHref(q)} />} variant="ghost" size="xs">{q.anchor ? 'Read the section' : `Lecture ${lectureNo(q.lecture)}`} <ArrowUpRight /></Button>
-      <Button variant="ghost" size="xs" onClick={copy}>
-        <Copy /> {copied ? 'Copied — paste in the terminal' : 'Ask Claude about this'}
+    <div className="-ml-1 flex flex-wrap items-center gap-1">
+      <Button render={<Link to={questionHref(q)} />} variant="ghost" size="xs" className="text-muted-foreground hover:text-foreground">{q.anchor ? 'Read the section' : `Lecture ${lectureNo(q.lecture)}`} <ArrowUpRight /></Button>
+      <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-foreground" onClick={copy}>
+        <Copy /> {copied ? 'Copied. Paste in the terminal' : 'Ask Claude about this'}
       </Button>
     </div>
   )
