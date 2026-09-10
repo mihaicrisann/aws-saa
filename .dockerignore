@@ -5,3 +5,10 @@ notes
 .git
 .claude
 *.tsbuildinfo
+.env
+.env.*
+**/.env
+**/.env.*
+app/.next
+test-results
+playwright-report
