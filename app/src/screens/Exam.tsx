@@ -28,6 +28,7 @@ import {
   type ActiveExam,
 } from '@/lib/store'
 import { useHotkeys } from '@/lib/hotkeys'
+import { useCountUp } from '@/lib/count-up'
 import QuestionView from '@/components/QuestionView'
 import Readiness from '@/components/Readiness'
 import { toggleChoice } from '@/components/Filters'
@@ -52,6 +53,11 @@ import { cn } from '@/lib/utils'
 import type { QuestionBank } from '@/lib/progress'
 
 type Session = ActiveExam
+
+function BigScore({ score, passed }: { score: number; passed: boolean }) {
+  const shown = useCountUp(score, 900)
+  return <div className={cn('mono mt-3 text-7xl font-medium tracking-tighter', passed ? 'text-good' : 'text-foreground')}>{shown}</div>
+}
 
 const fmt = (s: number) =>
   `${String(Math.floor(Math.max(0, s) / 60)).padStart(2, '0')}:${String(Math.max(0, s) % 60).padStart(2, '0')}`
@@ -258,8 +264,8 @@ export default function Exam() {
       ['Questions', `${full}, drawn from ${pool.length}`],
       ['Time', `${exam.minutes} minutes, about 2 per question`],
       ['Mix', domains.map((d) => `${shortDomain(d.id)} ${d.weight}%`).join(' · ')],
-      ['Pass', `${exam.passingScore} of ${exam.scaleMax} scaled. Not a percentage, and no per-domain minimum`],
-      ['Rules', 'Flag what you are unsure of, answer everything, review at the end. No penalty for guessing.'],
+      ['Pass', `${exam.passingScore} of ${exam.scaleMax}, scaled. No per-domain minimum`],
+      ['Rules', 'Answer everything, flag doubts. No penalty for guessing.'],
     ]
     return (
       <div className="mx-auto max-w-2xl px-5 py-10 md:py-14">
@@ -268,7 +274,7 @@ export default function Exam() {
           className="mt-6"
           eyebrow="Timed"
           title="Mock exam"
-          description="A countdown, no feedback until you submit, and a full review at the end. Questions are drawn to the exam's real domain weights."
+          description="Timed. No feedback until you submit, full review at the end."
         />
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="border-b px-5 py-4">
@@ -278,7 +284,7 @@ export default function Exam() {
               options={banks.map((b) => ({ value: b.id, label: b.label }))}
             />
             <p className="mt-2.5 text-xs text-muted-foreground">
-              {banks.find((b) => b.id === pick)?.blurb} Results are kept separate from the other bank.
+              {banks.find((b) => b.id === pick)?.blurb}
             </p>
           </div>
           <dl className="grid gap-3 px-5 py-4 text-[13px]">
@@ -317,11 +323,11 @@ export default function Exam() {
       <div className="mx-auto max-w-3xl px-5 py-10 md:py-14">
         <div className="mb-8">
           <div className={cn('eyebrow', passed ? 'text-good' : 'text-bad')}>{passed ? 'Pass' : 'Below the line'}</div>
-          <div className={cn('mono mt-3 text-7xl font-medium tracking-tighter', passed ? 'text-good' : 'text-foreground')}>{score}</div>
+          <BigScore score={score} passed={passed} />
           <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground">
             {passed
-              ? 'Sit another mock in two days on a fresh draw. Consistency across two is the real signal.'
-              : 'Re-read the lectures behind the misses before another mock. A handful of confusions cause most of the loss.'}
+              ? 'Sit another in two days on a fresh draw. Two in a row is the real signal.'
+              : 'Re-read the lectures behind the misses before the next one.'}
           </p>
         </div>
 

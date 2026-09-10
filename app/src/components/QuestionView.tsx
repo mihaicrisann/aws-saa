@@ -62,8 +62,8 @@ export default function QuestionView({
                 'disabled:cursor-default',
                 tone === 'idle' && !revealed && 'hover:border-border-strong hover:bg-accent/40',
                 tone === 'picked' && 'border-foreground bg-accent/50',
-                tone === 'right' && 'border-good bg-good/6 shadow-[inset_0_0_0_1px_var(--good)]',
-                tone === 'wrong' && 'border-bad bg-bad/6 shadow-[inset_0_0_0_1px_var(--bad)]',
+                tone === 'right' && 'feedback-right border-good bg-good/6 shadow-[inset_0_0_0_1px_var(--good)]',
+                tone === 'wrong' && 'feedback-wrong border-bad bg-bad/6 shadow-[inset_0_0_0_1px_var(--bad)]',
                 revealed && tone === 'idle' && 'opacity-50',
               )}
             >

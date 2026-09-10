@@ -60,6 +60,7 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 .dark {
@@ -158,6 +159,7 @@
   --ease-out: var(--ease-out);
   --ease-in-out: var(--ease-in-out);
   --ease-drawer: var(--ease-drawer);
+  --ease-spring: var(--ease-spring);
 }
 
 @layer base {
@@ -254,16 +256,22 @@
   * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
 
-/* Keep the shell stationary while route content changes. */
-::view-transition-group(study-page) { animation-duration: 140ms; }
-::view-transition-old(study-page) { animation: 80ms ease-out both page-leave; }
-::view-transition-new(study-page) { animation: 140ms var(--ease-out) both page-enter; }
-::view-transition { pointer-events: none; }
-@keyframes page-leave { to { opacity: 0; } }
-@keyframes page-enter { from { opacity: 0; transform: translateY(3px); } }
+/*
+  One motion for every page change: the shell stays put and the new page
+  settles in from just below. Nothing else animates on arrival.
+*/
+.page-enter { animation: page-enter 220ms var(--ease-out) both; }
+@keyframes page-enter { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .page-enter { animation: fade 160ms ease both; }
 }
+
+/* answer feedback: the right one settles with a small pop, the wrong one shakes its head */
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.02); } 100% { transform: scale(1); } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 45% { transform: translateX(3px); } 70% { transform: translateX(-2px); } }
+.feedback-right { animation: pop 320ms var(--ease-spring) both; }
+.feedback-wrong { animation: shake 360ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) { .feedback-right, .feedback-wrong { animation: none; } }
 
 /* thin, quiet scrollbars inside panels */
 .quiet-scroll { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }

@@ -17,7 +17,7 @@ export default function Lectures() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Learn"
-        description={`${lectures.length} lectures, about ${Math.round(totalMinutes / 60)} hours. In order: each one only assumes the ones before it.`}
+        description={`${lectures.length} lectures, about ${Math.round(totalMinutes / 60)} hours. Read in order.`}
         actions={
           <Button render={<a href="/lectures/index.html" target="_blank" rel="noreferrer" />} variant="outline" size="sm">
             Plain HTML <ArrowUpRight />
@@ -30,7 +30,7 @@ export default function Lectures() {
         <span className="mono text-xs text-muted-foreground">{read}/{lectures.length} read</span>
       </div>
 
-      <div className="stagger grid gap-8">
+      <div className="grid gap-8">
         {modules.map((m, mi) => {
           const ls = lectures.filter((l) => l.module === m.id)
           if (!ls.length) return null

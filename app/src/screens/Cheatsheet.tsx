@@ -30,34 +30,32 @@ export default function Cheatsheet() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Cheat sheet"
-        description="Cue words, the pairs people confuse, hard numbers, and the answer shapes that are automatically wrong."
+        className="mb-4"
         actions={<Button render={<a href="/lectures/19-exam-playbook.html" target="_blank" rel="noreferrer" />} variant="outline" size="sm">Exam playbook <ArrowUpRight /></Button>}
       />
+      <label className="mb-6 flex h-9 w-full max-w-xl items-center gap-2 rounded-lg border bg-card px-3 transition-[border-color,box-shadow] duration-100 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20">
+        <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="static ip, multi-az, glacier, least overhead…"
+          aria-label="Search the cheat sheet"
+          className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-faint-foreground"
+        />
+        {query ? (
+          <button type="button" aria-label="Clear" onClick={() => setQuery('')} className="text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
+        ) : (
+          <span className="mono text-xs text-faint-foreground">{total}</span>
+        )}
+      </label>
 
-      <div className="sticky top-12 z-30 -mx-5 mb-8 border-b bg-background/85 px-5 py-3 backdrop-blur-md md:top-0 md:-mx-10 md:px-10">
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex h-8 min-w-56 flex-1 items-center gap-2 rounded-lg border bg-card px-2.5 transition-[border-color,box-shadow] duration-100 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20">
-            <SearchIcon className="size-3.5 shrink-0 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="static ip, multi-az, glacier, least overhead…"
-              aria-label="Search the cheat sheet"
-              className="w-full min-w-0 bg-transparent text-[13px] outline-none placeholder:text-faint-foreground"
-            />
-            {query ? (
-              <button type="button" aria-label="Clear" onClick={() => setQuery('')} className="text-muted-foreground hover:text-foreground"><X className="size-3.5" /></button>
-            ) : (
-              <span className="mono text-[11px] text-faint-foreground">{total}</span>
-            )}
-          </label>
-          <Choice
-            className="flex-wrap"
-            value={active}
-            onChange={(v) => v && setActive(v)}
-            options={[{ value: 'all', label: 'All' }, ...cheat.sections.map((s) => ({ value: s.id, label: s.title }))]}
-          />
-        </div>
+      <div className="sticky top-12 z-30 -mx-5 mb-8 border-b bg-background/85 px-5 py-2.5 backdrop-blur-md md:top-0 md:-mx-10 md:px-10">
+        <Choice
+          className="w-full"
+          value={active}
+          onChange={(v) => v && setActive(v)}
+          options={[{ value: 'all', label: 'All' }, ...cheat.sections.map((s) => ({ value: s.id, label: s.title }))]}
+        />
       </div>
 
       {sections.length === 0 && <p className="py-16 text-center text-sm text-muted-foreground">Nothing matches "{query}".</p>}

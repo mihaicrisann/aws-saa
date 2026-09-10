@@ -333,7 +333,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
               <p role="alert" className="text-sm text-bad">{error}</p>
             )}
             <Button type="submit" loading={busy} className="mt-1">Sign in</Button>
-            <p className="mt-2 text-xs text-muted-foreground">Private study app. Accounts are managed by the owner.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Private. Accounts are managed by the owner.</p>
           </form>
         )}
       </div>

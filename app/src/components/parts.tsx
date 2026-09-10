@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { Link } from '@/lib/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Meter as MeterRoot, MeterIndicator, MeterTrack } from '@/components/ui/meter'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import { domainVar, shortDomain, type DomainId } from '@/lib/content'
@@ -164,21 +165,23 @@ export function Choice<T extends string>({
   className?: string
 }) {
   return (
-    <ToggleGroup
-      variant="outline"
-      size="sm"
-      className={className}
-      value={value ? [value] : []}
-      onValueChange={(next) => {
-        const picked = next[0] as T | undefined
-        if (picked || allowEmpty) onChange(picked)
-      }}
-    >
-      {options.map((o) => (
-        <ToggleGroupItem key={o.value} value={o.value} className="gap-1.5 px-2.5 text-[13px] font-normal data-pressed:font-medium">
-          {o.label}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <ScrollArea scrollFade scrollbarGutter clampContentMinWidth={false} className={cn('h-auto w-fit max-w-full', className)}>
+      <ToggleGroup
+        variant="outline"
+        size="sm"
+        className="w-max"
+        value={value ? [value] : []}
+        onValueChange={(next) => {
+          const picked = next[0] as T | undefined
+          if (picked || allowEmpty) onChange(picked)
+        }}
+      >
+        {options.map((o) => (
+          <ToggleGroupItem key={o.value} value={o.value} className="gap-1.5 px-2.5 text-[13px] font-normal data-pressed:font-medium">
+            {o.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </ScrollArea>
   )
 }

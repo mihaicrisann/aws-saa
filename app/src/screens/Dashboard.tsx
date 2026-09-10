@@ -1,7 +1,7 @@
 'use client'
 
 import { Link } from '@/lib/navigation'
-import { ArrowRight, ArrowUpRight } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Flame } from 'lucide-react'
 import { useStore, studyStreak } from '@/lib/store'
 import { isDue } from '@/lib/srs'
 import { lectures, modules, flashcards, domains, exam, lectureNo, scaledScore, shortDomain, bankById } from '@/lib/content'
@@ -74,14 +74,14 @@ export default function Dashboard() {
       </Link>
 
       <StatRow className="mt-3">
-        <Stat label="Lectures" value={<>{read}<span className="text-faint-foreground">/{lectures.length}</span></>} hint="read in order" />
+        <Stat label="Lectures read" value={<>{read}<span className="text-faint-foreground">/{lectures.length}</span></>} />
         <Stat label="Cards due" value={dueCards} hint={`of ${flashcards.length}`} />
-        <Stat label="Open mistakes" value={openMistakes} hint={openMistakes ? 'tag, re-read, retry' : 'nothing open'} tone={openMistakes ? undefined : 'good'} />
-        <Stat label="Streak" value={streak} hint={streak === 1 ? 'day' : 'days'} />
+        <Stat label="Open mistakes" value={openMistakes} tone={openMistakes ? undefined : 'good'} />
+        <Stat label="Streak" value={<span className="inline-flex items-center gap-1.5">{streak}{streak >= 2 && <Flame className="size-4 fill-current text-(--domain-perf)" />}</span>} hint={streak === 1 ? 'day' : 'days'} />
       </StatRow>
 
       <div className="mt-3 grid gap-3 md:grid-cols-[272px_1fr]">
-        <Panel title="Readiness" hint={`Arc is exam weight. Fill is accuracy on the ${bankById.original.label.toLowerCase()} bank.`} bodyClassName="p-4 pt-5">
+        <Panel title="Readiness" hint="Arc is exam weight, fill is your accuracy." bodyClassName="p-4 pt-5">
           <Readiness stats={stats} />
         </Panel>
 
@@ -143,7 +143,7 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <p className="text-[13px] text-muted-foreground">None yet. Sit one after module 3 to calibrate.</p>
+              <p className="text-[13px] text-muted-foreground">None yet. Sit one after module 3.</p>
             )}
           </Panel>
         </div>

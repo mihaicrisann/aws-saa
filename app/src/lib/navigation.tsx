@@ -8,7 +8,7 @@ type LinkProps = Omit<ComponentProps<typeof NextLink>, 'href'> & { to: string }
 
 /** Existing study controls use `to`; every link still uses Next's prefetching router. */
 export function Link({ to, ...props }: LinkProps) {
-  return <NextLink href={to} transitionTypes={['page-navigation']} {...props} />
+  return <NextLink href={to} {...props} />
 }
 
 export function NavLink({ to, end = false, className, ...props }: Omit<LinkProps, 'className'> & {

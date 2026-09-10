@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, ViewTransition, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useNavigate, useLocation } from '@/lib/navigation'
 import { Moon, Sun, Keyboard, PanelLeft, SearchIcon, LayoutGrid, BookOpen, Layers, Target, Timer, CircleX, ListChecks, TrendingUp, Network } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -25,8 +25,6 @@ export const NAV = [
   { to: '/progress', label: 'Progress', key: 'p', Icon: TrendingUp },
 ]
 
-export const pageIndex = (i: number) => String(i + 1).padStart(2, '0')
-
 const SIDEBAR_KEY = 'saa.sidebar'
 const readCollapsed = () => {
   try { return localStorage.getItem(SIDEBAR_KEY) === 'collapsed' } catch { return false }
@@ -37,13 +35,11 @@ const PAGE_KEYS: [string, ReactNode][] = [
   ['Cards', <><Kbd>Space</Kbd> flip · <Kbd>1</Kbd> again <Kbd>2</Kbd> hard <Kbd>3</Kbd> good <Kbd>4</Kbd> easy</>],
   ['Exam', <><Kbd>1</Kbd>–<Kbd>5</Kbd> pick · <Kbd>←</Kbd> <Kbd>→</Kbd> move · <Kbd>f</Kbd> flag</>],
   ['Learn', <><Kbd>n</Kbd> mark read, open next · <Kbd>←</Kbd> <Kbd>→</Kbd> previous, next</>],
+  ['Mistakes', <><Kbd>j</Kbd> <Kbd>k</Kbd> move · <Kbd>1</Kbd>–<Kbd>5</Kbd> retry · <Kbd>↵</Kbd> check, next · <Kbd>u</Kbd> understood</>],
 ]
 
-const navClass = (isActive: boolean) =>
-  cn(
-    'group pressable flex h-7 items-center gap-2.5 rounded-md px-2 text-[13px]',
-    isActive ? 'bg-sidebar-accent font-medium text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
-  )
+const NAV_ROW = 28
+const NAV_GAP = 2
 
 export default function Shell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
@@ -104,8 +100,8 @@ export default function Shell({ children }: { children: ReactNode }) {
 
       {!collapsed && (
         <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col px-3 pt-4 pb-3 md:flex">
-          <NavLink to="/" className="flex items-center gap-2.5 rounded-md px-2 py-1">
-            <span aria-hidden className="grid size-5 place-items-center rounded-[5px] bg-foreground text-[10px] font-semibold text-background">S</span>
+          <NavLink to="/" className="group flex items-center gap-2.5 rounded-md px-2 py-1">
+            <span aria-hidden className="grid size-5 place-items-center rounded-[5px] bg-foreground text-[10px] font-semibold text-background transition-transform duration-300 ease-(--ease-spring) group-hover:-rotate-12">S</span>
             <span className="text-[13px] font-semibold tracking-tight">AWS SAA</span>
             <span className="eyebrow ml-auto text-faint-foreground">C03</span>
           </NavLink>
@@ -120,13 +116,28 @@ export default function Shell({ children }: { children: ReactNode }) {
             <Kbd>/</Kbd>
           </button>
 
-          <nav className="mt-4 flex flex-col gap-px" aria-label="Sections">
+          <nav className="relative mt-4 flex flex-col gap-0.5" aria-label="Sections">
+            {activeIndex >= 0 && (
+              <span
+                aria-hidden
+                className="absolute inset-x-0 top-0 rounded-md bg-sidebar-accent transition-transform duration-200 ease-(--ease-out)"
+                style={{ height: NAV_ROW, transform: `translateY(${activeIndex * (NAV_ROW + NAV_GAP)}px)` }}
+              />
+            )}
             {NAV.map((n, i) => (
-              <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => navClass(isActive)}>
-                <n.Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} />
-                <span className="flex-1">{n.label}</span>
-                <span className="mono text-[10px] text-faint-foreground opacity-0 transition-opacity duration-100 group-hover:opacity-100" aria-hidden>{pageIndex(i)}</span>
-              </NavLink>
+              <Tooltip key={n.to}>
+                <TooltipTrigger
+                  render={<NavLink to={n.to} end={n.to === '/'} />}
+                  className={cn(
+                    'group relative flex h-7 items-center gap-2.5 rounded-md px-2 text-[13px] transition-colors duration-100',
+                    i === activeIndex ? 'font-medium text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
+                  )}
+                >
+                  <n.Icon className="size-[15px] shrink-0 opacity-80 transition-transform duration-200 ease-(--ease-spring) group-hover:scale-110" strokeWidth={1.75} />
+                  <span className="flex-1">{n.label}</span>
+                </TooltipTrigger>
+                <TooltipContent side="right">{n.label} <Kbd>{n.key.toUpperCase()}</Kbd></TooltipContent>
+              </Tooltip>
             ))}
           </nav>
 
@@ -160,7 +171,7 @@ export default function Shell({ children }: { children: ReactNode }) {
 
       <main
         id="main-content"
-        className="relative min-w-0 flex-1 bg-background pt-12 pb-16 md:my-2 md:mr-2 md:min-h-[calc(100svh-1rem)] md:rounded-xl md:border md:pt-0 md:pb-0 md:shadow-[0_1px_2px_--theme(--color-black/4%)] dark:md:shadow-none"
+        className={cn('relative min-w-0 flex-1 bg-background pt-12 pb-16 md:my-2 md:mr-2 md:min-h-[calc(100svh-1rem)] md:rounded-xl md:border md:pt-0 md:pb-0 md:shadow-[0_1px_2px_--theme(--color-black/4%)] dark:md:shadow-none', collapsed && 'md:ml-2')}
       >
         <div className="hidden h-11 items-center gap-1 border-b px-3 md:flex">
           <Tooltip>
@@ -174,10 +185,7 @@ export default function Shell({ children }: { children: ReactNode }) {
             </TooltipTrigger>
             <TooltipContent side="right">{collapsed ? 'Show' : 'Hide'} sidebar <Kbd>[</Kbd></TooltipContent>
           </Tooltip>
-          <span className="eyebrow ml-2 flex items-center gap-2">
-            <span className="text-faint-foreground">{activeIndex >= 0 ? pageIndex(activeIndex) : '—'}</span>
-            <span className="text-foreground">{active?.label ?? 'Study'}</span>
-          </span>
+          <span className="eyebrow ml-2 text-foreground">{active?.label ?? 'Study'}</span>
           {collapsed && (
             <div className="ml-auto flex items-center gap-0.5">
               <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Search" onClick={() => setSearch(true)}><SearchIcon /></Button>
@@ -187,9 +195,7 @@ export default function Shell({ children }: { children: ReactNode }) {
           )}
         </div>
         <div className="px-5 py-6 md:px-10 md:py-9">
-          <ViewTransition name="study-page" update="page-fade">
-            <div className="min-w-0">{children}</div>
-          </ViewTransition>
+          <div key={pathname} className="page-enter min-w-0">{children}</div>
         </div>
       </main>
 
@@ -206,10 +212,10 @@ export default function Shell({ children }: { children: ReactNode }) {
               {NAV.map((n) => (
                 <div key={n.to} className="flex items-center justify-between gap-3 text-[13px]">
                   <span className="text-muted-foreground">{n.label}</span>
-                  <Kbd>{n.key}</Kbd>
+                  <Kbd>{n.key.toUpperCase()}</Kbd>
                 </div>
               ))}
-              {[['Search', '/'], ['Theme', 't'], ['Sidebar', '['], ['This dialog', '?']].map(([label, key]) => (
+              {[['Search', '/'], ['Theme', 'T'], ['Sidebar', '['], ['This dialog', '?']].map(([label, key]) => (
                 <div key={key} className="flex items-center justify-between gap-3 text-[13px]">
                   <span className="text-muted-foreground">{label}</span>
                   <Kbd>{key}</Kbd>
