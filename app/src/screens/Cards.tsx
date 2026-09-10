@@ -12,11 +12,11 @@ import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
 
-const GRADES: { g: Grade; label: string; key: string }[] = [
-  { g: 0, label: 'Again', key: '1' },
-  { g: 1, label: 'Hard', key: '2' },
-  { g: 2, label: 'Good', key: '3' },
-  { g: 3, label: 'Easy', key: '4' },
+const GRADES: { g: Grade; label: string; key: string; tint: string }[] = [
+  { g: 0, label: 'Again', key: '1', tint: 'hover:border-bad/60 hover:text-bad' },
+  { g: 1, label: 'Hard', key: '2', tint: 'hover:border-(--domain-perf) hover:text-(--domain-perf)' },
+  { g: 2, label: 'Good', key: '3', tint: 'hover:border-good/60 hover:text-good' },
+  { g: 3, label: 'Easy', key: '4', tint: 'hover:border-good hover:text-good' },
 ]
 
 export default function Cards() {
@@ -87,7 +87,7 @@ export default function Cards() {
       <div className="mx-auto max-w-2xl">
         <PageHeader
           title="Cards"
-          description={<>Recall, then rate yourself honestly. The rating decides when the card comes back. <span className="mono text-xs">{dueTotal}/{flashcards.length}</span> due.</>}
+          description={<>Recall, then rate honestly. The rating sets when it comes back. <span className="mono text-xs">{dueTotal}/{flashcards.length}</span> due.</>}
         />
         <div className="overflow-hidden rounded-xl border bg-card">
           <Field label="Domain"><DomainPicker value={domain} onChange={(v) => { setDomain(v); syncParams(v, lecture) }} /></Field>
@@ -122,7 +122,7 @@ export default function Cards() {
         <PageHeader
           eyebrow="Deck done"
           title={<><span className="mono">{done}</span> card{done === 1 ? '' : 's'} reviewed</>}
-          description="Cards rated Good or Easy come back in days, not minutes, so the deck shrinks as things stick."
+          description="Good and Easy come back in days, so the deck shrinks as things stick."
         />
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setQueue(null)}>Pick another slice</Button>
@@ -144,7 +144,7 @@ export default function Cards() {
 
       <div style={{ perspective: 1600 }}>
         <div
-          className="relative transition-transform duration-500 ease-(--ease-in-out) motion-reduce:transition-none"
+          className="relative transition-transform duration-450 ease-(--ease-in-out) motion-reduce:transition-none"
           style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateX(180deg)' : 'none' }}
         >
           <div className="rounded-xl border bg-card" style={{ backfaceVisibility: 'hidden' }}>
@@ -159,7 +159,7 @@ export default function Cards() {
                 {state.reps > 0 && <span className="mono ml-auto text-[11px] text-faint-foreground">seen {state.reps}×</span>}
               </div>
               <div className="my-8 text-[22px] leading-snug font-medium tracking-tight">{current.front}</div>
-              <div className="eyebrow flex items-center gap-1.5"><Kbd>Space</Kbd> reveal</div>
+              <div />
             </button>
           </div>
 
@@ -171,7 +171,7 @@ export default function Cards() {
             <div className="eyebrow mb-4 line-clamp-2 normal-case tracking-normal">{current.front}</div>
             <div className="text-[15px] leading-relaxed whitespace-pre-line">{current.back}</div>
             {current.note && (
-              <div className="mt-5 rounded-lg border border-l-2 border-l-foreground/60 bg-muted/40 px-3.5 py-2.5 text-[13px] leading-relaxed text-muted-foreground">
+              <div className="mt-5 rounded-lg border bg-muted/40 px-3.5 py-2.5 text-[13px] leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground">Exam note. </span>{current.note}
               </div>
             )}
@@ -181,24 +181,21 @@ export default function Cards() {
 
       <div className="mt-3">
         {flipped ? (
-          <div className="rise grid grid-cols-4 gap-1.5">
+          <div className="stagger grid grid-cols-4 gap-1.5">
             {GRADES.map((g) => (
-              <Button key={g.g} variant="outline" className={cn('h-auto flex-col gap-0.5 py-2.5')} onClick={() => grade(g.g)}>
+              <Button key={g.g} variant="outline" className={cn('h-auto flex-col gap-0.5 py-2.5', g.tint)} onClick={() => grade(g.g)}>
                 <span className="flex items-center gap-1.5 text-[13px]"><Kbd>{g.key}</Kbd>{g.label}</span>
                 <span className="mono text-[11px] text-muted-foreground">{describeInterval(state, g.g)}</span>
               </Button>
             ))}
           </div>
         ) : (
-          <Button className="w-full" onClick={() => setFlipped(true)}>Show answer</Button>
+          <Button className="w-full" onClick={() => setFlipped(true)}>Show answer <Kbd className="bg-transparent text-current opacity-70 dark:bg-transparent">Space</Kbd></Button>
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+      <div className="mt-4 text-xs">
         <QuietLink to={`/learn/${current.lecture}`} className="text-xs">Read the lecture</QuietLink>
-        <span className="flex items-center gap-1">
-          {flipped ? <><Kbd>1</Kbd><Kbd>2</Kbd><Kbd>3</Kbd><Kbd>4</Kbd> rate</> : <><Kbd>Space</Kbd> flip</>}
-        </span>
       </div>
     </div>
   )

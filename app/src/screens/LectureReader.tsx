@@ -12,10 +12,10 @@ import { Kbd } from '@/components/ui/kbd'
 import { DomainDot, QuietLink } from '@/components/parts'
 import { cn } from '@/lib/utils'
 
-function useActiveSection(ids: string[]) {
+function useActiveSection(sections: { id: string }[]) {
   const [active, setActive] = useState<string | null>(null)
   useEffect(() => {
-    const els = ids.map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el)
+    const els = sections.map((s) => document.getElementById(s.id)).filter((el): el is HTMLElement => !!el)
     if (!els.length) return
     const io = new IntersectionObserver(
       (entries) => {
@@ -26,23 +26,8 @@ function useActiveSection(ids: string[]) {
     )
     els.forEach((el) => io.observe(el))
     return () => io.disconnect()
-  }, [ids.join('|')])
+  }, [sections])
   return active
-}
-
-function useReadProgress(key: string) {
-  const [p, setP] = useState(0)
-  useEffect(() => {
-    const onScroll = () => {
-      const doc = document.documentElement
-      const max = doc.scrollHeight - doc.clientHeight
-      setP(max > 0 ? Math.min(1, window.scrollY / max) : 0)
-    }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [key])
-  return p
 }
 
 export default function LectureReader({ html, sections }: { html: string; sections: { id: string; title: string }[] }) {
@@ -56,8 +41,7 @@ export default function LectureReader({ html, sections }: { html: string; sectio
   const note = useStore((s) => s.notes[id] ?? '')
   const readAt = useStore((s) => s.lectureRead[id])
   const [notesOpen, setNotesOpen] = useState(false)
-  const activeSection = useActiveSection(sections.map((s) => s.id))
-  const progress = useReadProgress(id)
+  const activeSection = useActiveSection(sections)
 
   const markAndAdvance = () => {
     markLectureRead(id)
@@ -95,10 +79,6 @@ export default function LectureReader({ html, sections }: { html: string; sectio
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5">
-        <div className="h-full bg-foreground/70 transition-[width] duration-100 ease-linear" style={{ width: `${progress * 100}%` }} />
-      </div>
-
       <div className="mb-8 flex flex-wrap items-center gap-2">
         <QuietLink to="/learn" className="flex items-center gap-1"><ArrowLeft className="size-3" /> Learn</QuietLink>
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
@@ -120,7 +100,7 @@ export default function LectureReader({ html, sections }: { html: string; sectio
           <Notes
             noteKey={id}
             label={`Notes on ${lec.title}`}
-            placeholder="Your notes on this lecture. Saved as you type."
+            placeholder="Notes. Saved as you type."
             className="min-h-36"
           />
         </div>
@@ -145,6 +125,7 @@ export default function LectureReader({ html, sections }: { html: string; sectio
             )}
           </header>
           <div className="lecture-prose" dangerouslySetInnerHTML={{ __html: html }} />
+          <div aria-hidden className="pointer-events-none sticky bottom-12 h-20 bg-[linear-gradient(to_bottom,transparent,var(--background)_75%)] md:bottom-0" />
         </article>
 
         <aside className="sticky top-8 hidden xl:block">
@@ -170,7 +151,7 @@ export default function LectureReader({ html, sections }: { html: string; sectio
         </aside>
       </div>
 
-      <nav className="mt-12 grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2">
+      <nav className="mt-2 grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2">
         {prev ? (
           <Link to={`/learn/${prev.id}`} className="group bg-card px-5 py-4 transition-colors duration-100 hover:bg-accent/50">
             <div className="eyebrow flex items-center gap-1.5"><ArrowLeft className="size-3 transition-transform duration-200 ease-(--ease-out) group-hover:-translate-x-0.5" /> Previous</div>

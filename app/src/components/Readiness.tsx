@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useCountUp } from '@/lib/count-up'
 import { domains, exam, scaledScore, shortDomain, domainVar, type DomainId } from '@/lib/content'
 
 export interface DomainStat {
@@ -41,6 +42,7 @@ export default function Readiness({ stats, hideScore = false }: { stats: DomainS
     return acc + (d.weight / 100) * (s && s.total ? s.correct / s.total : 0)
   }, 0)
   const score = scaledScore(weighted)
+  const shown = useCountUp(answered ? score : 0, 900)
   const passed = answered > 0 && score >= exam.passingScore
 
   let cursor = 0
@@ -82,7 +84,7 @@ export default function Readiness({ stats, hideScore = false }: { stats: DomainS
         ) : (
           <>
             <text x={C} y={C + 2} textAnchor="middle" fontSize="42" fontWeight="500" fill={passed ? 'var(--good)' : 'currentColor'} fontFamily="var(--font-mono)" letterSpacing="-0.04em">
-              {answered ? score : '—'}
+              {answered ? shown : '—'}
             </text>
             <text x={C} y={C + 22} textAnchor="middle" fontSize="10" fill="var(--muted-foreground)" fontFamily="var(--font-mono)" letterSpacing="0.08em">
               PASS {exam.passingScore}

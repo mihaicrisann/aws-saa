@@ -178,7 +178,7 @@ export default function Drill() {
       <div className="mx-auto max-w-2xl">
         <PageHeader
           title="Drill"
-          description="Short sets with the reasoning right after each answer. Attack one domain or one lecture at a time."
+          description="Short sets, reasoning after every answer."
         />
         <div className="overflow-hidden rounded-xl border bg-card">
           <Field label="Bank">
@@ -210,7 +210,7 @@ export default function Drill() {
           <Field label="Scope">
             <Label className="flex items-center gap-2 text-[13px] font-normal">
               <Checkbox checked={unseen} onCheckedChange={(v) => setUnseen(v === true)} />
-              Only questions I haven't seen
+              Unseen only
             </Label>
           </Field>
           <div className="flex items-center justify-between border-t bg-muted/40 px-5 py-3">
@@ -233,7 +233,7 @@ export default function Drill() {
     const missed = log.filter((l) => !l.ok)
     const confidentWrong = missed.filter((l) => l.confidence === 'sure').length
     const avg = Math.round(log.reduce((a, l) => a + l.seconds, 0) / log.length)
-    const verdict = p >= 85 ? 'Solid. Move on.' : p >= 72 ? 'Around the pass line. Work the misses before adding new material.' : 'Below the pass line. Re-read the lectures behind the misses rather than doing more questions.'
+    const verdict = p >= 85 ? 'Solid. Move on.' : p >= 72 ? 'Around the pass line. Work the misses first.' : 'Below the pass line. Re-read the lectures behind the misses.'
     return (
       <div className="mx-auto max-w-2xl">
         <PageHeader

@@ -80,10 +80,10 @@ export default function Progress() {
 
   const sure = calibration[0]
   const calibrationNote = sure.n < 5
-    ? 'Well-calibrated means "sure" lands near 90%+ and "guessing" near 25–50%.'
+    ? 'Calibrated means "sure" lands near 90% and "guessing" near 25–50%.'
     : sure.acc! < 0.85
-      ? `"Sure" is only ${Math.round(sure.acc! * 100)}% right. You are over-confident: slow down on the qualifier before committing.`
-      : '"Sure" holds up. Trust it in the exam and spend your time on the rest.'
+      ? `"Sure" is only ${Math.round(sure.acc! * 100)}% right. Slow down on the qualifier.`
+      : '"Sure" holds up. Trust it and spend the time elsewhere.'
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -144,7 +144,7 @@ export default function Progress() {
 
           <Panel title="Calibration" hint="Whether your confidence is worth anything.">
             {rated.length === 0 ? (
-              <p className="text-[13px] leading-relaxed text-muted-foreground">Rate how sure you are before checking in a drill, and this shows whether your confidence is worth anything.</p>
+              <p className="text-[13px] leading-relaxed text-muted-foreground">Rate how sure you are in drills and this fills in.</p>
             ) : (
               <div className="grid gap-2.5">
                 {calibration.map(({ c, n, acc }) => (
@@ -166,7 +166,7 @@ export default function Progress() {
 
           <Panel title="Mock exams" bodyClassName={exams.length ? 'p-0' : undefined}>
             {exams.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground">None yet. <Link to="/exam" className="underline underline-offset-4">Sit one</Link> after module 3.</p>
+              <p className="text-[13px] text-muted-foreground">None yet. <Link to="/exam" className="underline underline-offset-4">Sit one</Link>.</p>
             ) : (
               exams.slice().reverse().map((e, i) => {
                 const a = e.correct / e.total
@@ -205,14 +205,14 @@ export default function Progress() {
 
       <section className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t pt-6">
         <p className="max-w-lg text-[13px] leading-relaxed text-muted-foreground">
-          Progress is stored on your account, not in this browser.{' '}
+          Saved to your account.{' '}
           {mirror === 'error'
-            ? 'The last save failed. Unsaved answers are held on this device until it succeeds. Export a copy before clearing site data.'
+            ? 'The last save failed. Unsaved answers stay on this device until it succeeds. Export a copy first.'
             : mirror === 'conflict'
               ? 'Another device changed the same progress. Resolve that before relying on these numbers.'
               : mirror === 'saving'
                 ? 'A save is in flight.'
-                : 'Everything here is saved and will follow you to another browser.'}
+                : 'It follows you to any browser.'}
         </p>
         <AlertDialog>
           <AlertDialogTrigger render={<Button variant="destructive-outline" size="sm" />}>Reset all progress</AlertDialogTrigger>
