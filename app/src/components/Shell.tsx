@@ -21,25 +21,34 @@ export const NAV = [
   { to: '/exam', label: 'Exam', key: 'e', Icon: Timer },
   { to: '/mistakes', label: 'Mistakes', key: 'm', Icon: CircleX },
   { to: '/cheatsheet', label: 'Cheat sheet', key: 'k', Icon: ListChecks },
-  { to: '/maps', label: 'Architecture maps', key: 'a', Icon: Network },
+  { to: '/maps', label: 'Maps', key: 'a', Icon: Network },
   { to: '/progress', label: 'Progress', key: 'p', Icon: TrendingUp },
 ]
+
+export const pageIndex = (i: number) => String(i + 1).padStart(2, '0')
 
 const SIDEBAR_KEY = 'saa.sidebar'
 const readCollapsed = () => {
   try { return localStorage.getItem(SIDEBAR_KEY) === 'collapsed' } catch { return false }
 }
 
-const PAGE_KEYS = [
-  ['Drill', '1–5 pick · S / U / G how sure · Enter check / next'],
-  ['Cards', 'Space flip · 1 again · 2 hard · 3 good · 4 easy'],
-  ['Exam', '1–5 pick · ← → move · F flag'],
-  ['Learn', 'N mark read and open the next lecture · ← → previous / next'],
+const PAGE_KEYS: [string, ReactNode][] = [
+  ['Drill', <><Kbd>1</Kbd>–<Kbd>5</Kbd> pick · <Kbd>s</Kbd> <Kbd>u</Kbd> <Kbd>g</Kbd> how sure · <Kbd>↵</Kbd> check, next</>],
+  ['Cards', <><Kbd>Space</Kbd> flip · <Kbd>1</Kbd> again <Kbd>2</Kbd> hard <Kbd>3</Kbd> good <Kbd>4</Kbd> easy</>],
+  ['Exam', <><Kbd>1</Kbd>–<Kbd>5</Kbd> pick · <Kbd>←</Kbd> <Kbd>→</Kbd> move · <Kbd>f</Kbd> flag</>],
+  ['Learn', <><Kbd>n</Kbd> mark read, open next · <Kbd>←</Kbd> <Kbd>→</Kbd> previous, next</>],
 ]
+
+const navClass = (isActive: boolean) =>
+  cn(
+    'group pressable flex h-7 items-center gap-2.5 rounded-md px-2 text-[13px]',
+    isActive ? 'bg-sidebar-accent font-medium text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
+  )
 
 export default function Shell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
-  const activePage = NAV.find((item) => item.to === pathname || (item.to !== "/" && pathname.startsWith(`${item.to}/`)))?.label ?? "Study"
+  const activeIndex = NAV.findIndex((item) => item.to === pathname || (item.to !== '/' && pathname.startsWith(`${item.to}/`)))
+  const active = NAV[activeIndex]
   const theme = useStore((s) => s.theme)
   const nav = useNavigate()
   const [help, setHelp] = useState(false)
@@ -50,6 +59,7 @@ export default function Shell({ children }: { children: ReactNode }) {
     setCollapsed(next)
     try { localStorage.setItem(SIDEBAR_KEY, next ? 'collapsed' : 'open') } catch { /* ignore */ }
   }
+  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark')
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -66,101 +76,121 @@ export default function Shell({ children }: { children: ReactNode }) {
     if (e.key === '?') return setHelp((v) => !v)
     if (e.key === '/') { e.preventDefault(); return setSearch(true) }
     if (e.key === '[') return toggleSidebar()
-    if (e.key === 't') return setTheme(theme === 'dark' ? 'light' : 'dark')
+    if (e.key === 't') return toggleTheme()
     const item = NAV.find((n) => n.key === e.key)
     if (item) nav(item.to)
   }, [theme, collapsed])
 
+  const utilities = (
+    <>
+      <Tooltip>
+        <TooltipTrigger aria-label="Keyboard shortcuts" onClick={() => setHelp(true)} render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" />}>
+          <Keyboard />
+        </TooltipTrigger>
+        <TooltipContent>Shortcuts <Kbd>?</Kbd></TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger aria-label="Toggle theme" onClick={toggleTheme} render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" />}>
+          {theme === 'dark' ? <Sun /> : <Moon />}
+        </TooltipTrigger>
+        <TooltipContent>Theme <Kbd>t</Kbd></TooltipContent>
+      </Tooltip>
+    </>
+  )
+
   return (
-    <div className="flex min-h-svh">
+    <div className="flex min-h-svh bg-canvas">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-background focus:p-3">Skip to content</a>
+
       {!collapsed && (
-        <aside className="sticky top-0 hidden h-svh w-56 shrink-0 flex-col border-r bg-sidebar px-3 py-5 md:flex">
-          <NavLink to="/" className="px-3 text-sm font-semibold tracking-tight">AWS SAA<span className="mt-0.5 block text-xs font-normal text-muted-foreground">Your study workspace</span></NavLink>
+        <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col px-3 pt-4 pb-3 md:flex">
+          <NavLink to="/" className="flex items-center gap-2.5 rounded-md px-2 py-1">
+            <span aria-hidden className="grid size-5 place-items-center rounded-[5px] bg-foreground text-[10px] font-semibold text-background">S</span>
+            <span className="text-[13px] font-semibold tracking-tight">AWS SAA</span>
+            <span className="eyebrow ml-auto text-faint-foreground">C03</span>
+          </NavLink>
+
           <button
             type="button"
             onClick={() => setSearch(true)}
-            className="mt-4 flex h-8 items-center gap-2 rounded-xl border px-3 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
+            className="pressable mt-4 flex h-8 items-center gap-2 rounded-md border border-sidebar-border bg-background/60 px-2.5 text-[13px] text-muted-foreground hover:bg-background hover:text-foreground dark:bg-background/40"
           >
-            <SearchIcon className="size-4" /> <span className="flex-1 text-left">Search</span> <Kbd>/</Kbd>
+            <SearchIcon className="size-3.5" />
+            <span className="flex-1 text-left">Search</span>
+            <Kbd>/</Kbd>
           </button>
-          <nav className="mt-3 flex flex-col gap-0.5">
-            {NAV.map((n) => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                end={n.to === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    'group flex h-8 items-center gap-2.5 rounded-xl px-3 text-sm transition-colors',
-                    isActive ? 'bg-sidebar-accent font-medium text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
-                  )
-                }
-              >
-                <n.Icon className="size-4 shrink-0" />
+
+          <nav className="mt-4 flex flex-col gap-px" aria-label="Sections">
+            {NAV.map((n, i) => (
+              <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => navClass(isActive)}>
+                <n.Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} />
                 <span className="flex-1">{n.label}</span>
-                <Kbd className="opacity-0 transition-opacity group-hover:opacity-100">{n.key}</Kbd>
+                <span className="mono text-[10px] text-faint-foreground opacity-0 transition-opacity duration-100 group-hover:opacity-100" aria-hidden>{pageIndex(i)}</span>
               </NavLink>
             ))}
           </nav>
-          <div className="mt-auto flex items-center gap-1 px-1">
-            <Button variant="ghost" size="icon-sm" aria-label="Keyboard shortcuts" onClick={() => setHelp(true)}>
-              <Keyboard />
-            </Button>
-            <Button variant="ghost" size="icon-sm" aria-label="Toggle theme" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-              {theme === 'dark' ? <Sun /> : <Moon />}
-            </Button>
+
+          <div className="mt-auto flex items-center gap-0.5 px-1">
+            {utilities}
+            <div className="ml-auto flex items-center gap-2"><SyncStatus /><AccountMenu /></div>
           </div>
         </aside>
       )}
 
-      <header className="fixed inset-x-0 top-0 z-40 flex items-center gap-1 overflow-x-auto border-b bg-background/95 px-2 py-2 backdrop-blur md:hidden">
+      <header className="fixed inset-x-0 top-0 z-40 flex items-center gap-0.5 overflow-x-auto border-b bg-canvas/90 px-2 py-1.5 backdrop-blur-md md:hidden">
         {NAV.map((n) => (
           <NavLink
             key={n.to}
             to={n.to}
             end={n.to === '/'}
-            className={({ isActive }) =>
-              cn(
-                'shrink-0 rounded-xl px-2.5 py-1.5 text-sm',
-                isActive ? 'bg-muted font-medium' : 'text-muted-foreground',
-              )
-            }
+            className={({ isActive }) => cn('pressable shrink-0 rounded-md px-2.5 py-1.5 text-[13px]', isActive ? 'bg-sidebar-accent font-medium' : 'text-muted-foreground')}
           >
             {n.label}
           </NavLink>
         ))}
       </header>
-      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between border-t bg-background/95 px-5 py-3 backdrop-blur md:hidden"><SyncStatus /><div className="flex items-center gap-4"><button type="button" className="text-xs text-muted-foreground" onClick={() => setSearch(true)}>Search</button><AccountMenu /></div></div>
+      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between border-t bg-canvas/90 px-4 py-2 backdrop-blur-md md:hidden">
+        <SyncStatus />
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-sm" aria-label="Search" onClick={() => setSearch(true)}><SearchIcon /></Button>
+          {utilities}
+          <AccountMenu />
+        </div>
+      </div>
 
-      <main id="main-content" className="min-w-0 flex-1 px-5 pt-16 pb-20 md:px-10 md:pt-4">
-        <div className="mb-4 hidden md:flex md:items-center md:gap-1 md:-ml-2">
+      <main
+        id="main-content"
+        className="relative min-w-0 flex-1 bg-background pt-12 pb-16 md:my-2 md:mr-2 md:min-h-[calc(100svh-1rem)] md:rounded-xl md:border md:pt-0 md:pb-0 md:shadow-[0_1px_2px_--theme(--color-black/4%)] dark:md:shadow-none"
+      >
+        <div className="hidden h-11 items-center gap-1 border-b px-3 md:flex">
           <Tooltip>
             <TooltipTrigger
               aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
               aria-pressed={!collapsed}
               onClick={toggleSidebar}
-              render={<Button variant="ghost" size="icon-sm" />}
+              render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" />}
             >
               <PanelLeft />
             </TooltipTrigger>
             <TooltipContent side="right">{collapsed ? 'Show' : 'Hide'} sidebar <Kbd>[</Kbd></TooltipContent>
           </Tooltip>
-          <span className="ml-2 text-xs text-muted-foreground">{activePage}</span>
-          <div className="ml-auto flex items-center gap-4"><SyncStatus /><AccountMenu /></div>
+          <span className="eyebrow ml-2 flex items-center gap-2">
+            <span className="text-faint-foreground">{activeIndex >= 0 ? pageIndex(activeIndex) : '—'}</span>
+            <span className="text-foreground">{active?.label ?? 'Study'}</span>
+          </span>
           {collapsed && (
-            <>
-              <Button variant="ghost" size="icon-sm" aria-label="Search" onClick={() => setSearch(true)}><SearchIcon /></Button>
-              <Button variant="ghost" size="icon-sm" aria-label="Keyboard shortcuts" onClick={() => setHelp(true)}><Keyboard /></Button>
-              <Button variant="ghost" size="icon-sm" aria-label="Toggle theme" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                {theme === 'dark' ? <Sun /> : <Moon />}
-              </Button>
-            </>
+            <div className="ml-auto flex items-center gap-0.5">
+              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Search" onClick={() => setSearch(true)}><SearchIcon /></Button>
+              {utilities}
+              <div className="ml-2 flex items-center gap-2"><SyncStatus /><AccountMenu /></div>
+            </div>
           )}
         </div>
-        <ViewTransition name="study-page" update="page-fade">
-          <div className="min-w-0">{children}</div>
-        </ViewTransition>
+        <div className="px-5 py-6 md:px-10 md:py-9">
+          <ViewTransition name="study-page" update="page-fade">
+            <div className="min-w-0">{children}</div>
+          </ViewTransition>
+        </div>
       </main>
 
       <Search open={search} onOpenChange={setSearch} />
@@ -169,28 +199,31 @@ export default function Shell({ children }: { children: ReactNode }) {
         <DialogPopup className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Keyboard shortcuts</DialogTitle>
-            <DialogDescription>Work anywhere except inside a text field.</DialogDescription>
+            <DialogDescription>Anywhere except inside a text field.</DialogDescription>
           </DialogHeader>
-          <DialogPanel className="grid gap-2 text-sm">
-            <div className="flex flex-wrap items-center gap-1.5">
+          <DialogPanel className="grid gap-5 text-sm">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
               {NAV.map((n) => (
-                <span key={n.to} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs">
-                  <Kbd>{n.key}</Kbd> {n.label}
-                </span>
-              ))}
-              <span className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs"><Kbd>t</Kbd> theme</span>
-              <span className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs"><Kbd>[</Kbd> sidebar</span>
-              <span className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs"><Kbd>/</Kbd> search</span>
-              <span className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs"><Kbd>?</Kbd> this</span>
-            </div>
-            <dl className="mt-2 grid grid-cols-[72px_1fr] gap-x-3 gap-y-1.5">
-              {PAGE_KEYS.map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="font-medium">{k}</dt>
-                  <dd className="text-muted-foreground">{v}</dd>
+                <div key={n.to} className="flex items-center justify-between gap-3 text-[13px]">
+                  <span className="text-muted-foreground">{n.label}</span>
+                  <Kbd>{n.key}</Kbd>
                 </div>
               ))}
-            </dl>
+              {[['Search', '/'], ['Theme', 't'], ['Sidebar', '['], ['This dialog', '?']].map(([label, key]) => (
+                <div key={key} className="flex items-center justify-between gap-3 text-[13px]">
+                  <span className="text-muted-foreground">{label}</span>
+                  <Kbd>{key}</Kbd>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-2 border-t pt-4">
+              {PAGE_KEYS.map(([k, v]) => (
+                <div key={k} className="grid grid-cols-[56px_1fr] items-baseline gap-3 text-[13px]">
+                  <span className="eyebrow">{k}</span>
+                  <span className="text-muted-foreground">{v}</span>
+                </div>
+              ))}
+            </div>
           </DialogPanel>
         </DialogPopup>
       </Dialog>

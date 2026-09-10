@@ -6,6 +6,7 @@ const config: NextConfig = {
   outputFileTracingRoot: path.join(process.cwd(), ".."),
   poweredByHeader: false,
   cacheComponents: true,
+  agentRules: false,
 }
 
 export default config

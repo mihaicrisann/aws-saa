@@ -1,19 +1,22 @@
-.map-preview { background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 16px 16px; }
-.map-service { width:220px; min-height:105px; padding:14px 16px; border:1px solid var(--border); border-radius:14px; background:var(--card); color:var(--foreground); box-shadow:0 3px 12px #00000006; transition:border-color .15s, box-shadow .15s; }
-.map-service strong { display:block; font-size:14px; letter-spacing:-.02em; margin:9px 0 5px; }
+.map-preview { background-image: radial-gradient(var(--border-strong) 1px, transparent 1px); background-size: 14px 14px; }
+.map-service { width:220px; min-height:105px; padding:14px 16px; border:1px solid var(--border-strong); border-radius:12px; background:var(--card); color:var(--foreground); box-shadow:0 1px 2px #00000008; transition:border-color .15s, box-shadow .15s; }
+.map-service strong { display:block; font-size:14px; font-weight:500; letter-spacing:-.015em; margin:9px 0 4px; }
 .map-service > span { display:block; font-size:11px; color:var(--muted-foreground); line-height:1.5; }
-.map-service-zone { display:flex; gap:6px; align-items:center; font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-foreground); }
+.map-service-zone { display:flex; gap:6px; align-items:center; font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted-foreground); }
 .map-service-flags { display:flex; flex-wrap:wrap; gap:5px; margin-top:9px; }
-.map-service-flag { border:1px solid var(--border); border-radius:999px; padding:1px 7px; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+.map-service-flag { border:1px solid var(--border-strong); border-radius:5px; padding:1px 6px; font-family:var(--font-mono); font-size:9px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; }
 .map-service-flag-bad { border-color:var(--bad); color:var(--bad); }
-.map-service-highlighted { border-color:var(--domain-secure); box-shadow:0 0 0 2px color-mix(in srgb,var(--domain-secure) 15%,transparent); }
+.map-service-highlighted { border-color:var(--domain-secure); box-shadow:0 0 0 3px color-mix(in oklch,var(--domain-secure) 18%,transparent); }
 .map-service-highlighted .map-service-flag { border-color:var(--domain-secure); color:var(--domain-secure); }
-.map-service-selected { border-color:var(--foreground); box-shadow:0 0 0 2px var(--border); }
+.map-service-selected { border-color:var(--foreground); box-shadow:0 0 0 1px var(--foreground); }
 .map-service-warning { border-color:var(--bad); }
 .map-service-warning .map-service-zone { color:var(--bad); }
-.map-workspace .react-flow { --xy-background-color:var(--background); --xy-minimap-background-color:var(--card); --xy-controls-button-background-color:var(--card); --xy-controls-button-color:var(--foreground); --xy-controls-button-border-color:var(--border); --xy-node-color:var(--foreground); }
-.map-workspace .react-flow__attribution, .map-workspace .react-flow__attribution a { background:var(--background); color:var(--foreground); font-size:10px; }
-.map-workspace .react-flow__node:focus-visible { outline:2px solid var(--ring); outline-offset:4px; border-radius:16px; }
+.map-workspace .react-flow { --xy-background-color:var(--background); --xy-background-pattern-color:var(--border-strong); --xy-minimap-background-color:var(--card); --xy-minimap-mask-background-color:color-mix(in oklch,var(--canvas) 70%,transparent); --xy-controls-button-background-color:var(--card); --xy-controls-button-background-color-hover:var(--accent); --xy-controls-button-color:var(--foreground); --xy-controls-button-border-color:var(--border); --xy-node-color:var(--foreground); --xy-edge-label-background-color:var(--background); }
+.map-workspace .react-flow__controls { border-radius:8px; overflow:hidden; box-shadow:0 1px 2px #00000010; border:1px solid var(--border); }
+.map-workspace .react-flow__minimap { border-radius:8px; border:1px solid var(--border); }
+.map-workspace .react-flow__attribution, .map-workspace .react-flow__attribution a { background:var(--background); color:var(--faint-foreground); font-size:10px; }
+.map-workspace .react-flow__node:focus-visible { outline:2px solid var(--ring); outline-offset:4px; border-radius:14px; }
+.map-workspace .react-flow__handle { width:6px; height:6px; background:var(--border-strong); border:0; }
 /* The mini-map costs more room than it earns on a phone-width canvas. */
 @media(max-width:640px) { .map-workspace .react-flow__minimap { display:none; } }
 @media(prefers-reduced-motion:reduce) { .map-service, .map-workspace * { transition:none !important; animation:none !important; } }

@@ -7,7 +7,7 @@ import { Link } from '@/lib/navigation'
 import { useStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import Notes from '@/components/Notes'
-import { PageHeader } from '@/components/parts'
+import { PageHeader, Choice, QuietLink } from '@/components/parts'
 import { cn } from '@/lib/utils'
 import mapData from '@content/architecture-maps.json'
 import '@xyflow/react/dist/style.css'
@@ -43,7 +43,7 @@ function Preview({ map }: { map: Architecture }) {
   const maxY = Math.max(...map.nodes.map(n => n.y)) + 110
   return <svg viewBox={`-30 -40 ${maxX + 60} ${maxY + 80}`} className="h-36 w-full" aria-hidden>
     {map.edges.map((e, i) => { const a = byId.get(e.source), b = byId.get(e.target); return a && b ? <path key={i} d={`M${a.x + 110},${a.y + 45} L${b.x + 110},${b.y + 45}`} fill="none" stroke="currentColor" strokeWidth="4" opacity=".22" /> : null })}
-    {map.nodes.map((n, i) => <g key={n.id}><rect x={n.x} y={n.y} width="220" height="90" rx="16" fill="var(--background)" stroke="currentColor" strokeWidth="3" opacity=".9" /><rect x={n.x + 16} y={n.y + 20} width="10" height="50" rx="5" fill={i % 3 === 0 ? 'var(--domain-secure)' : 'currentColor'} opacity=".55" /><text x={n.x + 40} y={n.y + 53} fill="currentColor" fontSize="22" fontFamily="inherit">{n.service.length > 17 ? `${n.service.slice(0, 16)}…` : n.service}</text></g>)}
+    {map.nodes.map((n, i) => <g key={n.id}><rect x={n.x} y={n.y} width="220" height="90" rx="14" fill="var(--card)" stroke="currentColor" strokeWidth="2.5" opacity=".6" /><rect x={n.x + 16} y={n.y + 20} width="10" height="50" rx="5" fill={i % 3 === 0 ? 'var(--domain-secure)' : 'currentColor'} opacity=".55" /><text x={n.x + 40} y={n.y + 53} fill="currentColor" fontSize="22" fontFamily="var(--font-mono)">{n.service.length > 17 ? `${n.service.slice(0, 16)}…` : n.service}</text></g>)}
   </svg>
 }
 
@@ -53,18 +53,25 @@ export default function Maps() {
   const filtered = mapData.filter(m => (category === 'All' || m.category === category) && `${m.title} ${m.subtitle} ${m.nodes.map(n => n.service).join(' ')}`.toLowerCase().includes(query.toLowerCase()))
   const categories = ['All', ...new Set(mapData.map(m => m.category))]
   return <div className="mx-auto max-w-6xl">
-    <PageHeader title="Architecture maps" description="Follow a request. Find the boundary. Understand the tradeoff." />
-    <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-      <p className="max-w-xl text-sm text-muted-foreground">Six realistic application blueprints. Explore the services, walk through a flow, then see what breaks in the bad design.</p>
-      <label className="flex items-center gap-2 rounded-xl border px-3 py-2"><Search className="size-4 shrink-0 text-muted-foreground" /><input aria-label="Search architecture maps" placeholder="Find an app or service…" value={query} onChange={e => setQuery(e.target.value)} className="w-full min-w-0 bg-transparent text-sm outline-none sm:w-48" /></label>
+    <PageHeader
+      title="Architecture maps"
+      description="Six realistic application blueprints. Follow a request, find the boundary, understand the tradeoff, then see what breaks in the bad design."
+      actions={<label className="flex h-8 items-center gap-2 rounded-lg border bg-card px-2.5 transition-[border-color,box-shadow] duration-100 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20"><Search className="size-3.5 shrink-0 text-muted-foreground" /><input aria-label="Search architecture maps" placeholder="Find an app or service…" value={query} onChange={e => setQuery(e.target.value)} className="w-full min-w-0 bg-transparent text-[13px] outline-none placeholder:text-faint-foreground sm:w-52" /></label>}
+    />
+    <div className="mb-6" role="group" aria-label="Map categories">
+      <Choice value={category} onChange={v => v && setCategory(v)} options={categories.map(c => ({ value: c, label: c }))} className="flex-wrap" />
     </div>
-    <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Map categories">{categories.map(c => <button key={c} onClick={() => setCategory(c)} aria-pressed={category === c} className={cn('rounded-full border px-3 py-1.5 text-xs transition-colors', category === c ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted')}>{c}</button>)}</div>
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.map((m, i) => <Link key={m.id} to={`/maps/${m.id}`} className="group overflow-hidden rounded-2xl border bg-card transition-colors hover:border-foreground/35">
-      <div className="map-preview border-b bg-muted/30 px-5 py-4"><Preview map={m} /></div>
-      <div className="p-5"><div className="mb-3 flex justify-between text-xs text-muted-foreground"><span>{String(i + 1).padStart(2, '0')} / {m.category}</span><span>{m.nodes.length} services</span></div><h2 className="mb-2 font-semibold tracking-tight">{m.title}</h2><p className="min-h-15 text-sm leading-relaxed text-muted-foreground">{m.subtitle}</p><span className="mt-5 flex items-center gap-2 text-xs font-medium">Explore architecture <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" /></span></div>
+    <div className="stagger grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filtered.map((m, i) => <Link key={m.id} to={`/maps/${m.id}`} className="group pressable overflow-hidden rounded-xl border bg-card hover:border-border-strong">
+      <div className="map-preview border-b px-5 py-4 text-muted-foreground transition-colors duration-200 group-hover:text-foreground"><Preview map={m} /></div>
+      <div className="p-5">
+        <div className="eyebrow mb-3 flex justify-between"><span>{String(i + 1).padStart(2, '0')} · {m.category}</span><span className="text-faint-foreground">{m.nodes.length} services</span></div>
+        <h2 className="text-[15px] font-medium tracking-tight">{m.title}</h2>
+        <p className="mt-1.5 min-h-15 text-[13px] leading-relaxed text-muted-foreground">{m.subtitle}</p>
+        <span className="mt-4 flex items-center gap-1.5 text-xs font-medium">Explore <ArrowRight className="size-3.5 transition-transform duration-200 ease-(--ease-out) group-hover:translate-x-0.5" /></span>
+      </div>
     </Link>)}</div>
     {filtered.length === 0 && <p className="py-16 text-center text-sm text-muted-foreground">No maps match. Try a service such as S3, Lambda or RDS.</p>}
-    <p className="mt-7 text-xs text-muted-foreground">Authored reference applications grounded in AWS documentation. Each map includes its sources and simplifying assumptions.</p>
+    <p className="mt-8 text-xs leading-relaxed text-muted-foreground">Authored reference applications grounded in AWS documentation. Each map includes its sources and simplifying assumptions.</p>
   </div>
 }
 
@@ -107,41 +114,40 @@ function Canvas({ map }: { map: Architecture }) {
 
   const panel = (id: Tab) => ({ role: 'tabpanel' as const, id: `${uid}-panel-${id}`, 'aria-labelledby': `${uid}-tab-${id}`, tabIndex: 0 })
   return <div>
-    <Link to="/maps" className="mb-5 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" />All architecture maps</Link>
-    <PageHeader title={map.title} description={map.subtitle} />
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap gap-2"><Button variant={bad ? 'default' : 'outline'} onClick={() => setBad(v => !v)} aria-pressed={bad}><ShieldAlert />{bad ? 'Hide bad examples' : 'Show bad examples'}</Button><Button variant="outline" onClick={reset}><RotateCcw />Reset view</Button></div>
-      <span id={`${uid}-hint`} className="text-xs text-muted-foreground">Drag to pan · pinch or use the zoom controls · click or tab to a service, then press Enter</span>
-    </div>
-    <div className="map-workspace grid overflow-hidden rounded-2xl border lg:grid-cols-[minmax(0,1fr)_320px]">
+    <QuietLink to="/maps" className="mb-6 inline-flex items-center gap-1"><ArrowLeft className="size-3" /> All maps</QuietLink>
+    <PageHeader eyebrow={map.category} title={map.title} description={map.subtitle} className="mb-5"
+      actions={<><Button variant={bad ? 'default' : 'outline'} size="sm" onClick={() => setBad(v => !v)} aria-pressed={bad}><ShieldAlert />{bad ? 'Hide bad examples' : 'Show bad examples'}</Button><Button variant="outline" size="sm" onClick={reset}><RotateCcw />Reset view</Button></>}
+    />
+    <div className="map-workspace grid overflow-hidden rounded-xl border bg-card lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="relative h-[56svh] min-h-96 lg:h-[72svh]" role="region" aria-label={`${map.title} architecture canvas`} aria-describedby={`${uid}-hint`}>
         <ReactFlow nodes={displayNodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={handleNodesChange} onPaneClick={() => setSelected(null)} nodesConnectable={false} edgesFocusable={false} edgesReconnectable={false} deleteKeyCode={null} preventScrolling={false} fitView fitViewOptions={{ padding: .18 }} minZoom={.2} maxZoom={1.8} colorMode={theme} ariaLabelConfig={ariaLabelConfig} attributionPosition="bottom-left">
           <Background gap={22} size={1} /><Controls showInteractive={false} /><MiniMap pannable zoomable nodeColor={() => theme === 'dark' ? '#737373' : '#a3a3a3'} />
         </ReactFlow>
-        <div className="pointer-events-none absolute top-3 left-3 rounded-lg border bg-background/90 px-3 py-2 text-[11px] text-muted-foreground"><Network className="mr-1.5 inline size-3.5" />{map.category} · {map.nodes.length} services</div>
+        <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 rounded-md border bg-background/90 px-2.5 py-1.5 text-[11px] text-muted-foreground backdrop-blur-md"><Network className="size-3.5" /><span className="mono">{map.nodes.length} services</span></div>
+        <span id={`${uid}-hint`} className="pointer-events-none absolute bottom-3 right-3 hidden rounded-md border bg-background/90 px-2.5 py-1.5 text-[11px] text-muted-foreground backdrop-blur-md sm:block">Drag to pan · click or tab to a service, then Enter</span>
       </div>
       <div className="border-t bg-card lg:max-h-[72svh] lg:overflow-y-auto lg:border-t-0 lg:border-l">
-        <div className="sticky top-0 z-10 flex border-b bg-card p-2" role="tablist" aria-label="Map details" onKeyDown={e => {
+        <div className="sticky top-0 z-10 flex gap-1 border-b bg-card p-1.5" role="tablist" aria-label="Map details" onKeyDown={e => {
           const next = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
           if (!next) return
           e.preventDefault()
           const to = TABS[(TABS.findIndex(t => t.id === tab) + next + TABS.length) % TABS.length]
           setTab(to.id); document.getElementById(`${uid}-tab-${to.id}`)?.focus()
-        }}>{TABS.map(t => <button key={t.id} id={`${uid}-tab-${t.id}`} role="tab" aria-selected={tab === t.id} aria-controls={`${uid}-panel-${t.id}`} tabIndex={tab === t.id ? 0 : -1} onClick={() => setTab(t.id)} className={cn('flex-1 rounded-lg px-3 py-2 text-sm', tab === t.id ? 'bg-muted font-medium' : 'text-muted-foreground')}>{t.label}</button>)}</div>
-        {tab === 'notes' ? <div className="p-5" {...panel('notes')}><h2 className="mb-2 text-sm font-medium">Your observations</h2><p id={`${uid}-notes-hint`} className="mb-4 text-xs leading-relaxed text-muted-foreground">Write the distinction you want to remember. Saved with your study progress.</p><Notes noteKey={`map:${map.id}`} label="Architecture notes" placeholder="Why a queue here? What changes if…" className="min-h-64" describedBy={`${uid}-notes-hint`} /></div> : <div className="space-y-6 p-5" {...panel('guide')}>
-          <div aria-live="polite">{service ? <section className="rounded-xl border bg-muted/35 p-4"><div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{service.zone}</div><h2 className="mb-2 text-sm font-semibold">{service.service}</h2><p className="text-sm leading-relaxed">{service.why}</p><button onClick={() => setSelected(null)} className="mt-3 text-xs text-muted-foreground underline">Clear selection</button></section> : <p className="text-xs leading-relaxed text-muted-foreground">Select any service to see its job and why it belongs here. Move nodes to explore the relationships; reset restores the layout.</p>}</div>
-          <section><h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Compass className="size-4" />Follow the flow</h2><div className="space-y-2">{map.steps.map((s, i) => <button key={s.title} onClick={() => { setStep(step === i ? null : i); setSelected(null) }} aria-pressed={step === i} className={cn('w-full rounded-xl border p-3 text-left transition-colors', step === i ? 'border-foreground/30 bg-muted' : 'hover:bg-muted/40')}><span className="flex items-center gap-2 text-xs font-medium"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background text-[10px]">{step === i ? <Check size={12} /> : i + 1}</span>{s.title}</span>{step === i && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{s.description}</p>}</button>)}</div></section>
-          {bad && <section><h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-bad"><ShieldAlert className="size-4" />Where the design breaks</h2>{map.pitfalls.map(p => <div key={p.title} className="mb-3 rounded-xl border border-bad/25 bg-bad/5 p-3"><h3 className="mb-2 text-xs font-medium">{p.title}</h3><p className="text-xs leading-relaxed text-muted-foreground">{p.description}</p></div>)}</section>}
-          <section><h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><BookOpen className="size-4" />Read the source</h2>{map.sources.map(s => <a key={s.url} href={s.url} target="_blank" rel="noreferrer" className="mb-3 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground hover:text-foreground"><ExternalLink className="mt-0.5 size-3 shrink-0" aria-hidden />{s.title}<span className="sr-only"> (AWS documentation, opens in a new tab)</span></a>)}<p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">Reference design, reviewed September 2026. Supporting IAM, observability and deployment configuration are simplified to keep the main flow legible.</p></section>
+        }}>{TABS.map(t => <button key={t.id} id={`${uid}-tab-${t.id}`} role="tab" aria-selected={tab === t.id} aria-controls={`${uid}-panel-${t.id}`} tabIndex={tab === t.id ? 0 : -1} onClick={() => setTab(t.id)} className={cn('pressable flex-1 rounded-md px-3 py-1.5 text-[13px] transition-colors duration-100', tab === t.id ? 'bg-accent font-medium' : 'text-muted-foreground hover:text-foreground')}>{t.label}</button>)}</div>
+        {tab === 'notes' ? <div className="p-5" {...panel('notes')}><h2 className="eyebrow mb-2">Your observations</h2><p id={`${uid}-notes-hint`} className="mb-4 text-xs leading-relaxed text-muted-foreground">Write the distinction you want to remember. Saved with your study progress.</p><Notes noteKey={`map:${map.id}`} label="Architecture notes" placeholder="Why a queue here? What changes if…" className="min-h-64" describedBy={`${uid}-notes-hint`} /></div> : <div className="space-y-6 p-5" {...panel('guide')}>
+          <div aria-live="polite">{service ? <section className="rise rounded-lg border bg-muted/40 p-4"><div className="eyebrow mb-2">{service.zone}</div><h2 className="mb-2 text-sm font-medium tracking-tight">{service.service}</h2><p className="text-[13px] leading-relaxed">{service.why}</p><button onClick={() => setSelected(null)} className="pressable mt-3 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">Clear selection</button></section> : <p className="text-xs leading-relaxed text-muted-foreground">Select any service to see its job and why it belongs here. Move nodes to explore the relationships; reset restores the layout.</p>}</div>
+          <section><h2 className="eyebrow mb-3 flex items-center gap-2"><Compass className="size-3.5" />Follow the flow</h2><div className="space-y-1.5">{map.steps.map((s, i) => <button key={s.title} onClick={() => { setStep(step === i ? null : i); setSelected(null) }} aria-pressed={step === i} className={cn('pressable w-full rounded-lg border p-3 text-left', step === i ? 'border-border-strong bg-accent/60' : 'hover:border-border-strong hover:bg-accent/30')}><span className="flex items-center gap-2 text-xs font-medium"><span className="mono flex size-5 shrink-0 items-center justify-center rounded-full border bg-background text-[10px]">{step === i ? <Check size={11} strokeWidth={3} /> : i + 1}</span>{s.title}</span>{step === i && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{s.description}</p>}</button>)}</div></section>
+          {bad && <section><h2 className="eyebrow mb-3 flex items-center gap-2 text-bad"><ShieldAlert className="size-3.5" />Where the design breaks</h2>{map.pitfalls.map(p => <div key={p.title} className="rise mb-2 rounded-lg border border-bad/30 bg-bad/5 p-3"><h3 className="mb-2 text-xs font-medium">{p.title}</h3><p className="text-xs leading-relaxed text-muted-foreground">{p.description}</p></div>)}</section>}
+          <section><h2 className="eyebrow mb-3 flex items-center gap-2"><BookOpen className="size-3.5" />Read the source</h2>{map.sources.map(s => <a key={s.url} href={s.url} target="_blank" rel="noreferrer" className="mb-3 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground hover:text-foreground"><ExternalLink className="mt-0.5 size-3 shrink-0" aria-hidden />{s.title}<span className="sr-only"> (AWS documentation, opens in a new tab)</span></a>)}<p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">Reference design, reviewed September 2026. Supporting IAM, observability and deployment configuration are simplified to keep the main flow legible.</p></section>
         </div>}
       </div>
     </div>
-    <div className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><GitBranch className="mt-0.5 size-4 shrink-0" />Try explaining this application aloud: where is state durable, what retries, what fails together, and which requirement would make you choose a different service?</div>
+    <div className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><GitBranch className="mt-0.5 size-3.5 shrink-0" />Try explaining this application aloud: where is state durable, what retries, what fails together, and which requirement would make you choose a different service?</div>
   </div>
 }
 
 export function ArchitectureMap({ id }: { id: string }) {
   const map = mapData.find(m => m.id === id)
-  if (!map) return <div className="mx-auto max-w-2xl"><PageHeader title="Map not found" description="That architecture map does not exist. It may have been renamed." /><Link to="/maps" className="text-sm underline">Back to architecture maps</Link></div>
+  if (!map) return <div className="mx-auto max-w-2xl"><PageHeader title="Map not found" description="That architecture map does not exist. It may have been renamed." /><QuietLink to="/maps">Back to architecture maps</QuietLink></div>
   return <ReactFlowProvider key={id}><Canvas map={map} /></ReactFlowProvider>
 }

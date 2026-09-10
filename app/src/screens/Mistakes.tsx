@@ -8,7 +8,6 @@ import QuestionView from '@/components/QuestionView'
 import { toggleChoice } from '@/components/Filters'
 import { PageHeader, DomainBadge, Nothing, QuietLink, Stat, StatRow } from '@/components/parts'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -55,16 +54,16 @@ export default function Mistakes() {
         actions={
           <Tabs value={view} onValueChange={(v) => setView(v as 'open' | 'all')}>
             <TabsList>
-              <TabsTrigger value="open">Open {openCount}</TabsTrigger>
-              <TabsTrigger value="all">All {Object.keys(mistakes).length}</TabsTrigger>
+              <TabsTrigger value="open">Open <span className="mono ml-1 text-muted-foreground">{openCount}</span></TabsTrigger>
+              <TabsTrigger value="all">All <span className="mono ml-1 text-muted-foreground">{Object.keys(mistakes).length}</span></TabsTrigger>
             </TabsList>
           </Tabs>
         }
       />
 
       {sureWrong > 0 && (
-        <p className="mb-4 rounded-2xl border border-bad/40 bg-bad/5 px-4 py-2.5 text-sm">
-          <span className="font-medium text-bad">{sureWrong} answered "sure" and wrong.</span> Those are listed first — a confident wrong answer on the real exam costs the same as a guess but you won't flag it for review.
+        <p className="mb-4 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-[13px] leading-relaxed">
+          <span className="font-medium text-bad">{sureWrong} answered "sure" and wrong.</span> Listed first. A confident wrong answer on the real exam costs the same as a guess, but you won't flag it for review.
         </p>
       )}
       {openCount > 0 && (
@@ -80,36 +79,39 @@ export default function Mistakes() {
           Wrong answers from drills and mocks land here on their own. <Link to="/drill" className="underline underline-offset-4">Run a drill</Link>.
         </Nothing>
       ) : (
-        <div className="grid gap-3">
+        <div className="stagger grid gap-3">
           {rows.map(({ q, meta, chosen: prevChosen, confidence }) => {
             const lec = lectureById[q.lecture]
             const isRetrying = retrying === q.id
             return (
-              <Card key={q.id} className={cn(meta.resolved && 'opacity-60')}>
-                <CardContent>
-                  <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+              <article key={q.id} className={cn('overflow-hidden rounded-xl border bg-card transition-opacity duration-200', meta.resolved && 'opacity-55')}>
+                <div className="p-5">
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
                     <DomainBadge id={q.domain} />
-                    {lec && <QuietLink to={questionHref(q)} className="text-xs">{lectureNo(q.lecture)} {lec.title}</QuietLink>}
-                    {confidence === 'sure' && <span className="text-bad">was sure</span>}
-                    {confidence === 'guess' && <span className="text-muted-foreground">guessed</span>}
-                    {meta.resolved && <span className="text-good">resolved</span>}
-                    <button type="button" className="ml-auto text-muted-foreground hover:text-foreground" onClick={() => clearMistake(q.id)}>Remove</button>
+                    {lec && <QuietLink to={questionHref(q)} className="text-xs"><span className="mono">{lectureNo(q.lecture)}</span> {lec.title}</QuietLink>}
+                    {confidence === 'sure' && <span className="eyebrow text-bad">was sure</span>}
+                    {confidence === 'guess' && <span className="eyebrow">guessed</span>}
+                    {meta.resolved && <span className="eyebrow text-good">resolved</span>}
+                    <button type="button" className="pressable ml-auto text-xs text-muted-foreground hover:text-foreground" onClick={() => clearMistake(q.id)}>Remove</button>
                   </div>
 
                   {isRetrying ? (
                     <QuestionView q={q} chosen={chosen} revealed={revealed} showMeta={false} onToggle={(idx) => setChosen((c) => toggleChoice(c, idx, isMulti(q)))} />
                   ) : (
                     <>
-                      <p className="text-sm leading-relaxed">{q.stem}</p>
+                      <p className="text-[14px] leading-relaxed font-medium tracking-tight">{q.stem}</p>
                       <details className="group mt-3">
-                        <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">Show answer and reasoning</summary>
-                        <div className="rise mt-3">
+                        <summary className="cursor-pointer list-none text-xs text-muted-foreground transition-colors duration-100 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                          <span className="group-open:hidden">Show answer and reasoning</span>
+                          <span className="hidden group-open:inline">Hide answer</span>
+                        </summary>
+                        <div className="rise mt-4">
                           <QuestionView q={q} chosen={prevChosen} revealed onToggle={() => {}} showMeta={false} />
                         </div>
                       </details>
 
-                      <div className="mt-4 grid gap-3 border-t pt-4">
-                        <div className="text-xs text-muted-foreground">Why did I miss it?</div>
+                      <div className="mt-5 grid gap-3 border-t pt-4">
+                        <div className="eyebrow">Why did I miss it</div>
                         <ToggleGroup
                           variant="outline"
                           size="sm"
@@ -118,7 +120,7 @@ export default function Mistakes() {
                         >
                           {REASONS.map((r) => (
                             <Tooltip key={r.id}>
-                              <TooltipTrigger render={<ToggleGroupItem value={r.id} />}>{r.label}</TooltipTrigger>
+                              <TooltipTrigger render={<ToggleGroupItem value={r.id} className="px-2.5 text-[13px] font-normal data-pressed:font-medium" />}>{r.label}</TooltipTrigger>
                               <TooltipContent>{r.hint}</TooltipContent>
                             </Tooltip>
                           ))}
@@ -127,13 +129,13 @@ export default function Mistakes() {
                           value={meta.note ?? ''}
                           onChange={(e) => setMistakeMeta(q.id, { note: e.target.value })}
                           placeholder="One line: what will you check for next time?"
-                          className="min-h-14"
+                          className="min-h-14 text-[13px]"
                         />
                       </div>
                     </>
                   )}
-                </CardContent>
-                <CardFooter className="gap-2 border-t">
+                </div>
+                <div className="flex flex-wrap items-center gap-2 border-t bg-muted/40 px-5 py-2.5">
                   {isRetrying ? (
                     <>
                       <Button variant="outline" size="sm" onClick={stopRetry}>Close</Button>
@@ -148,14 +150,14 @@ export default function Mistakes() {
                   ) : (
                     <>
                       <Button size="sm" variant="outline" onClick={() => { setRetrying(q.id); setChosen([]); setRevealed(false) }}>Retry blind</Button>
-                      <Button render={<Link to={`/drill?lecture=${q.lecture}`} />} size="sm" variant="ghost">Drill this lecture</Button>
+                      <Button render={<Link to={`/drill?lecture=${q.lecture}`} />} size="sm" variant="ghost" className="text-muted-foreground">Drill this lecture</Button>
                       <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setMistakeMeta(q.id, { resolved: !meta.resolved })}>
                         {meta.resolved ? 'Reopen' : 'Mark understood'}
                       </Button>
                     </>
                   )}
-                </CardFooter>
-              </Card>
+                </div>
+              </article>
             )
           })}
         </div>

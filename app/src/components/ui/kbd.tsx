@@ -8,7 +8,7 @@ export function Kbd({
   return (
     <kbd
       className={cn(
-        "pointer-events-none inline-flex h-5 min-w-5 select-none items-center justify-center gap-1 rounded-[.25rem] bg-muted px-1 font-medium font-sans text-muted-foreground text-xs [&_svg:not([class*='size-'])]:size-3",
+        "pointer-events-none inline-flex h-[18px] min-w-[18px] select-none items-center justify-center gap-1 rounded-[4px] border border-border bg-background px-1 font-medium font-mono text-[10.5px] text-muted-foreground shadow-[0_1px_0_--theme(--color-black/4%)] dark:bg-muted dark:shadow-none [&_svg:not([class*='size-'])]:size-3",
         className,
       )}
       data-slot="kbd"
