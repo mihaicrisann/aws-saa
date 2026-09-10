@@ -5,3 +5,10 @@ app/node_modules/
 *.local
 notes/progress*.json
 *.tsbuildinfo
+.next/
+.env
+.env.*
+!.env.example
+app/coverage/
+test-results/
+playwright-report/

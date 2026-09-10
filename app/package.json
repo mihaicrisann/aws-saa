@@ -4,31 +4,46 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "next dev --port 5180",
+    "build": "next build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "next start --port 5180",
+    "start": "next start --port 5180",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "owner:provision": "tsx scripts/provision-owner.ts",
+    "tools:build": "esbuild scripts/migrate.ts scripts/provision-owner.ts --bundle --platform=node --target=node24 --format=esm --outdir=.next/tools --out-extension:.js=.mjs --external:pg --external:pg-native"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "@better-auth/drizzle-adapter": "^1.7.4",
     "@fontsource-variable/inter": "^5.3.0",
+    "@xyflow/react": "^12.11.6",
+    "better-auth": "^1.7.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.32.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.2",
-    "tailwind-merge": "^3.6.0"
+    "next": "^16.3.4",
+    "pg": "^8.23.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.6.1"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.13.3",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.4",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.28.2",
     "oxlint": "^1.75.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
     "typescript": "~6.0.2",
-    "vite": "^8.2.0"
+    "vitest": "^5.0.0"
   }
 }
