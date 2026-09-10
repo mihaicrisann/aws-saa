@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button'
 import { DomainBadge } from './parts'
 import { cn } from '@/lib/utils'
 
-const LETTERS = 'ABCDEFGH'
-
 /** A ready-to-paste prompt for the /explain skill in the terminal. */
 export function askPrompt(q: Question, chosen: number[]) {
   const mark = (i: number) => (q.correct.includes(i) ? ' (correct)' : chosen.includes(i) ? ' (my answer)' : '')
@@ -16,7 +14,7 @@ export function askPrompt(q: Question, chosen: number[]) {
     `/explain I got this SAA question wrong. Explain the reasoning and what cue I missed.`,
     ``,
     q.stem,
-    ...q.options.map((o, i) => `${LETTERS[i]}. ${o}${mark(i)}`),
+    ...q.options.map((o, i) => `${i + 1}. ${o}${mark(i)}`),
   ].join('\n')
 }
 
@@ -80,7 +78,7 @@ export default function QuestionView({
                   tone === 'idle' && 'text-muted-foreground',
                 )}
               >
-                {tone === 'right' ? <Check className="size-3" /> : tone === 'wrong' ? <X className="size-3" /> : LETTERS[i]}
+                {tone === 'right' ? <Check className="size-3" /> : tone === 'wrong' ? <X className="size-3" /> : i + 1}
               </span>
               <span className="min-w-0 flex-1">{opt}</span>
               {revealed && (picked || right) && (
@@ -97,7 +95,7 @@ export default function QuestionView({
         <div className="rise mt-5 grid gap-3">
           <div className="rounded-2xl border-l-2 border-good bg-muted/40 px-4 py-3">
             <div className="text-xs font-medium text-good">
-              Why {q.correct.map((i) => LETTERS[i]).join(' + ')}
+              Why {q.correct.map((i) => i + 1).join(' + ')}
             </div>
             <p className="mt-1 text-sm leading-relaxed">{q.explanation}</p>
           </div>
@@ -108,7 +106,7 @@ export default function QuestionView({
                 {q.distractors.map((d, i) =>
                   d ? (
                     <li key={i} className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
-                      <span className="w-4 shrink-0 font-medium text-foreground">{LETTERS[i]}</span>
+                      <span className="w-4 shrink-0 font-medium text-foreground">{i + 1}</span>
                       <span>{d}</span>
                     </li>
                   ) : null,

@@ -45,7 +45,7 @@ try {
   await page.goto(base + '/drill', { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: 'Start' }).click()
   await page.keyboard.press('1'); await page.keyboard.press('s'); await page.keyboard.press('Enter'); await page.waitForTimeout(300)
-  check((await page.locator('text=/Why [A-E]/').count()) === 1, 'drill: explanation not revealed')
+  check((await page.locator('text=/Why [1-8]/').count()) === 1, 'drill: explanation not revealed')
   await page.keyboard.press('Enter'); await page.waitForTimeout(300)
   check((await page.locator('text=2/10').count()) === 1, 'drill: Enter did not advance')
 
