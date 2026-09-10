@@ -3,9 +3,9 @@
 A workspace for getting from zero to certified. Four zones: **read**, **recall**, **test**, **fix what you got wrong**.
 
 ```
-lectures/     19 standalone HTML lectures — open in a browser, or read them in the app
-app/          the study app: reader, flashcards, drills, mock exam, mistake log, progress
-content/      the data behind all of it — curriculum, 313 questions, 150 cards, cheat sheet
+lectures/     21 standalone HTML lectures — open in a browser, or read them in the app
+app/          the study app: reader, flashcards, drills, mock exam, maps, mistakes, progress
+content/      the data behind all of it — curriculum, two question banks, cards, maps, cheat sheet
 notes/        yours: concepts you asked about, a mistake log, a session journal
 .claude/      eight small skills that compose into whatever study flow you want
 ```
@@ -17,29 +17,31 @@ npm run setup     # installs the app and builds the lectures (once)
 npm run dev       # http://localhost:5180
 ```
 
-That is the whole setup. Everything is local — no backend, no account, no network calls except web fonts for the standalone lectures. The UI is shadcn/ui, neutral and minimal.
+The app is Next.js with a PostgreSQL database behind a single private account, so progress follows you between browsers and machines. Local development needs `DATABASE_URL`, `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` in `app/.env.local`, then `npm --prefix app run db:migrate` and `npm --prefix app run owner:provision`. The standalone lectures still work with no server at all.
 
-**Where progress lives:** in the browser's `localStorage`, and — while `npm run dev` runs — mirrored to `notes/progress.json` on every change and restored from there if the browser is empty. `/study-plan` reads that file directly.
+**Where progress lives:** in PostgreSQL, keyed to your account. Unsaved changes are held in the browser until they are written, so a dropped connection does not lose answers. Export from **Progress → Export** to hand a snapshot to `/study-plan`.
 
 ---
 
 ## The zones
 
 ### 1. Learn — `/learn`
-Nineteen lectures, about five hours of reading, ordered so each one only assumes the ones before it. Each has two or three architecture diagrams drawn in the design system, self-checks, and six takeaways.
+Twenty-one lectures, about five hours of reading, ordered so each one only assumes the ones before it. Each has two or three architecture diagrams drawn in the design system, self-checks, and six takeaways.
 
 They are **real HTML files**. Open `lectures/index.html` directly in a browser and they work standalone — light/dark toggle, scroll progress, the lot. The app reads the same files, so there is one copy of the truth.
 
 Notes you take in the reader are saved per lecture.
 
 ### 2. Recall — `/cards`
-150 flashcards with spaced repetition. Flip with **space**, rate with **1–4**. What you rate *Good* comes back in days rather than minutes, so the deck shrinks as things stick. Filter by domain or by lecture.
+162 flashcards with spaced repetition. Flip with **space**, rate with **1–4**. What you rate *Good* comes back in days rather than minutes, so the deck shrinks as things stick. Filter by domain or by lecture.
 
 ### 3. Test — `/drill` and `/exam`
 
 **Drill** is testing *combined with* learning: 5 to 40 questions, filtered by domain or lecture, with the full reasoning — including why every wrong option is wrong — immediately after each answer. Before checking you say how sure you are (`s` / `u` / `g`); "sure and wrong" is tracked separately because it is the most dangerous kind of miss. Each question is timed, links to the exact lecture section that answers it, and has an "Ask Claude about this" button that copies a ready `/explain` prompt for the terminal.
 
 **Mock exam** is testing under exam conditions: 65 questions in 130 minutes, a live countdown, a question navigator, flags, no feedback until you submit, then a full review pass. Questions are drawn to the **real exam's domain weights** (30/26/24/20), not the bank's own distribution. Half and quick modes exist for when you have less time.
+
+Both come in two banks. **Original** is the full exam-level set across every lecture. **Hard** is 100 nastier scenarios with a sourced explanation on every question. Results are kept apart, so easy practice never flatters your hard-mode readiness.
 
 Both feed the same progress store.
 
@@ -48,6 +50,7 @@ Every wrong answer lands here automatically. Tag *why* you missed it — knowled
 
 ### Supporting
 
+- **`/maps`** — six reference architectures on a pan-and-zoom canvas. Click a service to see what it does there and what it costs you; trace a request or an event through the whole path; toggle the bad version of each design to see what breaks. Every claim links to AWS documentation, and your notes save per map.
 - **`/cheatsheet`** — searchable: keyword→service map, the confusion pairs, hard numbers, and the answer shapes that are automatically wrong. Search it mid-drill.
 - **`/progress`** — readiness by domain, accuracy per lecture worst-first (your re-reading order), calibration (accuracy when "sure" vs "guessing"), pace, exam history, a 12-week activity calendar. Export/import as JSON.
 - **Search** — `/` or `⌘K` searches every lecture section and the cheat sheet, and jumps to the exact section.
@@ -88,8 +91,15 @@ They combine. `/explain` → `/add-card` → `/quiz-me` is one flow. `/study-pla
 
 ```bash
 npm run check      # content: ids, references, anchors, distractor coverage, per-lecture minimums
+npm run check:v2   # the hard bank: sources, distractors, distribution, answer-length cues
 npm run test:ui    # builds the app and drives every page + shortcut in headless Chromium
 npm test           # both
+```
+
+Unit tests for progress merging, conflict handling and recovery live in the app:
+
+```bash
+npm --prefix app run test
 ```
 
 ## Commands
@@ -98,18 +108,20 @@ npm test           # both
 npm run dev        # study app on :5180
 npm run lectures   # rebuild lectures/*.html from lectures/_src/
 npm run check      # validate every content file
-npm run build      # production build into app/dist/
+npm run build      # production build
 ```
+
+Deployment, environment, migrations and backups: [docs/deployment.md](docs/deployment.md).
 
 ## Adding content
 
-Everything is data. `content/curriculum.json` defines the lectures and the domain weights; `content/questions.json` and `content/flashcards.json` are flat arrays; `content/cheatsheet.json` drives the reference page. Add to any of them and the app picks it up — `npm run check` will tell you if you got the shape wrong.
+Everything is data. `content/curriculum.json` defines the lectures and the domain weights; `content/questions.json`, `content/questions-v2.json` and `content/flashcards.json` are flat arrays; `content/cheatsheet.json` drives the reference page; `content/architecture-maps.json` holds the maps. Add to any of them and the app picks it up — `npm run check` will tell you if you got the shape wrong.
 
 Lectures live as body fragments in `lectures/_src/`. `npm run lectures` wraps them into complete standalone pages with the masthead, navigation and index.
 
 ## Where your progress lives
 
-Browser local storage, on this machine. **Progress → Export** writes a JSON file — do that before clearing site data, or to move to another machine, or to hand to `/study-plan`.
+PostgreSQL, keyed to your account, so it follows you to any browser you sign in from. **Progress → Export** writes a JSON file — do that before anything drastic, or to hand a snapshot to `/study-plan`.
 
 ## The exam
 
@@ -117,4 +129,4 @@ Browser local storage, on this machine. **Progress → Export** writes a JSON fi
 
 Domains: Secure 30% · Resilient 26% · High-Performing 24% · Cost-Optimized 20%.
 
-Six-week plan: `STUDY-PLAN.md`. Exam tactics: [lecture 19](lectures/19-exam-playbook.html).
+Six-week plan: `STUDY-PLAN.md`. Exam tactics: [the exam playbook](lectures/19-exam-playbook.html), the last lecture.
