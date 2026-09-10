@@ -275,3 +275,6 @@
 
 /* thin, quiet scrollbars inside panels */
 .quiet-scroll { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+/* toasts arrive from just below and leave by fading; nothing here blocks the page */
+.toast-enter { animation: rise 240ms var(--ease-out) both; }

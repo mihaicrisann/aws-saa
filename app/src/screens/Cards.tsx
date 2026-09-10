@@ -11,6 +11,9 @@ import { PageHeader, DomainBadge, Nothing, Meter, QuietLink, Choice } from '@/co
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
+import { XP } from '@/lib/game'
+import { XpEarned } from '@/components/Game'
+import { StatRow, Stat } from '@/components/parts'
 
 const GRADES: { g: Grade; label: string; key: string; tint: string }[] = [
   { g: 0, label: 'Again', key: '1', tint: 'hover:border-bad/60 hover:text-bad' },
@@ -124,6 +127,10 @@ export default function Cards() {
           title={<><span className="mono">{done}</span> card{done === 1 ? '' : 's'} reviewed</>}
           description="Good and Easy come back in days, so the deck shrinks as things stick."
         />
+        <StatRow className="mb-4 grid-cols-2 sm:grid-cols-2">
+          <Stat label="Reviewed" value={done} hint={`${dueTotal} still due`} />
+          <XpEarned earned={done * XP.card} />
+        </StatRow>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setQueue(null)}>Pick another slice</Button>
           <Button render={<Link to="/drill" />}>Drill questions</Button>

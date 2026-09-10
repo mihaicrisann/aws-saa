@@ -11,6 +11,8 @@ import { useStore, setTheme } from '@/lib/store'
 import { useHotkeys } from '@/lib/hotkeys'
 import Search from '@/components/Search'
 import { SyncStatus, AccountMenu } from '@/components/AuthGate'
+import { LevelCard, useGameToasts } from '@/components/Game'
+import { Toasts } from '@/components/Toast'
 import { cn } from '@/lib/utils'
 
 export const NAV = [
@@ -56,6 +58,7 @@ export default function Shell({ children }: { children: ReactNode }) {
     try { localStorage.setItem(SIDEBAR_KEY, next ? 'collapsed' : 'open') } catch { /* ignore */ }
   }
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark')
+  useGameToasts()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -115,6 +118,8 @@ export default function Shell({ children }: { children: ReactNode }) {
             <span className="flex-1 text-left">Search</span>
             <Kbd>/</Kbd>
           </button>
+
+          <LevelCard />
 
           <nav className="relative mt-4 flex flex-col gap-0.5" aria-label="Sections">
             {activeIndex >= 0 && (
@@ -200,6 +205,7 @@ export default function Shell({ children }: { children: ReactNode }) {
       </main>
 
       <Search open={search} onOpenChange={setSearch} />
+      <Toasts />
 
       <Dialog open={help} onOpenChange={setHelp}>
         <DialogPopup className="sm:max-w-md">
