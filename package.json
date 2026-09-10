@@ -9,6 +9,7 @@
     "preview": "npm --prefix app run preview",
     "lectures": "node lectures/_assets/build.mjs",
     "check": "node scripts/check-content.mjs",
+    "check:v2": "node scripts/check-v2.mjs",
     "setup": "npm install && npm --prefix app install && npx playwright install chromium && npm run lectures",
     "test:ui": "node scripts/smoke.mjs",
     "test": "npm run check && npm run test:ui"

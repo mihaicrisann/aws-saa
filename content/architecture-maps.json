@@ -1,0 +1,1022 @@
+[
+  {
+    "id": "order-checkout",
+    "title": "An online shop",
+    "subtitle": "Accept orders during a flash sale without making checkout wait for fulfillment.",
+    "category": "Serverless",
+    "nodes": [
+      {
+        "id": "buyer",
+        "service": "Customer",
+        "role": "Place an order",
+        "why": "The client sends a request ID so retried clicks can be recognized.",
+        "zone": "Internet",
+        "x": 0,
+        "y": 120
+      },
+      {
+        "id": "api",
+        "service": "API Gateway",
+        "role": "Authenticated HTTPS API",
+        "why": "Validates the request boundary; authentication still needs an authorizer and application authorization.",
+        "zone": "Regional API",
+        "x": 300,
+        "y": 120
+      },
+      {
+        "id": "accept",
+        "service": "Lambda",
+        "role": "Validate and accept",
+        "why": "Checks stock/business rules and writes a durable order. It returns acceptance, not a claim that shipping is finished.",
+        "zone": "Compute",
+        "x": 600,
+        "y": 120
+      },
+      {
+        "id": "orders",
+        "service": "DynamoDB",
+        "role": "Order + outbox record",
+        "why": "A transaction stores the order and event record together, avoiding a database write followed by an unreliable separate publish.",
+        "zone": "Durable state",
+        "x": 900,
+        "y": 120
+      },
+      {
+        "id": "stream",
+        "service": "DynamoDB Streams + Lambda",
+        "role": "Publish accepted orders",
+        "why": "A stream consumer publishes outbox changes to EventBridge. Retries mean consumers must handle duplicate business events.",
+        "zone": "Integration",
+        "x": 900,
+        "y": 400
+      },
+      {
+        "id": "bus",
+        "service": "EventBridge",
+        "role": "Route domain events",
+        "why": "Routes OrderAccepted events to independently managed subscribers. It is not the order database.",
+        "zone": "Integration",
+        "x": 600,
+        "y": 400
+      },
+      {
+        "id": "queue",
+        "service": "SQS",
+        "role": "Buffer fulfillment work",
+        "why": "The queue absorbs spikes; worker concurrency is limited to downstream capacity. Failed messages go to a dead-letter queue.",
+        "zone": "Integration",
+        "x": 300,
+        "y": 400
+      },
+      {
+        "id": "worker",
+        "service": "Lambda worker",
+        "role": "Reserve and fulfill",
+        "why": "Uses the order ID to make side effects idempotent. Payments require their own idempotency and reconciliation.",
+        "zone": "Compute",
+        "x": 0,
+        "y": 400
+      }
+    ],
+    "edges": [
+      {
+        "source": "buyer",
+        "target": "api",
+        "label": "HTTPS"
+      },
+      {
+        "source": "api",
+        "target": "accept",
+        "label": "invoke"
+      },
+      {
+        "source": "accept",
+        "target": "orders",
+        "label": "transaction"
+      },
+      {
+        "source": "orders",
+        "target": "stream",
+        "label": "changes"
+      },
+      {
+        "source": "stream",
+        "target": "bus",
+        "label": "publish"
+      },
+      {
+        "source": "bus",
+        "target": "queue",
+        "label": "route"
+      },
+      {
+        "source": "queue",
+        "target": "worker",
+        "label": "poll + retry"
+      }
+    ],
+    "steps": [
+      {
+        "title": "Accept durably",
+        "description": "Trace one order from the browser to its committed record. A successful HTTP response means the order was accepted.",
+        "nodes": [
+          "buyer",
+          "api",
+          "accept",
+          "orders"
+        ]
+      },
+      {
+        "title": "Separate acceptance from work",
+        "description": "An outbox/stream path moves the event toward fulfillment after the transaction. Design for repeated delivery.",
+        "nodes": [
+          "orders",
+          "stream",
+          "bus"
+        ]
+      },
+      {
+        "title": "Absorb the sale",
+        "description": "A backlog may grow safely while workers stay within downstream limits. Monitor message age, not only queue size.",
+        "nodes": [
+          "queue",
+          "worker"
+        ]
+      }
+    ],
+    "pitfalls": [
+      {
+        "title": "Bad: synchronous checkout chain",
+        "description": "Calling inventory, payment, shipping and email serially ties the user request to every dependency and complicates recovery after partial success.",
+        "nodes": [
+          "accept",
+          "worker"
+        ]
+      },
+      {
+        "title": "Bad: treating delivery as exactly once",
+        "description": "A retried worker can charge or reserve twice unless the business operation has an idempotency key.",
+        "nodes": [
+          "queue",
+          "worker"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "Event-driven Lambda architectures",
+        "url": "https://docs.aws.amazon.com/lambda/latest/dg/concepts-event-driven-architectures.html"
+      },
+      {
+        "title": "Transactional outbox pattern",
+        "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+      }
+    ]
+  },
+  {
+    "id": "container-saas",
+    "title": "A subscription web app",
+    "subtitle": "Run a conventional application across two availability zones with private data.",
+    "category": "Containers",
+    "nodes": [
+      {
+        "id": "user",
+        "service": "Browser",
+        "role": "Use the application",
+        "why": "TLS protects traffic in transit; user access is checked by the app.",
+        "zone": "Internet",
+        "x": 0,
+        "y": 120
+      },
+      {
+        "id": "alb",
+        "service": "Application Load Balancer",
+        "role": "HTTPS + routing",
+        "why": "Public subnets in two AZs; health checks choose healthy private task targets. WAF can filter malicious HTTP requests here.",
+        "zone": "Public subnets",
+        "x": 300,
+        "y": 120
+      },
+      {
+        "id": "a",
+        "service": "ECS Fargate · AZ A",
+        "role": "Application tasks",
+        "why": "Stateless tasks accept inbound traffic only from the ALB security group.",
+        "zone": "Private subnet A",
+        "x": 600,
+        "y": 0
+      },
+      {
+        "id": "b",
+        "service": "ECS Fargate · AZ B",
+        "role": "Application tasks",
+        "why": "A second AZ lets the service survive loss of one task location; desired capacity and scaling must be configured.",
+        "zone": "Private subnet B",
+        "x": 600,
+        "y": 280
+      },
+      {
+        "id": "db",
+        "service": "RDS PostgreSQL",
+        "role": "Writer database",
+        "why": "Private database security group permits only app traffic. Transactions enforce consistency for billing and subscriptions.",
+        "zone": "Private database A",
+        "x": 950,
+        "y": 0
+      },
+      {
+        "id": "standby",
+        "service": "RDS standby",
+        "role": "Automatic failover target",
+        "why": "This example uses a Multi-AZ DB instance with one standby. That standby does not serve application reads.",
+        "zone": "Private database B",
+        "x": 950,
+        "y": 280
+      },
+      {
+        "id": "secrets",
+        "service": "Secrets Manager",
+        "role": "Database credentials",
+        "why": "Task IAM roles retrieve scoped secrets; rotation needs application connection handling.",
+        "zone": "Regional service",
+        "x": 300,
+        "y": 440
+      },
+      {
+        "id": "egress",
+        "service": "NAT / VPC endpoints",
+        "role": "Reach dependencies",
+        "why": "NAT enables outbound internet access; endpoints provide private access to supported services. Neither makes the tasks public.",
+        "zone": "Network boundary",
+        "x": 600,
+        "y": 520
+      }
+    ],
+    "edges": [
+      {
+        "source": "user",
+        "target": "alb",
+        "label": "HTTPS"
+      },
+      {
+        "source": "alb",
+        "target": "a",
+        "label": "healthy target"
+      },
+      {
+        "source": "alb",
+        "target": "b",
+        "label": "healthy target"
+      },
+      {
+        "source": "a",
+        "target": "db",
+        "label": "SQL"
+      },
+      {
+        "source": "b",
+        "target": "db",
+        "label": "SQL"
+      },
+      {
+        "source": "db",
+        "target": "standby",
+        "label": "synchronous replication"
+      },
+      {
+        "source": "secrets",
+        "target": "a",
+        "label": "task role"
+      },
+      {
+        "source": "a",
+        "target": "egress",
+        "label": "outbound only"
+      }
+    ],
+    "steps": [
+      {
+        "title": "Follow a request",
+        "description": "The internet-facing ALB forwards to private task addresses. The tasks need no public IP for inbound load-balanced traffic.",
+        "nodes": [
+          "user",
+          "alb",
+          "a"
+        ]
+      },
+      {
+        "title": "Commit the subscription",
+        "description": "Both task groups use the database writer. Database failover and application reconnect behavior are separate concerns.",
+        "nodes": [
+          "a",
+          "b",
+          "db",
+          "standby"
+        ]
+      },
+      {
+        "title": "Survive an AZ failure",
+        "description": "Healthy tasks remain in the other AZ. A standby database may be promoted; clients must retry appropriate transient errors.",
+        "nodes": [
+          "alb",
+          "b",
+          "standby"
+        ]
+      }
+    ],
+    "pitfalls": [
+      {
+        "title": "Bad: use the standby for analytics",
+        "description": "The single standby in this deployment is for failover. A read replica or a different database deployment is needed for read scaling.",
+        "nodes": [
+          "standby"
+        ]
+      },
+      {
+        "title": "Bad: put everything in public subnets",
+        "description": "Public database access unnecessarily broadens exposure. Security groups, private addressing and least-privilege IAM form different boundaries.",
+        "nodes": [
+          "db",
+          "a",
+          "b"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "Inbound ECS networking",
+        "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/networking-inbound.html"
+      },
+      {
+        "title": "RDS Multi-AZ DB instances",
+        "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZSingleStandby.html"
+      },
+      {
+        "title": "Fargate networking",
+        "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+      }
+    ]
+  },
+  {
+    "id": "video-classroom",
+    "title": "A video learning platform",
+    "subtitle": "Upload once, produce streaming renditions, and deliver them near viewers.",
+    "category": "Media",
+    "nodes": [
+      {
+        "id": "teacher",
+        "service": "Instructor",
+        "role": "Upload a lesson",
+        "why": "An authenticated app grants a short-lived upload URL scoped to an object. Large video bytes go directly to S3.",
+        "zone": "Internet",
+        "x": 0,
+        "y": 100
+      },
+      {
+        "id": "input",
+        "service": "S3 source bucket",
+        "role": "Original media",
+        "why": "Private originals remain separate from delivery outputs; lifecycle rules can control retention costs.",
+        "zone": "Storage",
+        "x": 300,
+        "y": 100
+      },
+      {
+        "id": "trigger",
+        "service": "Lambda",
+        "role": "Submit encoding job",
+        "why": "An object event starts processing. Record job identity and handle duplicate notifications.",
+        "zone": "Compute",
+        "x": 600,
+        "y": 100
+      },
+      {
+        "id": "encode",
+        "service": "MediaConvert",
+        "role": "Encode renditions",
+        "why": "Produces formats and bitrates that suit target players. This is asynchronous work, not a request held open by the web server.",
+        "zone": "Media processing",
+        "x": 900,
+        "y": 100
+      },
+      {
+        "id": "output",
+        "service": "S3 output bucket",
+        "role": "Streaming segments",
+        "why": "Private origin stores the encoded assets. Access is limited to the intended distribution.",
+        "zone": "Storage",
+        "x": 900,
+        "y": 400
+      },
+      {
+        "id": "cdn",
+        "service": "CloudFront",
+        "role": "Cache and deliver",
+        "why": "Origin access control protects the S3 origin. Signed viewer URLs/cookies can enforce access to paid lessons.",
+        "zone": "Edge",
+        "x": 600,
+        "y": 400
+      },
+      {
+        "id": "viewer",
+        "service": "Student player",
+        "role": "Adaptive playback",
+        "why": "The player fetches the manifest and suitable segments as network conditions change.",
+        "zone": "Internet",
+        "x": 300,
+        "y": 400
+      }
+    ],
+    "edges": [
+      {
+        "source": "teacher",
+        "target": "input",
+        "label": "presigned upload"
+      },
+      {
+        "source": "input",
+        "target": "trigger",
+        "label": "object event"
+      },
+      {
+        "source": "trigger",
+        "target": "encode",
+        "label": "submit job"
+      },
+      {
+        "source": "encode",
+        "target": "output",
+        "label": "write outputs"
+      },
+      {
+        "source": "output",
+        "target": "cdn",
+        "label": "origin fetch"
+      },
+      {
+        "source": "cdn",
+        "target": "viewer",
+        "label": "manifest + segments"
+      }
+    ],
+    "steps": [
+      {
+        "title": "Upload without proxying bytes",
+        "description": "The app authorizes an upload; S3 receives the large file directly.",
+        "nodes": [
+          "teacher",
+          "input"
+        ]
+      },
+      {
+        "title": "Transform asynchronously",
+        "description": "An event starts an encoding job. Track failure and completion instead of treating upload success as playback readiness.",
+        "nodes": [
+          "input",
+          "trigger",
+          "encode",
+          "output"
+        ]
+      },
+      {
+        "title": "Deliver to viewers",
+        "description": "CloudFront caches encoded objects. Viewer authorization and origin protection solve different problems.",
+        "nodes": [
+          "output",
+          "cdn",
+          "viewer"
+        ]
+      }
+    ],
+    "pitfalls": [
+      {
+        "title": "Bad: public bucket for a paid library",
+        "description": "A signed CloudFront link does not protect a separately public S3 URL. Lock down the origin too.",
+        "nodes": [
+          "output",
+          "cdn"
+        ]
+      },
+      {
+        "title": "Bad: one huge original for every device",
+        "description": "Serving only an original file limits streaming adaptation and can waste bandwidth on constrained connections.",
+        "nodes": [
+          "input",
+          "viewer"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "Video on Demand reference implementation",
+        "url": "https://docs.aws.amazon.com/solutions/latest/video-on-demand-on-aws-foundation/solution-overview.html"
+      },
+      {
+        "title": "CloudFront video delivery",
+        "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/on-demand-streaming-video.html"
+      },
+      {
+        "title": "Restrict access to an S3 origin with OAC",
+        "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+      }
+    ]
+  },
+  {
+    "id": "analytics-lake",
+    "title": "Product analytics without a warehouse",
+    "subtitle": "Turn raw events into partitioned datasets and answer occasional SQL questions.",
+    "category": "Analytics",
+    "nodes": [
+      {
+        "id": "apps",
+        "service": "Product services",
+        "role": "Emit activity records",
+        "why": "Events carry stable IDs, event time and a schema version. Exclude unnecessary sensitive payloads.",
+        "zone": "Producers",
+        "x": 0,
+        "y": 120
+      },
+      {
+        "id": "delivery",
+        "service": "Amazon Data Firehose",
+        "role": "Batch delivery",
+        "why": "Buffers records before object delivery; this is a throughput/cost choice, not instant per-event query visibility.",
+        "zone": "Ingestion",
+        "x": 300,
+        "y": 120
+      },
+      {
+        "id": "raw",
+        "service": "S3 raw zone",
+        "role": "Retain source events",
+        "why": "An immutable source layer enables reprocessing when transformation logic changes.",
+        "zone": "Data lake",
+        "x": 600,
+        "y": 120
+      },
+      {
+        "id": "etl",
+        "service": "AWS Glue job",
+        "role": "Clean + compact",
+        "why": "Transforms data into analytics-friendly files and partitions. Validate schema evolution and late arrivals.",
+        "zone": "Processing",
+        "x": 900,
+        "y": 120
+      },
+      {
+        "id": "curated",
+        "service": "S3 curated zone",
+        "role": "Partitioned Parquet",
+        "why": "Columnar files and sensible partitioning reduce unnecessary reads. Too many tiny objects can hurt performance.",
+        "zone": "Data lake",
+        "x": 900,
+        "y": 420
+      },
+      {
+        "id": "catalog",
+        "service": "Glue Data Catalog",
+        "role": "Table metadata",
+        "why": "Describes where datasets live and their schemas; the catalog is not a second copy of the underlying records.",
+        "zone": "Metadata",
+        "x": 600,
+        "y": 420
+      },
+      {
+        "id": "athena",
+        "service": "Amazon Athena",
+        "role": "Run SQL over S3",
+        "why": "Good for intermittent exploration. Use partition predicates and workgroup controls; results also require governed storage.",
+        "zone": "Query",
+        "x": 300,
+        "y": 420
+      },
+      {
+        "id": "analyst",
+        "service": "Analyst",
+        "role": "Investigate behavior",
+        "why": "Query curated data with scoped access and handle personal-data retention obligations deliberately.",
+        "zone": "Consumer",
+        "x": 0,
+        "y": 420
+      }
+    ],
+    "edges": [
+      {
+        "source": "apps",
+        "target": "delivery",
+        "label": "records"
+      },
+      {
+        "source": "delivery",
+        "target": "raw",
+        "label": "buffered objects"
+      },
+      {
+        "source": "raw",
+        "target": "etl",
+        "label": "read"
+      },
+      {
+        "source": "etl",
+        "target": "curated",
+        "label": "write"
+      },
+      {
+        "source": "curated",
+        "target": "athena",
+        "label": "scan data"
+      },
+      {
+        "source": "catalog",
+        "target": "athena",
+        "label": "schema + locations"
+      },
+      {
+        "source": "athena",
+        "target": "analyst",
+        "label": "SQL results"
+      }
+    ],
+    "steps": [
+      {
+        "title": "Keep an original layer",
+        "description": "Ingestion creates recoverable source data before business transformations.",
+        "nodes": [
+          "apps",
+          "delivery",
+          "raw"
+        ]
+      },
+      {
+        "title": "Make reads efficient",
+        "description": "A transformation produces compact columnar datasets and useful partitions. Metadata describes the resulting files.",
+        "nodes": [
+          "raw",
+          "etl",
+          "curated",
+          "catalog"
+        ]
+      },
+      {
+        "title": "Ask focused questions",
+        "description": "Athena reads matching data from S3. Query cost and latency depend on the files actually scanned.",
+        "nodes": [
+          "catalog",
+          "curated",
+          "athena",
+          "analyst"
+        ]
+      }
+    ],
+    "pitfalls": [
+      {
+        "title": "Bad: a crawler is an ETL job",
+        "description": "Discovering schema does not clean records, rewrite them as Parquet or remove duplicates.",
+        "nodes": [
+          "catalog",
+          "etl"
+        ]
+      },
+      {
+        "title": "Bad: every dashboard scans every raw file",
+        "description": "Repeated full scans can be inefficient. Curate, partition and evaluate whether sustained analytics merits a warehouse.",
+        "nodes": [
+          "raw",
+          "athena"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS analytics decision guide",
+        "url": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/analytics-on-aws-how-to-choose.html"
+      },
+      {
+        "title": "Athena: partitioning, columnar formats and file size",
+        "url": "https://docs.aws.amazon.com/athena/latest/ug/performance-tuning-data-optimization-techniques.html"
+      },
+      {
+        "title": "Firehose delivery",
+        "url": "https://docs.aws.amazon.com/firehose/latest/dev/basic-deliver.html"
+      }
+    ]
+  },
+  {
+    "id": "hybrid-files",
+    "title": "A design studio with on-premises files",
+    "subtitle": "Keep the existing SMB workflow while storing file objects in S3.",
+    "category": "Hybrid",
+    "nodes": [
+      {
+        "id": "staff",
+        "service": "Design workstations",
+        "role": "Read and write files",
+        "why": "The existing application speaks SMB. It does not need to be rewritten to use an object API immediately.",
+        "zone": "Office",
+        "x": 0,
+        "y": 150
+      },
+      {
+        "id": "gateway",
+        "service": "S3 File Gateway",
+        "role": "Expose a file share",
+        "why": "Maps file operations to S3 objects and metadata. File semantics differ from a general-purpose shared POSIX filesystem.",
+        "zone": "Office appliance",
+        "x": 320,
+        "y": 150
+      },
+      {
+        "id": "cache",
+        "service": "Local cache disks",
+        "role": "Recently used + pending data",
+        "why": "Writes land locally before asynchronous upload. Monitor capacity and dirty cache during network outages.",
+        "zone": "Office disks",
+        "x": 320,
+        "y": 440
+      },
+      {
+        "id": "wan",
+        "service": "Network connection",
+        "role": "Transfer to AWS",
+        "why": "Bandwidth governs how fast the backlog drains. A private connection is not automatically encrypted end to end.",
+        "zone": "WAN",
+        "x": 640,
+        "y": 150
+      },
+      {
+        "id": "bucket",
+        "service": "Amazon S3",
+        "role": "Durable object storage",
+        "why": "Bucket policies and IAM constrain access. Versioning helps recover overwritten objects, subject to retention choices.",
+        "zone": "AWS Region",
+        "x": 960,
+        "y": 150
+      },
+      {
+        "id": "archive",
+        "service": "S3 lifecycle",
+        "role": "Age older objects",
+        "why": "Choose transitions based on retrieval needs and gateway support; archived data may need restoration before use.",
+        "zone": "Storage policy",
+        "x": 960,
+        "y": 440
+      }
+    ],
+    "edges": [
+      {
+        "source": "staff",
+        "target": "gateway",
+        "label": "SMB"
+      },
+      {
+        "source": "gateway",
+        "target": "cache",
+        "label": "local writes"
+      },
+      {
+        "source": "gateway",
+        "target": "wan",
+        "label": "HTTPS upload"
+      },
+      {
+        "source": "wan",
+        "target": "bucket",
+        "label": "objects"
+      },
+      {
+        "source": "bucket",
+        "target": "archive",
+        "label": "lifecycle rules"
+      }
+    ],
+    "steps": [
+      {
+        "title": "Keep the local interface",
+        "description": "The application continues to use a share. The gateway translates file activity into object storage operations.",
+        "nodes": [
+          "staff",
+          "gateway"
+        ]
+      },
+      {
+        "title": "Understand the acknowledgement",
+        "description": "A local write can finish before its upload to S3. Loss of the appliance before upload is a different failure from loss after upload.",
+        "nodes": [
+          "gateway",
+          "cache",
+          "wan",
+          "bucket"
+        ]
+      },
+      {
+        "title": "Match retention to retrieval",
+        "description": "Versioning and lifecycle have different jobs. Test recovery of old files with the configured storage classes.",
+        "nodes": [
+          "bucket",
+          "archive"
+        ]
+      }
+    ],
+    "pitfalls": [
+      {
+        "title": "Bad: call the local cache a backup",
+        "description": "The cache may contain the only copy of not-yet-uploaded data. It needs monitoring and protection against local failure.",
+        "nodes": [
+          "cache"
+        ]
+      },
+      {
+        "title": "Bad: assume unlimited offline writes",
+        "description": "An outage eventually exhausts local capacity if writes continue faster than uploads. Size the cache for realistic disruption.",
+        "nodes": [
+          "gateway",
+          "cache",
+          "wan"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "File Gateway requirements",
+        "url": "https://docs.aws.amazon.com/filegateway/latest/files3/Requirements.html"
+      },
+      {
+        "title": "Gateway cache metrics (CachePercentDirty)",
+        "url": "https://docs.aws.amazon.com/filegateway/latest/files3/monitoring-file-gateway.html"
+      },
+      {
+        "title": "S3 File Gateway documentation",
+        "url": "https://docs.aws.amazon.com/filegateway/latest/files3/what-is-file-s3.html"
+      }
+    ]
+  },
+  {
+    "id": "regional-recovery",
+    "title": "A booking app surviving a Region outage",
+    "subtitle": "Explore warm standby, replication lag and the order of recovery operations.",
+    "category": "Resilience",
+    "nodes": [
+      {
+        "id": "customers",
+        "service": "Customers",
+        "role": "Book and manage trips",
+        "why": "Clients reconnect through the public application endpoint after routing changes and DNS/cache delays.",
+        "zone": "Internet",
+        "x": 0,
+        "y": 180
+      },
+      {
+        "id": "dns",
+        "service": "Route 53",
+        "role": "Traffic routing",
+        "why": "Health checks can steer traffic, but routing alone does not promote a database or make an application ready.",
+        "zone": "Global DNS",
+        "x": 300,
+        "y": 180
+      },
+      {
+        "id": "primary",
+        "service": "Application · primary",
+        "role": "Serve production traffic",
+        "why": "Compute and dependencies run across AZs. Multi-AZ protects an AZ failure, not every Region-level failure.",
+        "zone": "Region A",
+        "x": 620,
+        "y": 0
+      },
+      {
+        "id": "writer",
+        "service": "Database · primary",
+        "role": "Accept writes",
+        "why": "Replicate to a compatible cross-Region secondary. The exact replication and failover behavior depends on the database product.",
+        "zone": "Region A",
+        "x": 950,
+        "y": 0
+      },
+      {
+        "id": "replica",
+        "service": "Database · secondary",
+        "role": "Replicate data",
+        "why": "Asynchronous replication can lag. Measure the business impact of losing recent writes during an unplanned promotion.",
+        "zone": "Region B",
+        "x": 950,
+        "y": 360
+      },
+      {
+        "id": "standby",
+        "service": "Application · standby",
+        "role": "Small working deployment",
+        "why": "Warm standby runs an operational reduced-capacity stack. It still needs scaling and dependency readiness before full load.",
+        "zone": "Region B",
+        "x": 620,
+        "y": 360
+      },
+      {
+        "id": "runbook",
+        "service": "Recovery runbook",
+        "role": "Promote, scale, validate",
+        "why": "Fence the old writer where possible, promote the secondary, configure the app, scale and test before routing users.",
+        "zone": "Operations",
+        "x": 300,
+        "y": 510
+      }
+    ],
+    "edges": [
+      {
+        "source": "customers",
+        "target": "dns",
+        "label": "resolve"
+      },
+      {
+        "source": "dns",
+        "target": "primary",
+        "label": "normal routing"
+      },
+      {
+        "source": "primary",
+        "target": "writer",
+        "label": "transactions"
+      },
+      {
+        "source": "writer",
+        "target": "replica",
+        "label": "async replication"
+      },
+      {
+        "source": "replica",
+        "target": "standby",
+        "label": "after promotion"
+      },
+      {
+        "source": "dns",
+        "target": "standby",
+        "label": "failover routing"
+      },
+      {
+        "source": "runbook",
+        "target": "standby",
+        "label": "recover + verify"
+      }
+    ],
+    "steps": [
+      {
+        "title": "Normal operation",
+        "description": "The primary serves users while data is copied to a secondary Region. Backups are still necessary for logical corruption.",
+        "nodes": [
+          "customers",
+          "dns",
+          "primary",
+          "writer",
+          "replica"
+        ]
+      },
+      {
+        "title": "Prepare the secondary",
+        "description": "Warm standby has working compute at reduced scale. Recovery promotes writable data and increases capacity.",
+        "nodes": [
+          "replica",
+          "standby",
+          "runbook"
+        ]
+      },
+      {
+        "title": "Move users after validation",
+        "description": "Traffic switching is one step in a tested runbook. Measure actual recovery time and lost-data exposure in drills.",
+        "nodes": [
+          "runbook",
+          "dns",
+          "standby",
+          "customers"
+        ]
+      }
+    ],
+    "pitfalls": [
+      {
+        "title": "Bad: DNS failover equals full recovery",
+        "description": "A healthy HTTP endpoint can still point at a read-only or stale database. Validate a business transaction before declaring recovery.",
+        "nodes": [
+          "dns",
+          "standby",
+          "replica"
+        ]
+      },
+      {
+        "title": "Bad: promise zero data loss from async replication",
+        "description": "A write acknowledged in the primary may not yet exist in the secondary. RPO is a requirement to engineer and test.",
+        "nodes": [
+          "writer",
+          "replica"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS disaster recovery strategies",
+        "url": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html"
+      },
+      {
+        "title": "RDS cross-Region replicas",
+        "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.XRgn.html"
+      }
+    ]
+  }
+]
