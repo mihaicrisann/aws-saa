@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Moon, Sun, Keyboard, PanelLeft, SearchIcon, LayoutGrid, BookOpen, Layers, Target, Timer, CircleX, ListChecks, TrendingUp } from 'lucide-react'
+'use client'
+
+import { useEffect, useState, ViewTransition, type ReactNode } from 'react'
+import { NavLink, useNavigate, useLocation } from '@/lib/navigation'
+import { Moon, Sun, Keyboard, PanelLeft, SearchIcon, LayoutGrid, BookOpen, Layers, Target, Timer, CircleX, ListChecks, TrendingUp, Network } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
@@ -8,6 +10,7 @@ import { Dialog, DialogPopup, DialogHeader, DialogPanel, DialogTitle, DialogDesc
 import { useStore, setTheme } from '@/lib/store'
 import { useHotkeys } from '@/lib/hotkeys'
 import Search from '@/components/Search'
+import { SyncStatus, AccountMenu } from '@/components/AuthGate'
 import { cn } from '@/lib/utils'
 
 export const NAV = [
@@ -18,6 +21,7 @@ export const NAV = [
   { to: '/exam', label: 'Exam', key: 'e', Icon: Timer },
   { to: '/mistakes', label: 'Mistakes', key: 'm', Icon: CircleX },
   { to: '/cheatsheet', label: 'Cheat sheet', key: 'k', Icon: ListChecks },
+  { to: '/maps', label: 'Architecture maps', key: 'a', Icon: Network },
   { to: '/progress', label: 'Progress', key: 'p', Icon: TrendingUp },
 ]
 
@@ -33,7 +37,9 @@ const PAGE_KEYS = [
   ['Learn', 'N mark read and open the next lecture · ← → previous / next'],
 ]
 
-export default function Shell() {
+export default function Shell({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  const activePage = NAV.find((item) => item.to === pathname || (item.to !== "/" && pathname.startsWith(`${item.to}/`)))?.label ?? "Study"
   const theme = useStore((s) => s.theme)
   const nav = useNavigate()
   const [help, setHelp] = useState(false)
@@ -67,9 +73,10 @@ export default function Shell() {
 
   return (
     <div className="flex min-h-svh">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-background focus:p-3">Skip to content</a>
       {!collapsed && (
-        <aside className="sticky top-0 hidden h-svh w-52 shrink-0 flex-col border-r bg-sidebar px-3 py-5 md:flex">
-          <div className="px-3 text-sm font-semibold tracking-tight">AWS SAA</div>
+        <aside className="sticky top-0 hidden h-svh w-56 shrink-0 flex-col border-r bg-sidebar px-3 py-5 md:flex">
+          <NavLink to="/" className="px-3 text-sm font-semibold tracking-tight">AWS SAA<span className="mt-0.5 block text-xs font-normal text-muted-foreground">Your study workspace</span></NavLink>
           <button
             type="button"
             onClick={() => setSearch(true)}
@@ -124,8 +131,9 @@ export default function Shell() {
           </NavLink>
         ))}
       </header>
+      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between border-t bg-background/95 px-5 py-3 backdrop-blur md:hidden"><SyncStatus /><div className="flex items-center gap-4"><button type="button" className="text-xs text-muted-foreground" onClick={() => setSearch(true)}>Search</button><AccountMenu /></div></div>
 
-      <main className="min-w-0 flex-1 px-5 pt-16 pb-20 md:px-10 md:pt-4">
+      <main id="main-content" className="min-w-0 flex-1 px-5 pt-16 pb-20 md:px-10 md:pt-4">
         <div className="mb-4 hidden md:flex md:items-center md:gap-1 md:-ml-2">
           <Tooltip>
             <TooltipTrigger
@@ -138,6 +146,8 @@ export default function Shell() {
             </TooltipTrigger>
             <TooltipContent side="right">{collapsed ? 'Show' : 'Hide'} sidebar <Kbd>[</Kbd></TooltipContent>
           </Tooltip>
+          <span className="ml-2 text-xs text-muted-foreground">{activePage}</span>
+          <div className="ml-auto flex items-center gap-4"><SyncStatus /><AccountMenu /></div>
           {collapsed && (
             <>
               <Button variant="ghost" size="icon-sm" aria-label="Search" onClick={() => setSearch(true)}><SearchIcon /></Button>
@@ -148,7 +158,9 @@ export default function Shell() {
             </>
           )}
         </div>
-        <Outlet />
+        <ViewTransition name="study-page" update="page-fade">
+          <div className="min-w-0">{children}</div>
+        </ViewTransition>
       </main>
 
       <Search open={search} onOpenChange={setSearch} />

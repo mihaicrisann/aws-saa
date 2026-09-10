@@ -1,6 +1,8 @@
 import curriculumJson from '@content/curriculum.json'
 import questionsJson from '@content/questions.json'
 import flashcardsJson from '@content/flashcards.json'
+import questionsV2Json from '@content/questions-v2.json'
+import type { QuestionBank } from './progress'
 
 export type DomainId = 'secure' | 'resilient' | 'perf' | 'cost'
 
@@ -34,6 +36,7 @@ export interface Question {
   explanation: string
   distractors?: string[]
   anchor?: string
+  sources?: { url: string; checkedAt: string }[]
 }
 
 export interface Flashcard {
@@ -64,7 +67,44 @@ export const curriculum = curriculumJson as unknown as {
 }
 
 export const questions = questionsJson as unknown as Question[]
+export const questionsV2 = questionsV2Json as unknown as Question[]
 export const flashcards = flashcardsJson as unknown as Flashcard[]
+
+export interface Bank {
+  id: QuestionBank
+  label: string
+  blurb: string
+  /** Bumped when the bank's questions change enough that older results are not comparable. */
+  version: number
+  questions: Question[]
+}
+export const banks: Bank[] = [
+  {
+    id: 'original',
+    label: 'Original',
+    blurb: 'Exam-level coverage across every lecture.',
+    version: 1,
+    questions,
+  },
+  {
+    id: 'v2',
+    label: 'Hard',
+    blurb: 'Harder scenarios with sourced explanations. Fewer, nastier.',
+    version: 1,
+    questions: questionsV2,
+  },
+]
+export const bankById = Object.fromEntries(banks.map((b) => [b.id, b])) as Record<QuestionBank, Bank>
+export const bankQuestions = (b: QuestionBank) => bankById[b].questions
+export const bankVersion = (b: QuestionBank) => bankById[b].version
+
+const bankOwning = new Map<string, QuestionBank>(
+  banks.flatMap((b) => b.questions.map((q) => [q.id, b.id] as const)),
+)
+/** Which bank a stored question id came from. Untagged history predates the hard bank. */
+export const bankOfQuestion = (id: string): QuestionBank => bankOwning.get(id) ?? 'original'
+export const questionById = new Map(banks.flatMap((b) => b.questions.map((q) => [q.id, q] as const)))
+export const findQuestion = (id: string) => questionById.get(id)
 
 export const domains = curriculum.domains
 export const lectures = curriculum.lectures
@@ -81,8 +121,8 @@ export const shortDomain = (id: DomainId) => SHORT[id]
 export const questionHref = (q: Pick<Question, 'lecture' | 'anchor'>) => `/learn/${q.lecture}${q.anchor ? `#${q.anchor}` : ''}`
 export const lectureNo = (id: string) => String(lectureById[id]?.n ?? 0).padStart(2, '0')
 
-export const questionsByDomain = (d: DomainId) => questions.filter((q) => q.domain === d)
-export const questionsByLecture = (l: string) => questions.filter((q) => q.lecture === l)
+export const questionsByDomain = (d: DomainId, b: QuestionBank = 'original') => bankQuestions(b).filter((q) => q.domain === d)
+export const questionsByLecture = (l: string, b: QuestionBank = 'original') => bankQuestions(b).filter((q) => q.lecture === l)
 export const cardsByLecture = (l: string) => flashcards.filter((c) => c.lecture === l)
 
 export function shuffle<T>(input: T[], rng: () => number = Math.random): T[] {

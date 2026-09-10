@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/navigation'
 import { Check, X, Copy, ArrowUpRight } from 'lucide-react'
 import { isMulti, lectureNo, questionHref, type Question } from '@/lib/content'
 import { Badge } from '@/components/ui/badge'

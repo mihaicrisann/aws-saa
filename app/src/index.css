@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./lecture.css";
 @import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
@@ -167,4 +168,15 @@
 @media (prefers-reduced-motion: reduce) {
   .rise { animation: none; }
   * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+/* Keep the shell stationary while route content changes. */
+::view-transition-group(study-page) { animation-duration: 180ms; }
+::view-transition-old(study-page) { animation: 110ms ease-out both page-leave; }
+::view-transition-new(study-page) { animation: 180ms ease-out both page-enter; }
+::view-transition { pointer-events: none; }
+@keyframes page-leave { to { opacity: 0; transform: translateY(-3px); } }
+@keyframes page-enter { from { opacity: 0; transform: translateY(5px); } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

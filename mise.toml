@@ -1,5 +1,5 @@
 [tools]
-node = "23.11.1"
+node = "24.21.0"
 
 [env]
 _.path = ["./node_modules/.bin", "./app/node_modules/.bin"]
@@ -10,7 +10,7 @@ run = "npm run setup"
 
 [tasks.dev]
 alias = "d"
-description = "vite dev server"
+description = "Next.js dev server"
 run = "npm --prefix app run dev"
 
 [tasks.build]
@@ -28,6 +28,10 @@ run = "node lectures/_assets/build.mjs"
 [tasks.check]
 description = "validate content/*.json"
 run = "node scripts/check-content.mjs"
+
+[tasks."check:v2"]
+description = "validate the hard v2 question bank"
+run = "node scripts/check-v2.mjs"
 
 [tasks.lint]
 run = "npm --prefix app run lint"
