@@ -8,6 +8,7 @@ import { lectures, modules, flashcards, domains, exam, lectureNo, scaledScore, s
 import { bankOf } from '@/lib/progress'
 import Readiness, { type DomainStat } from '@/components/Readiness'
 import { PageHeader, Stat, StatRow, Meter, Panel, DomainDot } from '@/components/parts'
+import { TodayPanel } from '@/components/Game'
 import { cn } from '@/lib/utils'
 
 export default function Dashboard() {
@@ -59,6 +60,7 @@ export default function Dashboard() {
         description={<span className="mono text-xs">{exam.code} · {exam.questions} questions · {exam.minutes} min · pass {exam.passingScore}</span>}
       />
 
+      <div className="grid gap-3 md:grid-cols-[1fr_272px]">
       <Link
         to={next.to}
         className="group pressable flex items-center justify-between gap-6 rounded-xl border bg-card px-5 py-4 hover:border-border-strong"
@@ -72,6 +74,8 @@ export default function Dashboard() {
           <ArrowRight className="size-4" />
         </span>
       </Link>
+      <TodayPanel />
+      </div>
 
       <StatRow className="mt-3">
         <Stat label="Lectures read" value={<>{read}<span className="text-faint-foreground">/{lectures.length}</span></>} />

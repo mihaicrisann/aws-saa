@@ -110,6 +110,7 @@ export const progressSchema = z
     activeExam: activeExamSchema.nullable().default(null),
     activeDrill: activeDrillSchema.nullable().default(null),
     legacyMigrated: z.boolean().default(false),
+    dailyGoal: z.number().int().min(10).max(5000).default(100),
   })
   .strict()
 export type Progress = z.infer<typeof progressSchema>

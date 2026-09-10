@@ -51,6 +51,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import type { QuestionBank } from '@/lib/progress'
+import { attemptXp, examXp } from '@/lib/game'
+import { XpEarned } from '@/components/Game'
 
 type Session = ActiveExam
 
@@ -334,8 +336,8 @@ export default function Exam() {
         <StatRow className="mb-3">
           <Stat label="Score" value={`${Math.round(acc * 100)}%`} hint={`${result.correct}/${result.total} correct`} />
           <Stat label="Pass mark" value={exam.passingScore} hint="scaled" />
-          <Stat label="Time used" value={fmt(result.seconds)} />
-          <Stat label="Per question" value={fmt(Math.round(result.seconds / result.total))} hint="exam allows 2:00" />
+          <Stat label="Per question" value={fmt(Math.round(result.seconds / result.total))} hint={`${fmt(result.seconds)} used · exam allows 2:00`} />
+          <XpEarned earned={result.correct * attemptXp({ correct: true, bank: session?.bank }) + (result.total - result.correct) * attemptXp({ correct: false, bank: session?.bank }) + examXp(result)} />
         </StatRow>
 
         <div className="grid gap-3 md:grid-cols-[272px_1fr]">

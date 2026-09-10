@@ -4,7 +4,10 @@ import { useMemo, useRef, useState } from 'react'
 import { Link } from '@/lib/navigation'
 import { domains, lectures, flashcards, banks, bankQuestions, exam, scaledScore, lectureNo } from '@/lib/content'
 import { bankOf, type QuestionBank } from '@/lib/progress'
-import { useStore, useMirror, resetProgress, exportStore, importStore, studyStreak, today } from '@/lib/store'
+import { useStore, useMirror, resetProgress, exportStore, importStore, studyStreak, today, setDailyGoal } from '@/lib/store'
+import { achievements, bestStreak, levelFor, levelLabel, levelThreshold, totalXp, xpPerDay, LEVELS } from '@/lib/game'
+import { GoalRing, LevelMeter, fmtXp } from '@/components/Game'
+import { Lock, Award } from 'lucide-react'
 import { isDue } from '@/lib/srs'
 import Readiness from '@/components/Readiness'
 import { PageHeader, Stat, StatRow, Rows, Meter, Nothing, Choice, Panel, SectionTitle } from '@/components/parts'
@@ -69,6 +72,18 @@ export default function Progress() {
   const dueCards = flashcards.filter((c) => isDue(store.cards[c.id])).length
   const maxDay = Math.max(1, ...days.map((w) => w.n))
   const activeDays = days.filter((w) => w.n > 0).length
+  const xp = useMemo(() => totalXp(store), [store])
+  const level = levelFor(xp)
+  const perDay = useMemo(() => xpPerDay(store), [store])
+  const earnedToday = perDay[today()] ?? 0
+  const goalDays = days.filter((w) => (perDay[w.key] ?? 0) >= store.dailyGoal).length
+  const badges = useMemo(() => achievements(store), [store])
+  const unlocked = badges.filter((b) => b.unlocked).length
+  const groups = [
+    { id: 'milestones', title: 'Milestones' },
+    { id: 'streaks', title: 'Streaks and runs' },
+    { id: 'mastery', title: 'Mastery' },
+  ] as const
 
   const download = () => {
     const a = document.createElement('a')
@@ -120,8 +135,38 @@ export default function Progress() {
         <Stat label="Accuracy" value={total ? `${Math.round(acc * 100)}%` : '—'} hint={total ? `≈ ${scaledScore(acc)} scaled` : 'no data yet'} tone={total ? (acc >= 0.72 ? 'good' : 'bad') : undefined} />
         <Stat label="Answered" value={total} hint={`of ${bankQuestions(view).length}`} />
         <Stat label="Cards due" value={dueCards} hint={`${Object.keys(store.cards).length} started`} />
-        <Stat label="Streak" value={studyStreak(store.activity)} hint="days" />
+        <Stat label="Streak" value={studyStreak(store.activity)} hint={`days · best ${bestStreak(store.activity)}`} />
       </StatRow>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <Panel title={levelLabel(level)} hint={level.next ? `${fmtXp(level.span - level.into)} xp to ${level.next}` : 'Top of the ladder.'} action={<span className="mono text-xs text-muted-foreground">{fmtXp(xp)} xp</span>}>
+          <LevelMeter level={level} />
+          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
+            {LEVELS.map((name, i) => (
+              <span key={name} className={cn('mono text-[11px]', i < level.index ? 'text-muted-foreground line-through decoration-border-strong' : i === level.index ? 'text-foreground' : 'text-faint-foreground')} title={`${fmtXp(levelThreshold(i))} xp`}>
+                {name}
+              </span>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="Daily goal" hint={`${goalDays} of the last 84 days hit it`} action={
+          <Choice
+            value={String(store.dailyGoal)}
+            onChange={(v) => v && setDailyGoal(Number(v))}
+            options={[50, 100, 200, 300].map((n) => ({ value: String(n), label: <span className="mono">{n}</span> }))}
+          />
+        }>
+          <div className="flex items-center gap-4">
+            <GoalRing value={earnedToday / store.dailyGoal} size={48}>
+              <span className="mono text-[10px] text-muted-foreground">{Math.min(999, Math.round((earnedToday / store.dailyGoal) * 100))}%</span>
+            </GoalRing>
+            <div className="text-[13px] leading-relaxed text-muted-foreground">
+              <span className="mono text-foreground">{fmtXp(earnedToday)}</span> of <span className="mono">{fmtXp(store.dailyGoal)}</span> xp today.
+              A right answer is 10, a card 4, a lecture 50, a mock 100.
+            </div>
+          </div>
+        </Panel>
+      </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-[272px_1fr]">
         <Panel title="All-time readiness" bodyClassName="p-4 pt-5">
@@ -184,6 +229,27 @@ export default function Progress() {
           </Panel>
         </div>
       </div>
+
+      <section className="mt-10">
+        <SectionTitle hint={`${unlocked} of ${badges.length} unlocked.`}>Achievements</SectionTitle>
+        <div className="grid gap-3">
+          {groups.map((g) => (
+            <Rows key={g.id} className="grid grid-cols-1 *:border-b sm:grid-cols-2 sm:*:border-r sm:*:nth-[2n]:border-r-0 sm:*:nth-last-[-n+2]:border-b-0 lg:grid-cols-3 lg:*:nth-[2n]:border-r lg:*:nth-[3n]:border-r-0 lg:*:nth-last-[-n+2]:border-b lg:*:nth-last-[-n+3]:border-b-0">
+              {badges.filter((b) => b.group === g.id).map((b) => (
+                <div key={b.id} className={cn('flex items-start gap-3 px-4 py-3', !b.unlocked && 'text-muted-foreground')}>
+                  <span className={cn('mt-0.5 grid size-6 shrink-0 place-items-center rounded-full', b.unlocked ? 'bg-foreground text-background' : 'border border-dashed border-border-strong text-faint-foreground')}>
+                    {b.unlocked ? <Award className="size-3.5" /> : <Lock className="size-3" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium tracking-tight">{b.title}</span>
+                    <span className="block text-xs text-muted-foreground">{b.how}</span>
+                  </span>
+                </div>
+              ))}
+            </Rows>
+          ))}
+        </div>
+      </section>
 
       <section className="mt-10">
         <SectionTitle hint="Worst first. This is your re-reading order.">Accuracy by lecture</SectionTitle>

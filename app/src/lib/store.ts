@@ -518,6 +518,8 @@ export const setCard = (id: string, c: CardState) =>
   update((s) => bumpActivity({ ...s, cards: { ...s.cards, [id]: c } }))
 export const markLectureRead = (id: string) =>
   update((s) => ({ ...s, lectureRead: { ...s.lectureRead, [id]: Date.now() } }))
+export const setDailyGoal = (dailyGoal: number) =>
+  update((s) => ({ ...s, dailyGoal }))
 export const setNote = (id: string, text: string) =>
   update((s) => ({ ...s, notes: { ...s.notes, [id]: text } }))
 export function applyTheme(theme: 'dark' | 'light') {

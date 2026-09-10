@@ -34,6 +34,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
+import { attemptXp, tailRun, longestRun } from '@/lib/game'
+import { XpEarned } from '@/components/Game'
 
 export default function Drill() {
   const [params, setParams] = useSearchParams()
@@ -233,6 +235,8 @@ export default function Drill() {
     const missed = log.filter((l) => !l.ok)
     const confidentWrong = missed.filter((l) => l.confidence === 'sure').length
     const avg = Math.round(log.reduce((a, l) => a + l.seconds, 0) / log.length)
+    const earned = log.reduce((a, l) => a + attemptXp({ correct: l.ok, bank }), 0)
+    const run = longestRun(log.map((l) => l.ok))
     const verdict = p >= 85 ? 'Solid. Move on.' : p >= 72 ? 'Around the pass line. Work the misses first.' : 'Below the pass line. Re-read the lectures behind the misses.'
     return (
       <div className="mx-auto max-w-2xl">
@@ -241,10 +245,11 @@ export default function Drill() {
           title={<><span className={cn('mono', p >= 72 ? 'text-good' : 'text-bad')}>{right}</span><span className="text-faint-foreground"> / {log.length}</span> correct</>}
           description={verdict}
         />
-        <StatRow className="grid-cols-3 sm:grid-cols-3">
+        <StatRow>
           <Stat label="Accuracy" value={`${p}%`} tone={p >= 72 ? 'good' : 'bad'} />
           <Stat label="Per question" value={fmtSeconds(avg)} hint="exam allows 2:00" />
-          <Stat label="Sure, wrong" value={confidentWrong} hint={confidentWrong ? 'those first' : 'none'} tone={confidentWrong ? 'bad' : undefined} />
+          <Stat label="Sure, wrong" value={confidentWrong} hint={confidentWrong ? 'those first' : run >= 3 ? `best run ×${run}` : 'none'} tone={confidentWrong ? 'bad' : undefined} />
+          <XpEarned earned={earned} />
         </StatRow>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={start}>Another {count}</Button>
@@ -270,13 +275,15 @@ export default function Drill() {
   }
 
   const rightSoFar = log.filter((l) => l.ok).length
+  const combo = tailRun(log.map((l) => l.ok))
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-6 flex items-center gap-4">
         <button type="button" className="pressable text-[13px] text-muted-foreground hover:text-foreground" onClick={() => setSet(null)}>End</button>
         <Meter value={i / set.length} className="flex-1" />
-        <span className="mono text-xs text-muted-foreground">
-          {i + 1}/{set.length} · {rightSoFar} right · {fmtSeconds(elapsed)}
+        <span className="mono flex items-center gap-2 text-xs text-muted-foreground">
+          {combo >= 3 && <span key={combo} className="feedback-right rounded-md bg-foreground px-1.5 py-0.5 text-[11px] font-medium text-background">×{combo}</span>}
+          <span>{i + 1}/{set.length} · {rightSoFar} right · {fmtSeconds(elapsed)}</span>
         </span>
       </div>
 
