@@ -1,6 +1,6 @@
 {
   "exam": {
-    "code": "SAA-C03 / SAA-C04",
+    "code": "SAA-C03",
     "name": "AWS Certified Solutions Architect – Associate",
     "questions": 65,
     "scored": 50,
@@ -9,7 +9,7 @@
     "scaleMin": 100,
     "scaleMax": 1000,
     "costUsd": 150,
-    "note": "50 of the 65 questions are scored; 15 are unscored pretest items you cannot identify. Scoring is scaled 100–1000, pass at 720. Domain weights are identical in C03 and C04."
+    "note": "50 of the 65 questions are scored; 15 are unscored pretest items you cannot identify. Scoring is scaled 100–1000, pass at 720."
   },
   "domains": [
     {
