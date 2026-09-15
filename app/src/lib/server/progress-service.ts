@@ -17,7 +17,11 @@ export async function readProgress(userId: string) {
     .select()
     .from(progress)
     .where(eq(progress.userId, userId))
-  return { revision: row.revision, data: normalizeProgress(row.data) }
+  return {
+    revision: row.revision,
+    updatedAt: row.updatedAt.getTime(),
+    data: normalizeProgress(row.data),
+  }
 }
 export async function saveProgress(
   userId: string,
@@ -45,7 +49,11 @@ export async function saveProgress(
         ),
       )
     if (duplicate)
-      return { revision: row.revision, data: normalizeProgress(row.data) }
+      return {
+        revision: row.revision,
+        updatedAt: row.updatedAt.getTime(),
+        data: normalizeProgress(row.data),
+      }
     if (revision > row.revision) throw new ProgressConflict(['revision'])
     const data = applyChanges(normalizeProgress(row.data), changes)
     await tx
@@ -53,6 +61,6 @@ export async function saveProgress(
       .set({ data, revision: row.revision + 1, updatedAt: new Date() })
       .where(eq(progress.userId, userId))
     await tx.insert(progressOperation).values({ userId, id: operationId })
-    return { revision: row.revision + 1, data }
+    return { revision: row.revision + 1, updatedAt: Date.now(), data }
   })
 }
