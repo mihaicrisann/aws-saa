@@ -83,7 +83,7 @@ export const banks: Bank[] = [
     id: 'original',
     label: 'Original',
     blurb: 'Exam-level coverage across every lecture.',
-    version: 1,
+    version: 2,
     questions,
   },
   {

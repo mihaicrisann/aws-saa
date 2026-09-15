@@ -82,6 +82,15 @@ for (const l of cur.lectures) {
   if (nq < 5) fail(`lecture ${l.id}: only ${nq} questions (want ≥5)`)
   if (nc < 5) fail(`lecture ${l.id}: only ${nc} cards (want ≥5)`)
 }
+// "the longest option is the correct one" must stay no better than guessing (25% with four options)
+const single = questions.filter((q) => q.correct.length === 1)
+const longestWins = single.filter((q) => {
+  const lens = q.options.map((o) => o.length)
+  const top = Math.max(...lens)
+  return lens[q.correct[0]] === top && lens.filter((l) => l === top).length === 1
+})
+const cue = longestWins.length / single.length
+if (cue > 0.25) fail(`answer-length cue: the correct option is uniquely longest in ${longestWins.length}/${single.length} single-answer questions (${Math.round(cue * 100)}%, want ≤25%): ${longestWins.map((q) => q.id).join(' ')}`)
 const anchored = questions.filter((q) => q.anchor).length
 
 const perDomain = cur.domains.map((d) => `${d.id} ${questions.filter((q) => q.domain === d.id).length}`).join(' · ')
@@ -91,5 +100,5 @@ if (problems.length) {
   process.exit(1)
 }
 console.log(
-  `✓ content ok — ${cur.lectures.length} lectures, ${questions.length} questions (${perDomain}, ${anchored} anchored), ${cards.length} cards, ${cheat.sections.length} cheat sections`,
+  `✓ content ok — ${cur.lectures.length} lectures, ${questions.length} questions (${perDomain}, ${anchored} anchored, length cue ${Math.round(cue * 100)}%), ${cards.length} cards, ${cheat.sections.length} cheat sections`,
 )

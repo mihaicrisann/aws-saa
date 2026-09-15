@@ -20,7 +20,7 @@ Mihai is preparing for the AWS Certified Solutions Architect – Associate exam.
 - Lecture fragments use a fixed component vocabulary (`note gotcha` / `note exam` / `note nuance`, `table-wrap`, `decisions`, `check`, `takeaways`). Match the existing files rather than inventing markup — see the `write-lecture` skill.
 - Don't invent AWS limits, prices or figures. If a number is uncertain, check it or say so. A wrong number here becomes a wrong answer in the exam.
 - `mise.toml` pins node and mirrors every npm script as a task (`mise run dev`, `mise run check`, …). Either form works.
-- Content is written for the current SAA exam (C03/C04 — identical domain weights). Ignore anything that only applied to older versions, notably S3 eventual consistency.
+- Content is written for the current SAA exam, SAA-C03 (no C04 has been announced; check aws.amazon.com/certification/coming-soon before assuming otherwise). Ignore anything that only applied to older versions, notably S3 eventual consistency.
 
 ## Writing voice
 

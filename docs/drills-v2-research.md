@@ -22,7 +22,7 @@ changed and for the judgement calls left standing.
 | cost | 20 | 20% | 4 |
 | **total** | **100** | **100%** | **20** |
 
-The counts mirror the SAA-C03/C04 domain weights exactly, so a 100-question run through the
+The counts mirror the SAA-C03 domain weights exactly, so a 100-question run through the
 bank is weighted like the real exam. Multi-select is held at 20% because the exam guide only
 recognises two response shapes — one correct of four, or two or more correct of five or more
 — and roughly a fifth of a real paper is the second shape.
