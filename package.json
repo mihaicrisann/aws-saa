@@ -7,7 +7,7 @@
     "dev": "npm --prefix app run dev",
     "build": "npm run lectures && npm --prefix app run build",
     "preview": "npm --prefix app run preview",
-    "lectures": "node lectures/_assets/build.mjs",
+    "lectures": "node lectures/_assets/build.mjs && node mobile/scripts/sync-content.mjs && node mobile/scripts/build-lectures.mjs",
     "check": "node scripts/check-content.mjs",
     "check:v2": "node scripts/check-v2.mjs",
     "setup": "npm install && npm --prefix app install && npx playwright install chromium && npm run lectures",

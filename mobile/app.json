@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "SAA",
+    "slug": "saa",
+    "scheme": "saa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "xyz.mihais.saa",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "xyz.mihais.saa",
+      "adaptiveIcon": {
+        "backgroundColor": "#0b0b0b",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#0b0b0b",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0b0b0b"
+          }
+        }
+      ],
+      "expo-sqlite",
+      "expo-font",
+      "expo-sharing",
+      "expo-document-picker",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
