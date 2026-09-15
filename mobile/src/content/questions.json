@@ -4698,22 +4698,22 @@
     "lecture": "06-s3",
     "anchor": "access-control",
     "difficulty": 2,
-    "stem": "Fifty product teams need write access to different prefixes of one shared data-lake bucket. The single bucket policy has grown unmanageable and is close to its size limit. What should the architect do to give each team its own scoped policy with the LEAST operational overhead?",
+    "stem": "A data-lake bucket is shared by product teams in twenty AWS accounts. Each team must write only to its own prefix, and each team's access must be allowed only from that team's VPC. The single bucket policy has become unmanageable. Which solution meets these requirements with the LEAST operational overhead?",
     "options": [
-      "Create an S3 Access Point per team with its own access-point policy",
-      "Grant per-team access with object ACLs on each prefix",
-      "Move the permissions into fifty IAM groups referencing the same bucket ARN",
-      "Split the data into fifty buckets, one per team"
+      "Create an S3 access point per team, restricted to the team's VPC, with an access-point policy scoped to its prefix",
+      "Grant per-team access with object ACLs on each prefix and reference the team's VPC in the ACL grants",
+      "Move the permissions into twenty IAM groups in the bucket owner's account that reference the same bucket ARN",
+      "Split the data into twenty buckets, one per team, each with a bucket policy that allows access only from that team's VPC endpoint"
     ],
     "correct": [
       0
     ],
-    "explanation": "S3 Access Points give each consumer a named endpoint with its own policy, so the bucket policy stays small and each team's rules live with its access point.",
+    "explanation": "S3 access points give each consumer a named endpoint with its own policy and an optional network origin of a single VPC, so both the prefix scope and the VPC restriction live with the access point while the bucket policy stays small.",
     "distractors": [
       "",
-      "ACLs are legacy, disabled by default with Bucket Owner Enforced, and cannot scope to a prefix.",
-      "IAM policies scale per identity but the bucket policy is the growing artefact; groups alone do not shrink it and cross-account teams still need the resource side.",
-      "Fifty buckets breaks the data-lake model and multiplies replication, logging and lifecycle configuration."
+      "ACLs are legacy, disabled by default with Bucket Owner Enforced, and cannot express a prefix or a VPC condition.",
+      "IAM groups exist in one account; cross-account teams cannot be members, and the bucket policy is the artefact that needs shrinking.",
+      "Twenty buckets breaks the data-lake model and multiplies replication, logging and lifecycle configuration."
     ]
   },
   {
@@ -4749,17 +4749,17 @@
     "lecture": "06-s3",
     "anchor": "performance-and-cost-levers",
     "difficulty": 2,
-    "stem": "An application stores hundreds of millions of objects and its request rate has grown to 20,000 GET/s. All keys are written under a single prefix such as data/2026-08-18-<uuid>. Requests are now being throttled with 503 Slow Down errors. What is the MOST effective fix?",
+    "stem": "An ingestion service writes several thousand small objects per second to one S3 bucket. All keys start with the same date prefix, such as ingest/2026-09-15/<uuid>, and the service now receives 503 Slow Down responses during peaks. What is the MOST effective fix?",
     "options": [
       "Enable S3 Transfer Acceleration on the bucket so requests are served from edge locations",
       "Move the objects to S3 Express One Zone, which supports a higher request rate per bucket",
       "Distribute the keys across multiple prefixes so that requests are parallelised",
-      "Turn on S3 Intelligent-Tiering so that frequently read objects move to a faster tier"
+      "Turn on S3 Intelligent-Tiering so that frequently written objects move to a faster tier"
     ],
     "correct": [
       2
     ],
-    "explanation": "S3 scales to 3,500 writes and 5,500 reads per second per prefix. Spreading keys across several prefixes multiplies that headroom; 20,000 GET/s needs roughly four or more prefixes.",
+    "explanation": "S3 scales to at least 3,500 PUT/COPY/POST/DELETE and 5,500 GET/HEAD requests per second per prefix. Spreading writes across several prefixes multiplies that headroom; a single date prefix concentrates every write on one partition.",
     "distractors": [
       "Transfer Acceleration speeds up long-distance uploads via edge locations; it does not lift per-prefix request limits.",
       "Express One Zone is for very low latency in one AZ and requires migrating data and code; prefix partitioning fixes the throttling directly.",
@@ -5508,19 +5508,19 @@
     "lecture": "09-vpc-connectivity",
     "anchor": "vpc-endpoints",
     "difficulty": 1,
-    "stem": "An application in private subnets writes to DynamoDB and S3. There is no NAT Gateway and no internet access, and the team wants to keep it that way at zero additional cost. How should the application reach the two services?",
+    "stem": "Lambda functions attached to private subnets must read from DynamoDB and write to S3. The VPC has no NAT gateway and no internet access, and the team wants to keep it that way at zero additional cost while ensuring the functions can reach only the company's own tables and buckets. Which solution meets these requirements?",
     "options": [
       "A NAT gateway in a public subnet, restricted with a security group to the two services",
       "A Transit Gateway attachment to a VPC that has internet access through its own NAT gateway",
-      "Interface endpoints for S3 and DynamoDB in each private subnet of the application",
-      "Gateway endpoints for S3 and DynamoDB with routes in the private route tables"
+      "Interface endpoints for S3 and DynamoDB in each private subnet with security groups",
+      "Gateway endpoints for S3 and DynamoDB with endpoint policies naming the allowed resources"
     ],
     "correct": [
       3
     ],
-    "explanation": "Gateway endpoints exist for exactly S3 and DynamoDB, are free, and work by adding a prefix-list route to the route table so traffic never leaves the AWS network.",
+    "explanation": "Gateway endpoints exist for exactly S3 and DynamoDB, are free, and work by adding a prefix-list route so traffic never leaves the AWS network. Each endpoint carries a policy that limits which buckets or tables are reachable through it.",
     "distractors": [
-      "NAT Gateways cost hourly and per GB and would give general internet egress.",
+      "NAT gateways cost hourly and per GB and would give general internet egress.",
       "Routing through another VPC to the internet is complex, costly and defeats the private goal.",
       "Interface endpoints work but are billed per hour per AZ and per GB; the gateway variant is free.",
       ""
@@ -6723,21 +6723,21 @@
     "lecture": "15-observability",
     "anchor": "systems-manager",
     "difficulty": 2,
-    "stem": "A security review requires that administrators can open shell sessions on private EC2 instances with every session logged, while inbound port 22 is closed everywhere and no SSH keys or bastion hosts exist. Which approach satisfies this?",
+    "stem": "Developers need to run database tools on their laptops against an RDS instance in a private subnet. The security team forbids bastion hosts, public database endpoints, and inbound SSH anywhere in the VPC, and requires every connection to be tied to an IAM identity. Which approach satisfies this?",
     "options": [
       "A bastion host in a public subnet with a tightly scoped security group and session recording",
-      "A Site-to-Site VPN from the corporate network with SSH allowed only from the VPN address range",
-      "EC2 Instance Connect over the public internet with an ephemeral key pushed for each session",
-      "AWS Systems Manager Session Manager with the SSM agent and an instance role"
+      "A Site-to-Site VPN from the corporate network with the database security group opened to the VPN range",
+      "EC2 Instance Connect to a jump instance over the public internet with an ephemeral key per session",
+      "AWS Systems Manager Session Manager port forwarding through an SSM-managed instance"
     ],
     "correct": [
       3
     ],
-    "explanation": "Session Manager brokers shell access through the SSM agent's outbound connection to the service: no open inbound ports, no keys, no bastion, and sessions can be logged to S3 or CloudWatch Logs — the exact checklist in the question.",
+    "explanation": "Session Manager can forward a local port to a remote host reachable from a managed instance, so a developer's laptop connects to the private RDS endpoint through the SSM channel. No inbound ports, keys or bastion are needed, the session is authorised by IAM and can be logged.",
     "distractors": [
       "A bastion is explicitly excluded, and it still needs port 22 open somewhere.",
-      "A VPN hides the traffic but the instances still accept SSH on port 22 with keys — the review forbids that.",
-      "EC2 Instance Connect still uses SSH on port 22, which must be open.",
+      "A VPN gives network reachability but ties access to a network path, not to an IAM identity, and requires the database to accept the whole VPN range.",
+      "EC2 Instance Connect still uses SSH on port 22 and a jump instance, both of which the security team forbids.",
       ""
     ]
   },
@@ -7065,17 +7065,17 @@
     "lecture": "17-resilience-dr",
     "anchor": "in-region-resilience-first",
     "difficulty": 1,
-    "stem": "An application runs in private subnets across three Availability Zones behind an ALB. All outbound traffic to third-party APIs goes through a single NAT Gateway in one AZ. During an AZ outage the application lost internet access in every AZ. What change removes this single point of failure?",
+    "stem": "An application in private subnets across three Availability Zones sends high volumes of outbound traffic to third-party APIs through a single NAT gateway in one AZ. A review lists two problems: an AZ outage would take away egress everywhere, and the bill shows cross-AZ data transfer for traffic reaching the gateway. Which change addresses BOTH problems?",
     "options": [
       "Replace the NAT gateway with a NAT instance on a larger instance type with enhanced networking",
       "Deploy one NAT gateway per AZ and route each private subnet to the NAT gateway in its own AZ",
-      "Attach an internet gateway to each private subnet so instances can reach the APIs directly",
+      "Attach an internet gateway to each private subnet so the instances reach the APIs directly",
       "Move the NAT gateway into a public subnet in a different Region and route the subnets to it"
     ],
     "correct": [
       1
     ],
-    "explanation": "A NAT Gateway is a zonal resource; when its AZ fails, every subnet routed through it loses egress. One NAT Gateway per AZ with AZ-local route tables confines the blast radius to the failed AZ.",
+    "explanation": "A NAT gateway is zonal. One per AZ, with each AZ's private route table pointing at its local gateway, means an AZ outage only affects that AZ and traffic never crosses a zone boundary to reach the gateway, so the cross-AZ transfer charge disappears too.",
     "distractors": [
       "A single NAT instance is still one zonal point of failure and adds management overhead.",
       "",
@@ -7212,22 +7212,22 @@
     "lecture": "17-resilience-dr",
     "anchor": "reading-a-resilience-question-in-ten-seconds",
     "difficulty": 2,
-    "stem": "A single-AZ RDS PostgreSQL instance backs an internal tool. Requirements now state that an instance or AZ failure must be handled with no manual intervention and no changes to the application's connection string. Which option meets this?",
+    "stem": "A single-AZ RDS for SQL Server instance backs a line-of-business application. A new requirement states that the database must survive an instance or AZ failure with no manual intervention, that failover must be transparent to the application, and that no data committed before the failure may be lost. Which option meets these requirements?",
     "options": [
       "Create a cross-Region read replica and update the DNS record manually during an outage",
       "Convert the instance to Multi-AZ so RDS fails over to a synchronous standby behind the same endpoint",
-      "Add an in-Region read replica and promote it to a standalone instance whenever the primary instance fails",
+      "Add an in-Region read replica and promote it to a standalone instance when the primary fails, then repoint the application",
       "Take hourly snapshots and restore to a new instance with the same name if the primary fails"
     ],
     "correct": [
       1
     ],
-    "explanation": "\"No manual intervention\" selects the option that fails over automatically. Multi-AZ keeps the same DNS endpoint and switches to the standby without operator action.",
+    "explanation": "Multi-AZ keeps a synchronous standby in another AZ, so every committed write exists on both before the commit is acknowledged, and failover keeps the same DNS endpoint without operator action. Asynchronous replicas and snapshots both risk losing committed data.",
     "distractors": [
-      "Manual DNS updates violate the no-manual-intervention requirement, and a Region-level solution exceeds an AZ-level need.",
+      "Manual DNS updates violate the no-manual-intervention requirement, and cross-Region replication is asynchronous, so committed writes can be lost.",
       "",
-      "Promoting a read replica is a manual step and gives it a new endpoint.",
-      "Restoring from snapshots is manual, slow, and loses up to an hour of data."
+      "Promoting a read replica is a manual step, gives it a new endpoint, and replication is asynchronous.",
+      "Restoring from snapshots is manual, slow, and loses up to an hour of committed data."
     ]
   },
   {
@@ -7236,22 +7236,22 @@
     "lecture": "18-cost",
     "anchor": "where-the-money-actually-goes",
     "difficulty": 1,
-    "stem": "EC2 instances in private subnets upload several terabytes a day to S3 buckets in the same Region. The bill shows large NAT Gateway data-processing charges. Which change reduces this cost the MOST?",
+    "stem": "Lambda functions attached to private subnets in a VPC write several terabytes a day to S3 buckets in the same Region. The functions reach S3 through a NAT gateway, and its data-processing charge is now the largest line on the bill. Which change reduces this cost the MOST?",
     "options": [
       "Enable S3 Transfer Acceleration on the buckets so uploads take the edge path",
       "Replace the NAT gateway with a NAT instance on a larger instance type",
       "Create a gateway VPC endpoint for S3 and route the private subnets to it",
-      "Move the instances to public subnets with Elastic IPs so they skip the NAT"
+      "Remove the VPC configuration from the functions so they use the public S3 endpoint"
     ],
     "correct": [
       2
     ],
-    "explanation": "A gateway endpoint carries S3 traffic over the AWS network with no hourly or per-GB charge, so the S3 uploads bypass the NAT Gateway entirely.",
+    "explanation": "A gateway endpoint carries S3 traffic over the AWS network with no hourly or per-GB charge, so the writes bypass the NAT gateway entirely. It applies to anything in the routed subnets, including VPC-attached Lambda functions.",
     "distractors": [
-      "Transfer Acceleration is for long-distance client uploads and adds cost; the traffic would still traverse the NAT Gateway.",
+      "Transfer Acceleration is for long-distance client uploads and adds cost; the traffic would still traverse the NAT gateway.",
       "A NAT instance replaces the per-GB charge with instance cost and management, and still moves all bytes through one box.",
       "",
-      "This removes the NAT charge but exposes the instances and adds public IPv4 charges; it violates the private-subnet design."
+      "Removing the VPC attachment would work for S3 but breaks whatever the functions are in the VPC to reach, and the question asks for a change to how S3 is reached."
     ]
   },
   {
@@ -8328,22 +8328,22 @@
     "lecture": "02-iam",
     "difficulty": 2,
     "anchor": "cross-account-access-the-externalid-trap",
-    "stem": "A company with dozens of AWS accounts wants staff to log in through its existing corporate directory and receive permissions that differ per account, and wants to revoke access everywhere by disabling a single directory user. Which solution meets these requirements?",
+    "stem": "A company uses IAM Identity Center for its 60 AWS accounts. Security wants engineers to have read-only access by default and to obtain an administrator-level session in a specific account only for a bounded period, with every elevated session recorded in CloudTrail and expiring automatically. Which approach meets these requirements with the LEAST operational overhead?",
     "options": [
-      "Configure IAM Identity Center with the corporate directory as its source and assign permission sets",
-      "Create an IAM user in every account and apply a shared password policy and MFA across the accounts",
-      "Create an IAM role in each account with an sts:ExternalId condition in its trust policy",
-      "Deploy AWS Directory Service Simple AD in every account and join the user accounts to it"
+      "Assign an administrator permission set with a short session duration that engineers request through Identity Center",
+      "Create an IAM user with AdministratorAccess in every account and share its credentials from a password vault when an engineer needs them",
+      "Create an IAM role in each account with an sts:ExternalId condition and let engineers assume it from the CLI",
+      "Deploy AWS Directory Service Simple AD in each account and manage the elevated group membership there"
     ],
     "correct": [
       0
     ],
-    "explanation": "IAM Identity Center federates to one external identity provider or directory and assigns permission sets across every account in the organization, so per-account permissions differ while a single directory user is the only identity to disable.",
+    "explanation": "Identity Center permission sets are provisioned as roles in each account, carry a configurable session duration, and every assumption is a normal AssumeRole event in CloudTrail. Pairing a read-only default permission set with a short-lived administrator permission set gives bounded, auditable elevation without any per-account credentials.",
     "distractors": [
       "",
-      "Per-account IAM users is precisely the long-term credential sprawl the requirement rules out.",
-      "ExternalId protects against the confused deputy problem for third-party access; it is not a workforce sign-in mechanism.",
-      "Simple AD in every account multiplies directories rather than federating one."
+      "Shared long-lived credentials remove individual accountability and never expire on their own.",
+      "ExternalId is the confused-deputy mitigation for third-party access; it does not bound the session or centralise who may elevate.",
+      "Simple AD cannot federate into AWS accounts on its own and adds a directory to run in every account."
     ]
   },
   {
@@ -8400,22 +8400,22 @@
     "lecture": "16-security-toolbox",
     "difficulty": 1,
     "anchor": "threat-detection",
-    "stem": "A company must discover whether any of its thousands of S3 buckets contain customer credit card numbers or other personally identifiable information, and be alerted when new sensitive data appears. Which service does this?",
+    "stem": "A company stores customer data across thousands of S3 buckets. It must continuously discover objects containing payment card numbers or other personal data, receive a finding as soon as such an object appears, and route those findings into its central Security Hub view. Which service should be enabled?",
     "options": [
       "Amazon Macie",
       "Amazon GuardDuty",
       "Amazon Inspector",
-      "AWS Config with an S3 public-access rule"
+      "Amazon Detective"
     ],
     "correct": [
       0
     ],
-    "explanation": "Macie uses machine learning and pattern matching to discover and classify sensitive data such as PII and payment card numbers in S3, and reports findings as it scans.",
+    "explanation": "Macie's automated sensitive data discovery samples objects across buckets continuously and generates findings for PII and payment card data; its findings publish to Security Hub and EventBridge, so alerts and central review need no custom code.",
     "distractors": [
       "",
-      "GuardDuty detects malicious or anomalous activity from logs; it does not inspect object contents.",
+      "GuardDuty detects malicious or anomalous activity from logs (including S3 access patterns); it does not inspect object contents for personal data.",
       "Inspector scans workloads for software vulnerabilities and unintended network exposure, not data content.",
-      "Config evaluates resource configuration such as public access settings, not what the objects contain."
+      "Detective investigates security findings after the fact; it does not scan data."
     ]
   },
   {
@@ -8523,21 +8523,21 @@
     "lecture": "18-cost",
     "difficulty": 2,
     "anchor": "where-the-money-actually-goes",
-    "stem": "An analytics fleet in private subnets reads terabytes from Amazon S3 in the same Region every day, and the NAT gateway data processing charges dominate the bill. What is the cheapest correct fix?",
+    "stem": "An analytics fleet in private subnets reads terabytes from Amazon S3 in the same Region every day through a NAT gateway, whose data-processing charges dominate the bill. Security also requires that instances in these subnets can reach only the company's own buckets. Which solution meets BOTH requirements at the lowest cost?",
     "options": [
-      "Create an S3 gateway VPC endpoint and route the subnets to it",
-      "Create an S3 interface VPC endpoint powered by AWS PrivateLink",
-      "Move the instances into public subnets with public IP addresses",
-      "Enable S3 Transfer Acceleration for the bucket"
+      "Create an S3 gateway endpoint with an endpoint policy limited to the company's buckets and route the subnets to it",
+      "Create an S3 interface endpoint powered by AWS PrivateLink with a security group that allows only the fleet's instances to connect",
+      "Move the instances into public subnets with public IP addresses and add a bucket policy on each bucket",
+      "Enable S3 Transfer Acceleration for the buckets and restrict the accelerated endpoint with a bucket policy"
     ],
     "correct": [
       0
     ],
-    "explanation": "A gateway endpoint for S3 adds a route so the traffic never traverses the NAT gateway, and gateway endpoints themselves carry no hourly or data processing charge.",
+    "explanation": "A gateway endpoint adds a route so S3 traffic never traverses the NAT gateway, and gateway endpoints carry no hourly or data-processing charge. Its endpoint policy is a resource policy on the endpoint itself, so it can restrict which buckets are reachable through it regardless of the caller's IAM permissions.",
     "distractors": [
       "",
       "An interface endpoint also bypasses the NAT gateway but bills per hour and per GB, so it is not the cheapest option for S3.",
-      "Public subnets remove the NAT charge but expose the fleet directly to the internet, which is a security regression.",
+      "Public subnets remove the NAT charge but expose the fleet directly to the internet, and bucket policies alone do not stop instances reaching other buckets.",
       "Transfer Acceleration is for long-distance uploads and would add cost, not remove it."
     ]
   },
@@ -8547,22 +8547,391 @@
     "lecture": "03-ec2",
     "difficulty": 2,
     "anchor": "the-five-purchasing-models",
-    "stem": "Developers use EC2 workstations only during office hours. Each workstation takes several minutes to rebuild its in-memory caches after a start, and the developers want that warm state preserved overnight while the company stops paying for compute. Which solution meets these requirements?",
+    "stem": "A team runs memory-intensive analysis on EC2 instances that take 30 minutes to rebuild their in-memory working set after every start. The instances are idle overnight and the team wants to stop paying for compute while preserving the working set. The instances were launched from a launch template with an unencrypted 8 GB root volume. Which change is required?",
     "options": [
-      "Hibernate the instances at the end of each day and start them each morning",
-      "Stop the instances at the end of each day and start them each morning",
-      "Terminate the instances each evening and relaunch them from an AMI each morning",
-      "Move the workstations to Spot Instances that use the stop interruption behaviour"
+      "Launch replacement instances with hibernation enabled and an encrypted root volume large enough to hold RAM",
+      "Stop the existing instances each evening from a scheduled action and start them again each morning before work begins",
+      "Create an AMI from each instance each evening and relaunch it from the AMI each morning",
+      "Move the instances to Spot Instances with the stop interruption behaviour so state is preserved"
     ],
     "correct": [
       0
     ],
-    "explanation": "Hibernation writes the instance's memory to the root EBS volume and restores it on start, so the caches survive while compute charges stop overnight.",
+    "explanation": "Hibernation writes RAM to the root EBS volume and restores it on start, so compute charges stop while the working set survives. It must be enabled at launch, the root volume must be encrypted, and it must have room for the RAM contents on top of the OS — none of which the current launch template satisfies.",
     "distractors": [
       "",
-      "A normal stop discards memory contents, so the warm-up cost returns every morning.",
-      "Terminating and relaunching loses both the memory state and any local changes.",
-      "Spot Instances can be interrupted at any time, which is unsuitable for interactive developer workstations."
+      "A normal stop discards memory contents, so the 30-minute rebuild happens every morning.",
+      "An AMI captures the disk, not memory; the working set would still be rebuilt on every launch.",
+      "Spot Instances can be reclaimed at any time, and the stop behaviour only preserves the disk, not RAM."
+    ]
+  },
+  {
+    "id": "q354",
+    "domain": "perf",
+    "lecture": "07-block-and-file",
+    "difficulty": 2,
+    "anchor": "the-fsx-family",
+    "stem": "A company is migrating an on-premises NetApp storage array to AWS. Linux hosts mount it over NFS, Windows hosts over SMB, and storage administrators rely on ONTAP snapshots and SnapMirror replication in their runbooks. The migrated file system must keep rarely used data on cheaper storage automatically. Which service meets these requirements?",
+    "options": [
+      "Amazon EFS with lifecycle management to the Infrequent Access class",
+      "Amazon FSx for Windows File Server with data deduplication enabled",
+      "Amazon FSx for NetApp ONTAP with capacity pool tiering enabled",
+      "Amazon FSx for Lustre with a data repository association to S3"
+    ],
+    "correct": [
+      2
+    ],
+    "explanation": "FSx for NetApp ONTAP serves NFS, SMB and iSCSI from one file system, keeps ONTAP features such as snapshots and SnapMirror (so existing runbooks and replication from the on-premises array carry over), and tiers cold data to its capacity pool automatically. Any scenario that names NetApp, ONTAP or both NFS and SMB together is this service.",
+    "distractors": [
+      "EFS is NFS only, does not serve SMB to Windows hosts, and has no SnapMirror compatibility.",
+      "FSx for Windows is SMB only; the Linux NFS hosts and the ONTAP-specific features are not served.",
+      "",
+      "Lustre is a parallel HPC file system with no SMB support and no ONTAP feature set."
+    ]
+  },
+  {
+    "id": "q355",
+    "domain": "cost",
+    "lecture": "13-caching-analytics",
+    "difficulty": 2,
+    "anchor": "analytics-the-recognition-table",
+    "stem": "A company runs a nightly Apache Spark job on an Amazon EMR cluster that reads raw data from S3 and writes results back to S3. The cluster runs 24 hours a day but the job takes four hours. The job is fault-tolerant. Which combination of changes reduces cost the MOST? (Choose TWO.)",
+    "options": [
+      "Convert the cluster to a transient cluster that is created for the job and terminated when it finishes",
+      "Run the task nodes on Spot Instances with an instance fleet spread across several instance types",
+      "Store the intermediate and output data in HDFS on the core nodes instead of in S3",
+      "Run the primary node on a Spot Instance to capture the discount on the most expensive node",
+      "Purchase a three-year Reserved Instance for every node in the cluster"
+    ],
+    "correct": [
+      0,
+      1
+    ],
+    "explanation": "Because the data lives in S3 (EMRFS), the cluster holds no state worth keeping between runs, so it can be created for the job and terminated afterwards, paying for four hours instead of twenty-four. Task nodes hold no HDFS data, so running them on diversified Spot capacity captures the discount without risking the job.",
+    "distractors": [
+      "",
+      "",
+      "Keeping data in HDFS ties it to the cluster's lifetime, which prevents terminating the cluster and forces core nodes to stay On-Demand.",
+      "Losing the primary node terminates the whole cluster, so it should run On-Demand.",
+      "Reserved Instances discount 24-hour usage of a cluster that only needs to exist for four hours a night."
+    ]
+  },
+  {
+    "id": "q356",
+    "domain": "perf",
+    "lecture": "13-caching-analytics",
+    "difficulty": 2,
+    "anchor": "analytics-the-recognition-table",
+    "stem": "A data team runs ad-hoc Spark jobs a few times a week against data in S3. Each run needs a different cluster size, and the team wants to stop sizing, launching and terminating clusters themselves while continuing to submit the same Spark applications. Which option meets these requirements with the LEAST operational overhead?",
+    "options": [
+      "A long-running Amazon EMR cluster with managed scaling enabled",
+      "Amazon EMR Serverless with the applications submitted as jobs",
+      "AWS Glue crawlers scheduled to run the Spark applications",
+      "Amazon Athena with the Spark applications rewritten as SQL queries"
+    ],
+    "correct": [
+      1
+    ],
+    "explanation": "EMR Serverless runs Spark and Hive applications without any cluster to provision or size: it allocates workers per job, scales them during the run and releases them afterwards, so the team only submits jobs. It is the answer whenever the cue is Spark or Hive with no cluster management.",
+    "distractors": [
+      "Managed scaling adjusts a cluster that still has to exist, be sized and be paid for between runs.",
+      "",
+      "Glue crawlers discover schemas for the Data Catalog; they do not run Spark applications (Glue ETL jobs would, but that means rewriting them as Glue jobs).",
+      "Athena runs SQL, not existing Spark applications, so the workload would have to be rewritten."
+    ]
+  },
+  {
+    "id": "q357",
+    "domain": "secure",
+    "lecture": "07-block-and-file",
+    "difficulty": 3,
+    "anchor": "the-fsx-family",
+    "stem": "A company is moving Windows file shares to Amazon FSx for Windows File Server. Users must keep authenticating with their existing on-premises Active Directory accounts over an existing Site-to-Site VPN, and the security team wants the smallest possible footprint of directory infrastructure in AWS. Which approach should the solutions architect take?",
+    "options": [
+      "Create a Cognito user pool synchronised from the on-premises directory and join FSx to it",
+      "Deploy AD Connector in the VPC and join the FSx file system to it",
+      "Deploy AWS Directory Service Simple AD in the VPC and create a trust with the on-premises domain",
+      "Join the FSx file system directly to the self-managed on-premises Active Directory over the VPN"
+    ],
+    "correct": [
+      3
+    ],
+    "explanation": "FSx for Windows File Server can join a self-managed Active Directory directly (or AWS Managed Microsoft AD). Joining the on-premises domain over the VPN needs no directory resources in AWS at all, which is the smallest footprint. AD Connector is a proxy for services such as IAM Identity Center and WorkSpaces; FSx does not support it.",
+    "distractors": [
+      "Cognito is for application end users; a Windows file system cannot be domain-joined to a user pool.",
+      "AD Connector proxies authentication for services like IAM Identity Center, WorkSpaces and EC2 seamless domain join; FSx for Windows cannot be joined to an AD Connector.",
+      "Simple AD is Samba-based, cannot establish trusts with another domain, and would be a separate directory rather than the existing accounts.",
+      ""
+    ]
+  },
+  {
+    "id": "q358",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "difficulty": 2,
+    "anchor": "roles-and-sts",
+    "stem": "A company with an on-premises Active Directory domain wants staff to sign in to its AWS accounts through IAM Identity Center with their existing domain credentials. The company does not want to replicate directory data into AWS and has a Site-to-Site VPN in place. Which identity source should be configured?",
+    "options": [
+      "AWS Managed Microsoft AD with a one-way trust to the on-premises domain",
+      "AD Connector pointing at the on-premises domain controllers",
+      "Simple AD populated by a nightly export from the on-premises directory",
+      "The default Identity Center directory with users created by SCIM provisioning"
+    ],
+    "correct": [
+      1
+    ],
+    "explanation": "AD Connector is a directory gateway that forwards authentication and lookups to the on-premises domain controllers without storing directory data in AWS, and it is a supported identity source for IAM Identity Center. Managed Microsoft AD with a trust also works but creates a full directory in AWS, which the requirement rules out.",
+    "distractors": [
+      "Managed Microsoft AD is a real directory running in AWS; it meets the sign-in need but adds directory infrastructure the company said it does not want.",
+      "",
+      "Simple AD cannot connect to or trust an external domain, and a nightly export copies directory data into AWS.",
+      "The built-in directory holds its own users and passwords; staff would not be signing in with their domain credentials."
+    ]
+  },
+  {
+    "id": "q359",
+    "domain": "secure",
+    "lecture": "02-iam",
+    "difficulty": 2,
+    "anchor": "roles-and-sts",
+    "stem": "A company plans to run Amazon RDS for SQL Server with Windows Authentication and several EC2 Windows instances that must be domain-joined. The company has an on-premises Active Directory and wants users in that domain to authenticate to these AWS resources without running domain controllers on EC2. Which directory option meets these requirements?",
+    "options": [
+      "AWS Directory Service Simple AD in the VPC with the on-premises users imported nightly",
+      "AD Connector in the VPC pointing at the on-premises domain controllers over the VPN",
+      "AWS Managed Microsoft AD with a trust relationship to the on-premises domain",
+      "IAM Identity Center with the on-premises domain as its identity source"
+    ],
+    "correct": [
+      2
+    ],
+    "explanation": "RDS for SQL Server Windows Authentication requires AWS Managed Microsoft AD, and a forest trust lets users of the on-premises domain authenticate through it. Managed Microsoft AD also supports EC2 domain join, and AWS operates the domain controllers.",
+    "distractors": [
+      "Simple AD cannot trust another domain and is not supported for RDS Windows Authentication.",
+      "AD Connector supports EC2 seamless domain join and Identity Center, but RDS Windows Authentication requires Managed Microsoft AD, not a connector.",
+      "",
+      "Identity Center federates people into AWS accounts; it does not domain-join EC2 instances or authenticate SQL Server logins."
+    ]
+  },
+  {
+    "id": "q360",
+    "domain": "secure",
+    "lecture": "16-security-toolbox",
+    "difficulty": 2,
+    "anchor": "perimeter-waf-shield-firewall-manager",
+    "stem": "A public web application runs behind an Application Load Balancer. Last month it was taken offline twice by DDoS attacks: one flooded the network layer, and the other sent millions of legitimate-looking HTTP requests from thousands of addresses. The company wants both attack types mitigated and wants help from AWS during future events. Which combination of actions should the solutions architect take? (Choose TWO.)",
+    "options": [
+      "Subscribe to AWS Shield Advanced and add the ALB as a protected resource",
+      "Attach an AWS WAF web ACL to the ALB with a rate-based rule",
+      "Add network ACL deny rules for the source addresses seen in the last attack",
+      "Move the ALB into private subnets so it cannot be reached from the internet",
+      "Enable Amazon GuardDuty so that attack traffic is blocked automatically"
+    ],
+    "correct": [
+      0,
+      1
+    ],
+    "explanation": "Shield Advanced adds enhanced layer 3/4 mitigation for the ALB, access to the Shield Response Team during an attack, and cost protection against scaling charges. The HTTP flood is a layer 7 problem, which AWS WAF handles: a rate-based rule blocks any source that exceeds a request threshold, whatever its address.",
+    "distractors": [
+      "",
+      "",
+      "Attackers rotate addresses; a static deny list is stale before the next attack and NACLs cannot see request rates.",
+      "An internet-facing ALB must be in public subnets to serve users at all.",
+      "GuardDuty detects and reports threats; it does not sit inline and cannot block traffic."
+    ]
+  },
+  {
+    "id": "q361",
+    "domain": "resilient",
+    "lecture": "16-security-toolbox",
+    "difficulty": 2,
+    "anchor": "perimeter-waf-shield-firewall-manager",
+    "stem": "A game studio hosts multiplayer servers on EC2 instances that clients reach directly through Elastic IP addresses over a custom UDP protocol. The studio wants DDoS protection for these addresses with 24/7 access to AWS DDoS experts and protection from the scaling costs an attack would cause. What should the studio do?",
+    "options": [
+      "Put the game servers behind Amazon CloudFront so that attacks are absorbed at the edge",
+      "Attach an AWS WAF web ACL with a rate-based rule to the instances' security group",
+      "Rely on AWS Shield Standard, which already covers Elastic IP addresses automatically at no additional cost",
+      "Subscribe to AWS Shield Advanced and register the Elastic IP addresses as protected resources"
+    ],
+    "correct": [
+      3
+    ],
+    "explanation": "Shield Advanced protects EC2 Elastic IPs alongside CloudFront, Route 53, Global Accelerator and load balancers, and only the Advanced tier includes the Shield Response Team and cost protection. Shield Standard is automatic but offers neither.",
+    "distractors": [
+      "CloudFront serves HTTP and HTTPS only, so a custom UDP protocol cannot go through it.",
+      "WAF inspects HTTP(S) at CloudFront, ALB, API Gateway, AppSync and Cognito; it cannot attach to a security group or see UDP game traffic.",
+      "Shield Standard mitigates common layer 3/4 floods for every customer but includes no expert support and no cost protection.",
+      ""
+    ]
+  },
+  {
+    "id": "q362",
+    "domain": "resilient",
+    "lecture": "09-vpc-connectivity",
+    "difficulty": 3,
+    "anchor": "transit-gateway",
+    "stem": "A company has 20 VPCs attached to a Transit Gateway in eu-west-1 and is opening a second site with 15 VPCs in us-east-1. Every VPC in both Regions must be able to reach every other VPC over private IP addresses, and the traffic must stay on the AWS network. Which solution meets these requirements with the LEAST operational overhead?",
+    "options": [
+      "Create VPC peering connections between each eu-west-1 VPC and each us-east-1 VPC, with routes added to every VPC route table",
+      "Create a Transit Gateway in us-east-1 and peer the two Transit Gateways with static routes for each Region's CIDR range",
+      "Attach the us-east-1 VPCs to the existing eu-west-1 Transit Gateway across Regions using cross-Region attachments",
+      "Establish a Site-to-Site VPN between the two Transit Gateways over the internet"
+    ],
+    "correct": [
+      1
+    ],
+    "explanation": "Transit Gateway peering connects a Transit Gateway in one Region to one in another over the AWS backbone, encrypted, with no internet exposure. Each side needs a static route for the other Region's address space. It replaces what would otherwise be 300 cross-Region peering connections.",
+    "distractors": [
+      "A full mesh of 20 by 15 VPC peering connections is 300 connections to create and route by hand.",
+      "",
+      "A Transit Gateway is a Regional resource; VPCs in another Region cannot attach to it directly, which is what peering between Transit Gateways is for.",
+      "A VPN between Transit Gateways works but traverses the internet and is bandwidth-limited per tunnel, which fails the AWS-network requirement."
+    ]
+  },
+  {
+    "id": "q363",
+    "domain": "secure",
+    "lecture": "09-vpc-connectivity",
+    "difficulty": 3,
+    "anchor": "transit-gateway",
+    "stem": "A company with 30 VPCs attached to a Transit Gateway wants all internet-bound traffic from every VPC to leave through a single set of NAT gateways and be inspected by AWS Network Firewall, and wants to stop deploying NAT gateways in every VPC. Which design meets these requirements?",
+    "options": [
+      "Peer every spoke VPC with the egress VPC and add a default route through the peering connection in each spoke",
+      "Deploy a NAT gateway and a Network Firewall endpoint in every spoke VPC and point each spoke's default route at its own firewall endpoint before the NAT gateway",
+      "Create a central egress VPC with the firewall and NAT gateways, attach it to the Transit Gateway, and make it the default route in the spoke route tables",
+      "Attach an internet gateway to the Transit Gateway and place the firewall rules in the Transit Gateway route table"
+    ],
+    "correct": [
+      2
+    ],
+    "explanation": "A centralised egress VPC is the Transit Gateway pattern for shared outbound inspection: spoke Transit Gateway route tables send 0.0.0.0/0 to the egress VPC attachment, where the firewall inspects traffic before the NAT gateways send it out. The per-VPC NAT gateways disappear.",
+    "distractors": [
+      "VPC peering is not transitive and does not carry a default route to the internet through another VPC's internet gateway.",
+      "This is the current state made more expensive; it keeps a NAT gateway and firewall per VPC.",
+      "",
+      "Internet gateways attach to VPCs, not to Transit Gateways, and Transit Gateway route tables hold routes, not firewall rules."
+    ]
+  },
+  {
+    "id": "q364",
+    "domain": "resilient",
+    "lecture": "09-vpc-connectivity",
+    "difficulty": 2,
+    "anchor": "transit-gateway",
+    "stem": "A company has a single AWS Direct Connect connection terminating on a Direct Connect gateway. It has grown from 3 VPCs to 40 across two Regions and now needs every VPC to reach the data centre and each other. The virtual private gateway association limit on the Direct Connect gateway has been reached. What should the solutions architect do?",
+    "options": [
+      "Create VPC peering connections from the associated VPCs to the remaining VPCs and rely on transitive routing",
+      "Order a second Direct Connect connection with its own Direct Connect gateway and split the virtual private gateway associations across the two",
+      "Replace the private virtual interface with a public virtual interface so all VPCs are reachable at once",
+      "Associate a Transit Gateway in each Region with the Direct Connect gateway and attach the VPCs to the Transit Gateways"
+    ],
+    "correct": [
+      3
+    ],
+    "explanation": "A Direct Connect gateway can associate with Transit Gateways over a transit virtual interface. One association per Region then reaches every VPC attached to that Region's Transit Gateway, and the Transit Gateways route between the VPCs, replacing the per-VPC virtual private gateway associations.",
+    "distractors": [
+      "VPC peering is not transitive, so peered VPCs cannot reach the data centre through another VPC's connection.",
+      "More connections add cost and provisioning time but do not change how many virtual private gateways a Direct Connect gateway can associate with.",
+      "A public virtual interface reaches AWS public endpoints, not the private address space of VPCs.",
+      ""
+    ]
+  },
+  {
+    "id": "q365",
+    "domain": "cost",
+    "lecture": "07-block-and-file",
+    "difficulty": 2,
+    "anchor": "efs",
+    "stem": "A development team shares source trees and build caches on an Amazon EFS file system. The files are read intensively for a few days after creation and rarely afterwards, the data can be regenerated from a repository, and the file system runs in a single-AZ development VPC. The team wants the LOWEST EFS cost without changing how developers use the share. Which configuration should be used?",
+    "options": [
+      "EFS Standard storage with Provisioned throughput sized for the peak build load",
+      "EFS One Zone storage with lifecycle management transitioning files to One Zone-Infrequent Access",
+      "EFS Standard storage with lifecycle management disabled so that files are never charged for Infrequent Access reads",
+      "An EFS file system per developer so that each pays only for their own files"
+    ],
+    "correct": [
+      1
+    ],
+    "explanation": "One Zone storage costs less than the Regional class and is appropriate for reproducible data in a single-AZ environment; lifecycle management then moves files that go untouched into the One Zone-Infrequent Access class, which is priced far lower per GB. Both are transparent to the NFS clients.",
+    "distractors": [
+      "Provisioned throughput is a performance setting that adds cost; nothing here needs it.",
+      "",
+      "Disabling lifecycle management keeps every cold file at the full Standard price.",
+      "Per-developer file systems multiply management and lose the shared cache entirely."
+    ]
+  },
+  {
+    "id": "q366",
+    "domain": "perf",
+    "lecture": "05-serverless",
+    "difficulty": 2,
+    "anchor": "the-rest-of-the-serverless-kit",
+    "stem": "A two-person startup must ship a React web application with user sign-up, a GraphQL API backed by DynamoDB, and file uploads within a month. They want hosting with continuous deployment from their Git repository and do not want to assemble the backend services by hand. Which AWS service is designed for this?",
+    "options": [
+      "Amazon Cognito",
+      "AWS Elastic Beanstalk",
+      "AWS Amplify",
+      "AWS App Runner"
+    ],
+    "correct": [
+      2
+    ],
+    "explanation": "Amplify is the front-end and mobile developer toolkit: it hosts the web app with Git-based CI/CD and provisions the backend (Cognito auth, AppSync GraphQL over DynamoDB, S3 storage) from a single project. It is the answer when a question describes building a web or mobile front end quickly, and a distractor in almost every other scenario.",
+    "distractors": [
+      "Cognito provides the sign-up and sign-in piece only; the API, storage and hosting still have to be built separately.",
+      "Elastic Beanstalk deploys and runs application code on EC2; it does not provision authentication, GraphQL or storage for a front end.",
+      "",
+      "App Runner runs a container or source code as a web service; it hosts a backend, not a front end with its auth, API and storage scaffolding."
+    ]
+  },
+  {
+    "id": "q367",
+    "domain": "perf",
+    "lecture": "07-block-and-file",
+    "difficulty": 2,
+    "anchor": "the-fsx-family",
+    "stem": "A financial modelling team runs a nightly simulation on hundreds of EC2 instances that read a 40 TB dataset kept in S3 and write results back to S3. The job needs a shared POSIX file system with throughput in the hundreds of GB/s during the run, and the file system is not needed between runs. Which option is the MOST cost-effective?",
+    "options": [
+      "An Amazon FSx for NetApp ONTAP file system with the dataset copied in from S3 before each run",
+      "A persistent Amazon FSx for Lustre file system with automatic daily backups, kept running between the nightly runs",
+      "An Amazon EFS file system in Max I/O mode with the dataset copied in from S3 before each run",
+      "A scratch Amazon FSx for Lustre file system linked to the S3 bucket, created for each run and deleted afterwards"
+    ],
+    "correct": [
+      3
+    ],
+    "explanation": "Scratch FSx for Lustre is the cheaper deployment type for short-lived, high-throughput processing: it lazily loads the linked S3 objects on first access, exports results back, and is deleted when the job finishes so nothing is paid for between runs. Persistent deployment type adds replication and backups the workload does not need.",
+    "distractors": [
+      "ONTAP is a general-purpose multi-protocol file system, not a parallel HPC file system, and would also need the data copied in.",
+      "Persistent file systems cost more per TB and keep charging between runs; their durability is unnecessary when the source and results live in S3.",
+      "EFS does not reach Lustre's throughput class for HPC and copying 40 TB in before each run adds hours and transfer cost.",
+      ""
+    ]
+  },
+  {
+    "id": "q368",
+    "domain": "resilient",
+    "lecture": "13-caching-analytics",
+    "difficulty": 2,
+    "anchor": "analytics-the-recognition-table",
+    "stem": "A company is migrating an on-premises Hadoop cluster to Amazon EMR. Data scientists currently share Hive table definitions across the cluster and lose them whenever the cluster is rebuilt. On AWS, the team wants clusters to be disposable while table definitions and data survive cluster termination. Which combination should the architect use? (Choose TWO.)",
+    "options": [
+      "Store the data in Amazon S3 and access it from EMR through EMRFS",
+      "Use the AWS Glue Data Catalog as the Hive metastore for the clusters",
+      "Store the data in HDFS on the core nodes and snapshot the volumes nightly",
+      "Run the Hive metastore database on the primary node of each cluster",
+      "Keep one cluster running permanently so the metastore is never lost"
+    ],
+    "correct": [
+      0,
+      1
+    ],
+    "explanation": "With data in S3 (read through EMRFS) and the Glue Data Catalog as the external metastore, nothing of value lives on the cluster itself, so clusters can be created and terminated freely and every new cluster sees the same tables and data.",
+    "distractors": [
+      "",
+      "",
+      "HDFS lives on the cluster's instances; snapshots are a fragile workaround that still ties data to a cluster's lifetime.",
+      "A metastore on the primary node disappears with the cluster, which is the current problem.",
+      "A permanent cluster defeats the disposable-cluster goal and pays for idle capacity."
     ]
   }
 ]
