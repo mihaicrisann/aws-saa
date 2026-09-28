@@ -15,6 +15,7 @@ const cur = read('content/curriculum.json')
 const questions = read('content/questions.json')
 const cards = read('content/flashcards.json')
 const cheat = read('content/cheatsheet.json')
+const services = read('content/services.json')
 
 const lectureIds = new Set(cur.lectures.map((l) => l.id))
 const sectionIds = Object.fromEntries(
@@ -76,6 +77,23 @@ for (const s of cheat.sections) {
     s.rows.forEach((r, i) => (Array.isArray(r) && r.length === want) || fail(`cheatsheet ${s.id} row ${i}: expected ${want} cells`))
 }
 
+const seenGroups = new Set()
+for (const g of services.groups) {
+  if (seenGroups.has(g.id)) fail(`services: duplicate group ${g.id}`)
+  seenGroups.add(g.id)
+  for (const s of g.services) {
+    if (!s.name || !s.solves || !Array.isArray(s.use) || s.use.length === 0) fail(`services ${g.id} / ${s.name}: needs name, solves and at least one use`)
+    if (s.lecture && !lectureIds.has(s.lecture)) fail(`services ${g.id} / ${s.name}: unknown lecture ${s.lecture}`)
+  }
+  const seenCmp = new Set()
+  for (const c of g.comparisons) {
+    if (seenCmp.has(c.id)) fail(`services ${g.id}: duplicate comparison ${c.id}`)
+    seenCmp.add(c.id)
+    const want = c.columns.length + 1
+    c.rows.forEach((r, i) => (Array.isArray(r) && r.length === want) || fail(`services ${g.id} / ${c.id} row ${i}: expected ${want} cells, got ${r.length}`))
+  }
+}
+
 for (const l of cur.lectures) {
   const nq = questions.filter((q) => q.lecture === l.id).length
   const nc = cards.filter((c) => c.lecture === l.id).length
@@ -100,5 +118,5 @@ if (problems.length) {
   process.exit(1)
 }
 console.log(
-  `✓ content ok — ${cur.lectures.length} lectures, ${questions.length} questions (${perDomain}, ${anchored} anchored, length cue ${Math.round(cue * 100)}%), ${cards.length} cards, ${cheat.sections.length} cheat sections`,
+  `✓ content ok — ${cur.lectures.length} lectures, ${questions.length} questions (${perDomain}, ${anchored} anchored, length cue ${Math.round(cue * 100)}%), ${cards.length} cards, ${cheat.sections.length} cheat sections, ${services.groups.length} service groups`,
 )

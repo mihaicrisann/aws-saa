@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useNavigate, useLocation } from '@/lib/navigation'
-import { Moon, Sun, Keyboard, PanelLeft, SearchIcon, LayoutGrid, BookOpen, Layers, Target, Timer, CircleX, ListChecks, TrendingUp, Network } from 'lucide-react'
+import { Moon, Sun, Keyboard, PanelLeft, SearchIcon, LayoutGrid, BookOpen, Layers, Target, Timer, CircleX, ListChecks, TrendingUp, Network, Boxes } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
@@ -23,6 +23,7 @@ export const NAV = [
   { to: '/exam', label: 'Exam', key: 'e', Icon: Timer },
   { to: '/mistakes', label: 'Mistakes', key: 'm', Icon: CircleX },
   { to: '/cheatsheet', label: 'Cheat sheet', key: 'k', Icon: ListChecks },
+  { to: '/services', label: 'Services', key: 'v', Icon: Boxes },
   { to: '/maps', label: 'Maps', key: 'a', Icon: Network },
   { to: '/progress', label: 'Progress', key: 'p', Icon: TrendingUp },
 ]
