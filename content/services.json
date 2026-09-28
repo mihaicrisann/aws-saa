@@ -1,0 +1,1028 @@
+{
+  "groups": [
+    {
+      "id": "compute",
+      "title": "Compute",
+      "blurb": "Where the code runs. The exam mostly asks which one costs least effort for the shape of the workload.",
+      "services": [
+        {
+          "name": "EC2",
+          "solves": "A virtual machine you fully control: OS, agents, licences, GPUs.",
+          "use": ["Legacy or stateful apps that need the OS", "Long-running work over 15 min or needing more than 10 GB RAM", "Specific hardware: GPU, bare metal, BYOL per socket"],
+          "avoid": "Anything short, spiky and stateless that Lambda or Fargate would run with no servers to patch.",
+          "lecture": "03-ec2"
+        },
+        {
+          "name": "Lambda",
+          "solves": "Run a function per event, pay per millisecond, nothing to manage.",
+          "use": ["Event-driven glue: S3 upload, SQS message, API call, schedule", "Bursty traffic that would idle a server", "Least operational overhead"],
+          "avoid": "Runs over 15 min, needs more than 10 GB, or needs a persistent connection or local state.",
+          "lecture": "05-serverless"
+        },
+        {
+          "name": "ECS on Fargate",
+          "solves": "Run containers without managing instances.",
+          "use": ["Containerised app that outgrows Lambda limits", "Predictable microservices where you do not want to patch hosts", "Batch containers on Fargate Spot"],
+          "avoid": "You need GPUs, daemonsets or host-level control: use ECS on EC2 instead.",
+          "lecture": "05-serverless"
+        },
+        {
+          "name": "EKS",
+          "solves": "Managed Kubernetes control plane.",
+          "use": ["Team already runs Kubernetes and wants to keep manifests and tooling", "Multi-cloud or on-prem portability is a stated requirement"],
+          "avoid": "The question does not say Kubernetes. ECS is simpler and cheaper to run.",
+          "lecture": "05-serverless"
+        },
+        {
+          "name": "Elastic Beanstalk",
+          "solves": "Deploy a web app from code; AWS provisions EC2, ALB, ASG and RDS for you.",
+          "use": ["Developers who want to upload code and not think about infrastructure", "Standard web stacks: Java, .NET, Node, Python, Docker"],
+          "avoid": "You need control over the underlying resources. You still pay for what it creates.",
+          "lecture": "05-serverless"
+        },
+        {
+          "name": "AWS Batch",
+          "solves": "Queue and run batch jobs on the cheapest compute, scaling to zero.",
+          "use": ["Thousands of jobs with dependencies, running on Spot", "Jobs longer than Lambda's 15 min"],
+          "lecture": "05-serverless"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "ec2-purchasing",
+          "title": "EC2 purchasing options",
+          "columns": ["On-Demand", "Reserved / Savings Plan", "Spot", "Dedicated Host"],
+          "rows": [
+            ["Commitment", "None", "1 or 3 years", "None, can be reclaimed", "1 or 3 years, or on-demand"],
+            ["Discount", "0 %", "Up to ~72 %", "Up to ~90 %", "None: you pay for the box"],
+            ["Interruption", "Never", "Never", "2 min warning", "Never"],
+            ["Use when", "Short, unpredictable, first time", "Steady baseline, 24/7", "Fault-tolerant, stateless, batch, CI", "Socket or core BYOL licence, compliance"]
+          ],
+          "verdict": "Baseline on Reserved or a Savings Plan, burst on Spot, everything else On-Demand."
+        },
+        {
+          "id": "savings-plans",
+          "title": "Savings Plans vs Reserved Instances",
+          "columns": ["Compute Savings Plan", "EC2 Instance Savings Plan", "Standard RI", "Convertible RI"],
+          "rows": [
+            ["Covers", "EC2 any family or Region, Fargate, Lambda", "One family in one Region, any size", "One instance type, Region or AZ", "Exchangeable for other types"],
+            ["Discount", "Up to 66 %", "Up to 72 %", "Up to 72 %", "Up to 66 %"],
+            ["Flexibility", "Highest", "Size and OS only", "None", "Change family, OS, tenancy"],
+            ["Use when", "Mixed compute, may move to containers or Lambda", "Committed to one family", "Never changing, want max discount, capacity reservation in an AZ", "Need discount but expect to change type"]
+          ]
+        },
+        {
+          "id": "lambda-concurrency",
+          "title": "Lambda concurrency controls",
+          "columns": ["Reserved concurrency", "Provisioned concurrency"],
+          "rows": [
+            ["What it does", "Caps how many concurrent executions this function may take from the account pool", "Pre-warms N execution environments"],
+            ["Solves", "One function starving the others, or throttling downstream", "Cold starts on latency-sensitive paths"],
+            ["Cost", "Free", "Charged while provisioned"],
+            ["Use when", "Limit blast radius, protect a database", "Predictable latency, e.g. a checkout API"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scaling",
+      "title": "Load balancing and scaling",
+      "blurb": "Which balancer, and how the fleet grows and shrinks.",
+      "services": [
+        {
+          "name": "Application Load Balancer",
+          "solves": "Layer 7 HTTP/HTTPS routing to targets across AZs.",
+          "use": ["Route by path, host, header, query string", "Targets are EC2, ECS tasks, Lambda, or IPs including on-prem", "Needs WAF, Cognito auth, sticky sessions, WebSocket"],
+          "avoid": "You need a static IP or non-HTTP protocols.",
+          "lecture": "04-elb-asg"
+        },
+        {
+          "name": "Network Load Balancer",
+          "solves": "Layer 4 TCP/UDP/TLS at millions of requests per second with a static IP per AZ.",
+          "use": ["Partner needs to allowlist fixed IPs", "Ultra-low latency, non-HTTP protocols", "Preserve source IP to the target", "Front an ALB when you need a static IP for HTTP"],
+          "lecture": "04-elb-asg"
+        },
+        {
+          "name": "Gateway Load Balancer",
+          "solves": "Transparently insert third-party appliances into the traffic path.",
+          "use": ["Firewall, IDS/IPS, deep packet inspection from a vendor", "Uses GENEVE on port 6081 with an endpoint in each consumer VPC"],
+          "lecture": "04-elb-asg"
+        },
+        {
+          "name": "Auto Scaling group",
+          "solves": "Keep N healthy instances across AZs and change N on demand.",
+          "use": ["Replace unhealthy instances automatically", "Scale on CPU, request count, queue depth, or a schedule", "Mixed On-Demand and Spot in one group"],
+          "lecture": "04-elb-asg"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "load-balancers",
+          "title": "ALB vs NLB vs GWLB",
+          "columns": ["ALB", "NLB", "Gateway LB"],
+          "rows": [
+            ["OSI layer", "7, HTTP/HTTPS/gRPC/WebSocket", "4, TCP/UDP/TLS", "3, IP packets"],
+            ["Routing", "Path, host, header, query, method", "Port only", "None: all traffic to appliances"],
+            ["Static IP", "No, DNS name only", "Yes, one Elastic IP per AZ", "n/a"],
+            ["Source IP", "Lost, in X-Forwarded-For", "Preserved", "Preserved"],
+            ["Latency", "Milliseconds", "~100 µs", "Adds an appliance hop"],
+            ["Extras", "WAF, Cognito, Lambda targets, sticky sessions", "TLS passthrough, PrivateLink endpoint service", "GENEVE encapsulation"],
+            ["Use when", "Web app, microservices, content routing", "Fixed IPs, extreme throughput, non-HTTP", "Vendor firewall or IDS inline"]
+          ]
+        },
+        {
+          "id": "scaling-policies",
+          "title": "Auto Scaling policies",
+          "columns": ["Target tracking", "Step scaling", "Simple scaling", "Scheduled", "Predictive"],
+          "rows": [
+            ["Trigger", "Keep a metric at a value, e.g. CPU 50 %", "CloudWatch alarm with bands", "CloudWatch alarm, one action", "A cron time", "ML forecast of history"],
+            ["Effort", "Lowest, AWS creates the alarms", "You define bands", "You define one step and a cooldown", "You know the calendar", "Needs at least 24 h of history"],
+            ["Use when", "Default answer", "Aggressive response to big spikes", "Legacy, rarely the answer", "Known pattern: 9 am Monday", "Cyclical traffic, want capacity ready before the spike"]
+          ],
+          "verdict": "Target tracking unless the question describes a schedule or a forecastable cycle."
+        },
+        {
+          "id": "asg-health",
+          "title": "Health checks and lifecycle",
+          "columns": ["EC2 status check", "ELB health check", "Lifecycle hook"],
+          "rows": [
+            ["Checks", "Instance and host hardware", "Your app answers on a path or port", "Pauses launch or termination"],
+            ["Catches", "Crashed VM", "App hung but VM fine", "n/a"],
+            ["Use when", "Default", "Behind a load balancer, always enable", "Copy logs before terminate, warm up before serving"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "title": "Storage",
+      "blurb": "Object, block or file. Then which tier inside each.",
+      "services": [
+        {
+          "name": "S3",
+          "solves": "Unlimited object storage with 11 nines of durability and per-object tiering.",
+          "use": ["Static assets, backups, data lake, logs", "Anything reached over HTTP rather than mounted", "Lifecycle rules to move to cheaper tiers"],
+          "avoid": "A file system that many instances mount, or a database.",
+          "lecture": "06-s3"
+        },
+        {
+          "name": "EBS",
+          "solves": "A network block volume attached to one instance in one AZ.",
+          "use": ["Boot volumes, databases on EC2", "Snapshots to S3 for backup and cross-AZ or cross-Region copy", "Multi-Attach only for io1/io2 within one AZ with a cluster-aware file system"],
+          "avoid": "Shared access from many instances or across AZs.",
+          "lecture": "07-block-and-file"
+        },
+        {
+          "name": "Instance store",
+          "solves": "Physically attached NVMe disk, highest IOPS, lost on stop or hardware failure.",
+          "use": ["Scratch, cache, buffer, replicated databases that tolerate loss"],
+          "avoid": "Anything that must survive a stop.",
+          "lecture": "07-block-and-file"
+        },
+        {
+          "name": "EFS",
+          "solves": "POSIX NFS file system shared by thousands of Linux instances across AZs.",
+          "use": ["Shared content between web servers, home directories, CMS uploads", "Lambda or containers needing a shared file system", "Regional by default, One Zone for cheaper non-critical data"],
+          "avoid": "Windows, or HPC-scale throughput.",
+          "lecture": "07-block-and-file"
+        },
+        {
+          "name": "FSx for Windows File Server",
+          "solves": "Managed SMB file share with NTFS, ACLs and Active Directory integration.",
+          "use": ["Windows workloads, lift-and-shift file servers, DFS namespaces"],
+          "lecture": "07-block-and-file"
+        },
+        {
+          "name": "FSx for Lustre",
+          "solves": "Parallel file system for HPC and ML with hundreds of GB/s.",
+          "use": ["Training or simulation over a dataset that lives in S3", "Scratch for burst jobs, Persistent for long-running"],
+          "lecture": "07-block-and-file"
+        },
+        {
+          "name": "FSx for NetApp ONTAP / OpenZFS",
+          "solves": "Bring existing NetApp or ZFS features: multi-protocol, snapshots, cloning, dedup.",
+          "use": ["Migrating from NetApp; needs NFS and SMB and iSCSI on the same share", "OpenZFS: NFS with low-latency snapshots, Linux only"],
+          "lecture": "07-block-and-file"
+        },
+        {
+          "name": "Storage Gateway",
+          "solves": "On-prem appliance that presents S3 as local storage with a cache.",
+          "use": ["S3 File Gateway: NFS/SMB share backed by S3", "Volume Gateway: iSCSI block, cached or stored", "Tape Gateway: replace a physical tape library with virtual tapes in Glacier"],
+          "lecture": "19-migration-hybrid"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "block-file-object",
+          "title": "EBS vs EFS vs FSx vs S3",
+          "columns": ["EBS", "EFS", "FSx Windows", "FSx Lustre", "S3"],
+          "rows": [
+            ["Type", "Block", "File, NFS", "File, SMB", "File, parallel", "Object, HTTP"],
+            ["Attach", "One instance, one AZ", "Thousands, across AZs", "Many Windows or Linux", "Many, one AZ", "Anything, anywhere"],
+            ["OS", "Any", "Linux", "Windows first", "Linux", "n/a"],
+            ["Scale", "Up to 64 TiB", "Petabytes, elastic", "Up to 64 TiB per FS", "Hundreds of GB/s", "Unlimited"],
+            ["Use when", "Boot, database on EC2", "Shared Linux content", "AD, NTFS, SMB", "HPC, ML training on S3 data", "Assets, backups, data lake"]
+          ]
+        },
+        {
+          "id": "ebs-types",
+          "title": "EBS volume types",
+          "columns": ["gp3", "io2 Block Express", "st1", "sc1"],
+          "rows": [
+            ["Kind", "SSD, general", "SSD, provisioned IOPS", "HDD, throughput", "HDD, cold"],
+            ["IOPS", "3,000 baseline, up to 16,000, set independently of size", "Up to 256,000, sub-ms, 99.999 % durable", "500", "250"],
+            ["Bootable", "Yes", "Yes", "No", "No"],
+            ["Multi-Attach", "No", "Yes", "No", "No"],
+            ["Use when", "Default for everything", "Critical databases needing more than 16k IOPS", "Big sequential: logs, Kafka, ETL", "Cheapest, infrequently accessed"]
+          ],
+          "verdict": "gp3 unless the number of IOPS says io2. HDD never boots."
+        },
+        {
+          "id": "efs-classes",
+          "title": "EFS storage classes and modes",
+          "columns": ["Standard", "Infrequent Access", "Archive", "One Zone"],
+          "rows": [
+            ["Availability", "Multi-AZ", "Multi-AZ", "Multi-AZ", "Single AZ, ~47 % cheaper"],
+            ["Access cost", "None", "Per GB retrieved", "Per GB retrieved, higher", "None"],
+            ["Move with", "Lifecycle policy after N days without access", "Lifecycle policy", "Lifecycle policy", "Chosen at creation"],
+            ["Throughput", "Elastic (default), Bursting, Provisioned", "", "", ""],
+            ["Use when", "Active data", "Accessed a few times a quarter", "Accessed a few times a year", "Dev, scratch, easily recreated"]
+          ]
+        },
+        {
+          "id": "s3-classes",
+          "title": "S3 storage classes",
+          "columns": ["Standard", "Intelligent-Tiering", "Standard-IA", "One Zone-IA", "Glacier Instant", "Glacier Flexible", "Glacier Deep Archive"],
+          "rows": [
+            ["Retrieval", "ms", "ms", "ms", "ms", "ms", "Minutes to 12 h", "12 to 48 h"],
+            ["Min duration", "None", "None", "30 days", "30 days", "90 days", "90 days", "180 days"],
+            ["Retrieval fee", "No", "No", "Yes", "Yes", "Yes", "Yes", "Yes"],
+            ["AZs", "3+", "3+", "3+", "1", "3+", "3+", "3+"],
+            ["Use when", "Hot, frequently read", "Unknown or changing pattern, no analysis", "Backups read monthly", "Recreatable data, cheapest ms access", "Archive needing instant read once a quarter", "Archive, hours is fine", "Compliance, 7 to 10 years, rarely touched"]
+          ],
+          "verdict": "\"Unknown access pattern\" is Intelligent-Tiering. \"Milliseconds\" rules out Flexible and Deep Archive."
+        },
+        {
+          "id": "s3-security",
+          "title": "S3 access controls",
+          "columns": ["Bucket policy", "IAM policy", "ACL", "Block Public Access", "Object Lock"],
+          "rows": [
+            ["Attached to", "Bucket", "User or role", "Bucket or object, legacy", "Bucket or account", "Bucket, versioned objects"],
+            ["Cross-account", "Yes", "No, same account only", "Yes, but avoid", "n/a", "n/a"],
+            ["Use when", "Grant another account, enforce TLS, restrict to a VPC endpoint", "Grant your own principals", "Almost never; disable with Object Ownership", "Always on unless it is a public website", "WORM: governance (overridable) or compliance (nobody, even root)"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "databases",
+      "title": "Databases",
+      "blurb": "Relational vs NoSQL is the first cut. Then availability vs read scaling.",
+      "services": [
+        {
+          "name": "RDS",
+          "solves": "Managed relational engines: MySQL, PostgreSQL, MariaDB, Oracle, SQL Server, Db2.",
+          "use": ["Existing SQL app, joins, transactions", "Automated backups, patching, Multi-AZ with one checkbox"],
+          "avoid": "You need the OS, or a NoSQL access pattern at massive scale.",
+          "lecture": "11-rds-aurora"
+        },
+        {
+          "name": "Aurora",
+          "solves": "AWS-built MySQL/PostgreSQL-compatible engine on a shared storage layer copied 6 ways across 3 AZs.",
+          "use": ["Higher performance and availability than RDS", "Up to 15 readers on one endpoint, failover in about 30 s", "Serverless v2 for variable or unknown load", "Global Database for cross-Region under 1 s lag"],
+          "lecture": "11-rds-aurora"
+        },
+        {
+          "name": "DynamoDB",
+          "solves": "Serverless key-value store with single-digit ms at any scale.",
+          "use": ["Session state, carts, profiles, IoT, leaderboards", "Known access patterns by key", "TTL to expire items, Streams to react to changes, Global Tables for active-active"],
+          "avoid": "Ad-hoc joins, complex queries across many attributes.",
+          "lecture": "12-dynamodb"
+        },
+        {
+          "name": "ElastiCache",
+          "solves": "In-memory cache in front of a database, sub-ms reads.",
+          "use": ["Read-heavy relational workloads", "Session store, leaderboards, pub/sub (Redis)"],
+          "lecture": "13-caching-analytics"
+        },
+        {
+          "name": "DAX",
+          "solves": "Write-through cache built into DynamoDB, microsecond reads, no code change.",
+          "use": ["DynamoDB read hot spots", "Question says microseconds and DynamoDB together"],
+          "lecture": "12-dynamodb"
+        },
+        {
+          "name": "Redshift",
+          "solves": "Petabyte columnar data warehouse for BI and complex joins.",
+          "use": ["OLAP, dashboards, joins across TBs", "Spectrum to query S3 without loading"],
+          "avoid": "OLTP, or ad-hoc queries over S3 with nothing to provision: that is Athena.",
+          "lecture": "13-caching-analytics"
+        },
+        {
+          "name": "Others to recognise",
+          "solves": "Neptune is graphs. DocumentDB is MongoDB. Keyspaces is Cassandra. Timestream is time series. QLDB is an immutable ledger. MemoryDB is durable Redis as a primary database.",
+          "use": ["Pick by the word in the question"],
+          "lecture": "20-managed-services"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "multi-az-vs-replica",
+          "title": "RDS Multi-AZ vs read replica",
+          "columns": ["Multi-AZ instance", "Multi-AZ cluster", "Read replica"],
+          "rows": [
+            ["Purpose", "Availability", "Availability and read scaling", "Read scaling, or a cross-Region copy"],
+            ["Replication", "Synchronous", "Synchronous to 2 readers", "Asynchronous"],
+            ["Readable?", "No, standby is idle", "Yes, 2 readable standbys", "Yes, that is the point"],
+            ["Failover", "Automatic, 60 to 120 s, same DNS", "Automatic, under 35 s", "Manual promotion, breaks replication"],
+            ["Where", "Second AZ, same Region", "Two other AZs", "Same AZ, other AZ, or other Region"],
+            ["Backups", "Taken from standby, no I/O pause", "From a reader", "Can have their own"],
+            ["Cost", "Two instances", "Three instances", "One extra per replica plus cross-Region transfer"],
+            ["Use when", "Cannot afford downtime", "Both HA and reads", "Reporting, read-heavy, DR in another Region"]
+          ],
+          "verdict": "Sync and idle is availability. Async and readable is performance. A replica can also be Multi-AZ."
+        },
+        {
+          "id": "aurora-topologies",
+          "title": "Aurora options",
+          "columns": ["Aurora replicas", "Aurora Serverless v2", "Global Database", "Multi-master (legacy)"],
+          "rows": [
+            ["Solves", "Read scaling and HA in one Region", "Unknown or spiky load", "Cross-Region DR and local reads", "Multi-writer in one Region"],
+            ["Replication", "Shared storage, ms lag", "Same", "Async storage-level, under 1 s lag", "n/a"],
+            ["Failover", "~30 s, replica promoted, reader endpoint", "Same", "Secondary promoted in under 1 min, RPO ~1 s", "n/a"],
+            ["Readers", "Up to 15, auto scaling, custom endpoints", "Scales in ACUs", "Up to 16 per secondary Region", "n/a"],
+            ["Use when", "Default Aurora", "Dev, test, unpredictable, pay per second", "RPO under 1 s and RTO under 1 min across Regions", "Rare on the exam"]
+          ]
+        },
+        {
+          "id": "aurora-vs-rds",
+          "title": "Aurora vs RDS",
+          "columns": ["RDS", "Aurora"],
+          "rows": [
+            ["Engines", "6 including Oracle and SQL Server", "MySQL and PostgreSQL compatible only"],
+            ["Storage", "EBS, you pick size and type", "Auto-grows to 128 TiB, 6 copies in 3 AZs"],
+            ["Readers", "Up to 15 (5 on Oracle/SQL Server), async", "Up to 15, share storage, ms lag"],
+            ["Failover", "60 to 120 s", "About 30 s"],
+            ["Cross-Region", "Read replica, async", "Global Database, under 1 s"],
+            ["Cost", "Lower for small steady loads", "Higher base, better price per throughput"],
+            ["Use when", "Oracle or SQL Server, or simple small DB", "Performance, availability, MySQL/Postgres"]
+          ]
+        },
+        {
+          "id": "dynamodb-capacity",
+          "title": "DynamoDB capacity and indexes",
+          "columns": ["On-demand", "Provisioned + auto scaling", "GSI", "LSI"],
+          "rows": [
+            ["What", "Pay per request", "Pay for RCU/WCU, reserved possible", "Index on any partition and sort key", "Index with the same partition key, different sort key"],
+            ["When created", "Any time, switch once per 24 h", "Any time", "Any time", "At table creation only"],
+            ["Capacity", "n/a", "n/a", "Its own", "Shares the table's"],
+            ["Consistency", "n/a", "n/a", "Eventual only", "Strong or eventual"],
+            ["Use when", "Unknown or spiky traffic, new tables", "Predictable traffic, cheaper", "Query by another attribute", "Alternate sort within one partition, strongly consistent"]
+          ]
+        },
+        {
+          "id": "caches",
+          "title": "ElastiCache Redis vs Memcached vs DAX",
+          "columns": ["Redis", "Memcached", "DAX"],
+          "rows": [
+            ["Data", "Structures, sorted sets, pub/sub, geospatial", "Simple key-value", "DynamoDB items and query results"],
+                ["Durability", "Persistence, replication, Multi-AZ auto failover, backups", "None, disposable", "Multi-AZ cluster"],
+            ["Threads", "Single-threaded", "Multi-threaded, scales out by adding nodes", "n/a"],
+            ["Use when", "Anything that must survive, leaderboards, sessions", "Simplest cache, large nodes, no HA needed", "DynamoDB specifically, microseconds, no code change"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "networking",
+      "title": "VPC and connectivity",
+      "blurb": "Traffic control inside the VPC, then getting out of it and connecting to others.",
+      "services": [
+        {
+          "name": "Security group",
+          "solves": "Stateful firewall on an ENI: allow rules only, return traffic is automatic.",
+          "use": ["Default answer for instance-level control", "Reference another SG as the source: 'only the ALB may talk to the app tier'"],
+          "lecture": "08-vpc"
+        },
+        {
+          "name": "Network ACL",
+          "solves": "Stateless subnet-level firewall with ordered allow and deny rules.",
+          "use": ["Block a specific IP or range", "Defence in depth at subnet boundary", "Remember ephemeral ports both ways"],
+          "lecture": "08-vpc"
+        },
+        {
+          "name": "NAT Gateway",
+          "solves": "Private subnet instances reach the internet for outbound only.",
+          "use": ["Patching, package downloads, calling public APIs from private instances", "One per AZ for resilience, lives in a public subnet", "IPv6 uses an egress-only internet gateway instead"],
+          "avoid": "Traffic to S3 or DynamoDB: use a gateway endpoint, it is free.",
+          "lecture": "08-vpc"
+        },
+        {
+          "name": "VPC endpoints",
+          "solves": "Reach AWS services privately without an internet gateway or NAT.",
+          "use": ["Gateway endpoint: S3 and DynamoDB, free, a route table entry", "Interface endpoint (PrivateLink): everything else, an ENI in your subnet, hourly cost", "Endpoint policies to restrict which buckets or APIs"],
+          "lecture": "09-vpc-connectivity"
+        },
+        {
+          "name": "VPC peering",
+          "solves": "Private routing between two VPCs, even across accounts and Regions.",
+          "use": ["A handful of VPCs", "No overlapping CIDRs, not transitive"],
+          "avoid": "Many VPCs: the mesh explodes. Use Transit Gateway.",
+          "lecture": "09-vpc-connectivity"
+        },
+        {
+          "name": "Transit Gateway",
+          "solves": "Hub-and-spoke router for many VPCs, VPNs and Direct Connect.",
+          "use": ["Tens or hundreds of VPCs", "Transitive routing, shared VPN or DX, multicast", "Cross-Region peering of TGWs"],
+          "lecture": "09-vpc-connectivity"
+        },
+        {
+          "name": "PrivateLink",
+          "solves": "Expose one service to other VPCs or accounts without peering or overlapping CIDR worries.",
+          "use": ["SaaS-style: consumers get an interface endpoint to your NLB", "Only that service is reachable, nothing else in the VPC"],
+          "lecture": "09-vpc-connectivity"
+        },
+        {
+          "name": "Site-to-Site VPN",
+          "solves": "Encrypted IPsec tunnel from on-prem over the public internet in minutes.",
+          "use": ["Quick, cheap hybrid link", "Backup for Direct Connect", "Accelerated VPN via Global Accelerator for jittery paths"],
+          "lecture": "09-vpc-connectivity"
+        },
+        {
+          "name": "Direct Connect",
+          "solves": "Dedicated private fibre from your data centre to AWS.",
+          "use": ["Consistent latency, large sustained throughput, cheaper egress", "Takes weeks to months; not encrypted by default, add VPN on top or MACsec", "Two connections at two locations for resilience"],
+          "lecture": "09-vpc-connectivity"
+        },
+        {
+          "name": "Client VPN",
+          "solves": "OpenVPN-based remote access for individual users into a VPC.",
+          "use": ["Remote staff needing private access", "Auth via AD, SAML or certificates"],
+          "lecture": "09-vpc-connectivity"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "sg-vs-nacl",
+          "title": "Security group vs network ACL",
+          "columns": ["Security group", "Network ACL"],
+          "rows": [
+            ["Level", "Instance / ENI", "Subnet"],
+            ["State", "Stateful", "Stateless, evaluate both directions"],
+            ["Rules", "Allow only", "Allow and deny, numbered, first match wins"],
+            ["Evaluation", "All rules", "In order until a match"],
+            ["Default", "Deny all inbound, allow all outbound", "Default NACL allows all; custom denies all"],
+            ["Use when", "Nearly always", "Block a specific IP, subnet-wide deny"]
+          ]
+        },
+        {
+          "id": "egress-options",
+          "title": "Getting private subnets out",
+          "columns": ["NAT Gateway", "NAT instance", "Gateway endpoint", "Interface endpoint", "Egress-only IGW"],
+          "rows": [
+            ["Managed", "Yes, 100 Gbps, per AZ", "No, an EC2 you patch", "Yes", "Yes", "Yes"],
+            ["Cost", "Hourly plus per GB", "Instance price", "Free", "Hourly per AZ plus per GB", "Free"],
+            ["Reaches", "Any internet host", "Any internet host", "S3 and DynamoDB only", "One AWS or PrivateLink service", "IPv6 internet"],
+            ["Use when", "Default outbound", "Port forwarding or bastion, legacy", "Private subnet to S3, cut NAT cost", "Private to any other AWS API, also from on-prem", "IPv6 outbound"]
+          ],
+          "verdict": "\"Reduce NAT Gateway cost\" plus S3 or DynamoDB equals gateway endpoint."
+        },
+        {
+          "id": "vpc-connectivity",
+          "title": "Connecting VPCs and sites",
+          "columns": ["Peering", "Transit Gateway", "PrivateLink", "Site-to-Site VPN", "Direct Connect"],
+          "rows": [
+            ["Connects", "Two VPCs", "Many VPCs, VPNs, DX", "One service to many consumers", "On-prem to VPC", "On-prem to VPC or many via DX Gateway"],
+            ["Transitive", "No", "Yes", "n/a", "Via TGW", "Via DX Gateway"],
+            ["CIDR overlap", "Not allowed", "Not allowed", "Allowed", "Not allowed", "Not allowed"],
+            ["Setup time", "Minutes", "Minutes", "Minutes", "Hours", "Weeks to months"],
+            ["Encrypted", "Yes on AWS backbone", "Yes on backbone", "Yes", "IPsec", "No, add VPN or MACsec"],
+            ["Use when", "Few VPCs", "Hub and spoke at scale", "Expose a service, SaaS", "Fast, cheap hybrid, backup path", "Steady high bandwidth, consistent latency"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "edge",
+      "title": "Edge, DNS and acceleration",
+      "blurb": "Route 53 answers names, CloudFront caches, Global Accelerator routes over the backbone.",
+      "services": [
+        {
+          "name": "Route 53",
+          "solves": "DNS with health checks and traffic-shaping routing policies.",
+          "use": ["Alias records to ALB, CloudFront, S3 website at the zone apex", "Failover, latency, geolocation, weighted, multivalue routing", "Private hosted zones for VPC-internal names"],
+          "lecture": "10-edge"
+        },
+        {
+          "name": "CloudFront",
+          "solves": "CDN that caches HTTP content at edge locations worldwide.",
+          "use": ["Static and dynamic web content, video, APIs", "Origin Access Control to keep S3 private", "Signed URLs or cookies for paid content", "Lambda@Edge and CloudFront Functions to rewrite requests", "Field-level encryption, WAF and Shield attach here"],
+          "lecture": "10-edge"
+        },
+        {
+          "name": "Global Accelerator",
+          "solves": "Two static anycast IPs that route any TCP/UDP traffic over the AWS backbone to the nearest healthy endpoint.",
+          "use": ["Gaming, VoIP, IoT, non-HTTP", "Static IPs for allowlisting in front of ALB/NLB/EIP", "Fast cross-Region failover, deterministic routing"],
+          "avoid": "Caching. It does not cache anything.",
+          "lecture": "10-edge"
+        },
+        {
+          "name": "S3 Transfer Acceleration",
+          "solves": "Upload to a far-away bucket faster by entering at the nearest edge and riding the backbone.",
+          "use": ["Global users uploading large files to one bucket", "Pair with multipart upload for anything over 100 MB"],
+          "lecture": "06-s3"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "cloudfront-vs-ga",
+          "title": "CloudFront vs Global Accelerator vs Transfer Acceleration",
+          "columns": ["CloudFront", "Global Accelerator", "S3 Transfer Acceleration"],
+          "rows": [
+            ["Protocol", "HTTP/HTTPS", "Any TCP or UDP", "HTTPS to S3"],
+            ["Caches", "Yes", "No", "No"],
+            ["Static IP", "No, DNS name", "Two anycast IPs", "No"],
+            ["Direction", "Download-heavy, serve content", "Both, application traffic", "Upload to a bucket"],
+            ["Failover", "Origin groups", "Sub-minute, health-based", "n/a"],
+            ["Use when", "Cache content close to users, S3 websites, video", "Non-HTTP, static IP, gaming, fast Regional failover", "Users far from the bucket uploading large objects"]
+          ]
+        },
+        {
+          "id": "route53-policies",
+          "title": "Route 53 routing policies",
+          "columns": ["Simple", "Weighted", "Latency", "Failover", "Geolocation", "Geoproximity", "Multivalue"],
+          "rows": [
+            ["Picks by", "Nothing, one record", "Percent split", "Lowest measured latency", "Health check", "Where the user is", "Distance plus a bias", "Up to 8 healthy random"],
+            ["Health checks", "No", "Optional", "Optional", "Required", "Optional", "Optional", "Yes"],
+            ["Use when", "Single endpoint", "Blue/green, canary", "Speed", "Active-passive DR", "Legal jurisdiction, localised content", "Shift traffic between Regions on purpose", "Poor man's load balancing"]
+          ],
+          "verdict": "\"Fastest\" is latency. \"Must stay in country\" is geolocation. \"Standby\" is failover."
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "title": "Identity and security",
+      "blurb": "Who can do what, where the guard rails sit, and which service watches which layer.",
+      "services": [
+        {
+          "name": "IAM",
+          "solves": "Users, groups, roles and policies inside one account.",
+          "use": ["Roles for anything running on AWS, never long-lived keys", "Identity policies grant, resource policies grant cross-account, permission boundaries cap", "Explicit deny always wins"],
+          "lecture": "02-iam"
+        },
+        {
+          "name": "Organizations and SCPs",
+          "solves": "Many accounts under one payer with guard rails that even root cannot bypass.",
+          "use": ["Consolidated billing and shared Reserved discounts", "SCPs to deny a Region, a service, or disabling CloudTrail", "OUs for prod vs sandbox"],
+          "avoid": "SCPs do not grant anything and do not apply to the management account.",
+          "lecture": "02-iam"
+        },
+        {
+          "name": "IAM Identity Center",
+          "solves": "Single sign-on to many accounts and SaaS apps from one identity source.",
+          "use": ["Workforce SSO with AD or Okta", "Permission sets across an Organization"],
+          "lecture": "02-iam"
+        },
+        {
+          "name": "Cognito",
+          "solves": "Sign-up, sign-in and tokens for your own app's customers.",
+          "use": ["User pool: directory and JWTs, social login, MFA", "Identity pool: swap a token for temporary AWS credentials, guest access"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "Directory Service",
+          "solves": "Active Directory in AWS, in three flavours.",
+          "use": ["See the comparison below; the exam asks which flavour"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "KMS",
+          "solves": "Managed keys for envelope encryption across almost every service.",
+          "use": ["Customer managed keys for audit, rotation and cross-account grants", "Multi-Region keys for replicated data", "4 KB limit per direct encrypt call"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "CloudHSM",
+          "solves": "Single-tenant FIPS 140-2 Level 3 hardware you control.",
+          "use": ["Regulatory need to own the key material", "Oracle TDE, SSL offload, custom key store for KMS"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "Secrets Manager",
+          "solves": "Store and automatically rotate database and API credentials.",
+          "use": ["RDS, Redshift, DocumentDB rotation with a Lambda", "Cross-account secret sharing"],
+          "avoid": "Plain config values: Parameter Store standard tier is free.",
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "ACM",
+          "solves": "Free public TLS certificates with auto-renewal for ALB, CloudFront, API Gateway.",
+          "use": ["CloudFront certs must live in us-east-1", "Private CA for internal certs"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "WAF",
+          "solves": "Layer 7 rules on ALB, CloudFront, API Gateway, AppSync, Cognito.",
+          "use": ["SQL injection, XSS, geo block, rate limit per IP, bot control", "Managed rule groups from AWS and vendors"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "Shield",
+          "solves": "DDoS protection. Standard is free and on; Advanced adds 24/7 response, cost protection, and WAF at no charge.",
+          "use": ["Advanced when the question mentions sophisticated DDoS, cost of scaling during an attack, or the DRT"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "GuardDuty",
+          "solves": "Threat detection from CloudTrail, VPC Flow Logs, DNS logs, EKS, S3, Malware.",
+          "use": ["Compromised credentials, crypto mining, unusual API calls", "Nothing to install; findings go to EventBridge"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "Inspector",
+          "solves": "Vulnerability scanning of EC2, container images and Lambda.",
+          "use": ["CVEs and network reachability", "Continuous, agent via SSM"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "Macie",
+          "solves": "Finds PII and sensitive data in S3 with ML.",
+          "use": ["Question says S3 and personal data or compliance discovery"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "Security Hub and Detective",
+          "solves": "Security Hub aggregates findings and scores against standards. Detective builds a graph to investigate a finding's root cause.",
+          "use": ["Single pane across accounts", "Detective when the question says investigate or root cause"],
+          "lecture": "16-security-toolbox"
+        },
+        {
+          "name": "Network Firewall",
+          "solves": "Managed stateful firewall at the VPC level with domain, IP and Suricata rules.",
+          "use": ["Central egress filtering, intrusion prevention across VPCs", "Deployed via Firewall Manager for the whole Organization"],
+          "lecture": "16-security-toolbox"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "policy-types",
+          "title": "Policy types",
+          "columns": ["Identity policy", "Resource policy", "Permission boundary", "SCP", "Session policy"],
+          "rows": [
+            ["Attached to", "User, group, role", "Bucket, queue, key, secret", "User or role", "OU or account", "AssumeRole call"],
+            ["Grants?", "Yes", "Yes, incl. other accounts", "No, caps", "No, caps", "No, caps"],
+            ["Cross-account", "No", "Yes", "n/a", "Whole Organization", "n/a"],
+            ["Use when", "Give a principal access", "Let another account in, or restrict a resource", "Delegate IAM admin safely", "Guard rail: no Region X, no leaving the org", "Temporary narrowing"]
+          ],
+          "verdict": "Effective = (identity OR resource) AND boundary AND SCP AND session, minus any explicit deny."
+        },
+        {
+          "id": "directory-flavours",
+          "title": "Directory Service flavours",
+          "columns": ["AWS Managed Microsoft AD", "AD Connector", "Simple AD"],
+          "rows": [
+            ["What it is", "Real Windows AD running in AWS, Multi-AZ", "A proxy to your on-prem AD, nothing stored", "Samba-based, AD-compatible"],
+            ["Users live", "In AWS, plus trust to on-prem", "On-prem only", "In AWS"],
+            ["Trust with on-prem", "Yes, one or two way", "n/a, it is on-prem", "No"],
+            ["Works with", "FSx Windows, RDS SQL Server, SSO, EC2 domain join, MFA via RADIUS", "EC2 domain join, SSO, WorkSpaces, MFA", "Small: under 5,000 users, no MFA, no trust"],
+            ["Use when", "Need AD in AWS, or hybrid with a trust, or AD-aware services", "Keep everything on-prem, just let AWS authenticate against it", "Cheap, small, Linux-friendly, no Microsoft features"]
+          ]
+        },
+        {
+          "id": "kms-key-types",
+          "title": "KMS key types",
+          "columns": ["AWS owned", "AWS managed", "Customer managed", "Imported / CloudHSM"],
+          "rows": [
+            ["Visible", "No", "Yes, aws/service", "Yes", "Yes"],
+            ["Rotation", "AWS decides", "Yearly, automatic", "Optional yearly, or manual", "Manual"],
+            ["Cross-account", "No", "No", "Yes via key policy", "Yes"],
+            ["Cost", "Free", "Free key, per-call", "$1/month plus per-call", "HSM cluster hourly"],
+            ["Use when", "Default", "Just want encryption on", "Audit, cross-account, control policy", "Must own key material"]
+          ]
+        },
+        {
+          "id": "s3-encryption",
+          "title": "S3 encryption options",
+          "columns": ["SSE-S3", "SSE-KMS", "DSSE-KMS", "SSE-C", "Client-side"],
+          "rows": [
+            ["Key held by", "S3", "KMS", "KMS, encrypted twice", "You, sent per request", "You"],
+            ["Audit trail", "No", "CloudTrail per key use", "Yes", "No", "Yours"],
+            ["Gotcha", "Default since 2023", "KMS request quota, Bucket Keys reduce it", "Compliance needing two layers", "HTTPS mandatory, you lose key you lose data", "S3 never sees plaintext"],
+            ["Use when", "Nothing special asked", "Need control or audit of the key", "Two-layer requirement", "Own keys, no KMS", "Encrypt before upload"]
+          ]
+        },
+        {
+          "id": "security-monitoring",
+          "title": "Which security service watches what",
+          "columns": ["GuardDuty", "Inspector", "Macie", "Security Hub", "Detective", "Config"],
+          "rows": [
+            ["Looks at", "Logs: CloudTrail, VPC Flow, DNS", "EC2, ECR images, Lambda", "S3 objects", "Findings from all of them", "A finding's history graph", "Resource configuration"],
+            ["Finds", "Threats, compromise", "CVEs, open ports", "PII, secrets", "Compliance score, aggregation", "Root cause", "Drift, non-compliant resources"],
+            ["Use when", "Malicious activity, mining", "Vulnerabilities", "Sensitive data in S3", "Single view across accounts", "Investigate", "Is this bucket public, was it always"]
+          ]
+        },
+        {
+          "id": "waf-shield-fw",
+          "title": "WAF vs Shield vs Network Firewall vs NACL",
+          "columns": ["WAF", "Shield Advanced", "Network Firewall", "NACL / SG"],
+          "rows": [
+            ["Layer", "7, HTTP", "3, 4 and 7 DDoS", "3 to 7 at VPC edge", "3 and 4"],
+            ["Attaches to", "ALB, CloudFront, API Gateway, AppSync", "ALB, CloudFront, GA, EIP, Route 53", "VPC subnets via endpoint", "Subnet / ENI"],
+            ["Stops", "SQLi, XSS, bots, rate abuse, geo", "Volumetric floods, with cost protection", "Domain egress, IPS signatures, cross-VPC", "Specific IPs and ports"],
+            ["Use when", "Application attacks on HTTP", "DDoS with SLA and money back", "Central inspection of all VPC traffic", "Simple allow / deny"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "integration",
+      "title": "Messaging and integration",
+      "blurb": "Decoupling. The words 'lose', 'order', 'replay' and 'fan out' each point to one service.",
+      "services": [
+        {
+          "name": "SQS",
+          "solves": "Durable queue that buffers work between producers and consumers.",
+          "use": ["Absorb spikes, never lose a request, retry with a dead-letter queue", "Consumers scale on queue depth", "Long polling to cut cost, visibility timeout to avoid double work"],
+          "lecture": "14-decoupling"
+        },
+        {
+          "name": "SNS",
+          "solves": "Push one message to many subscribers at once.",
+          "use": ["Fan out to SQS queues, Lambda, HTTP, email, SMS", "Message filtering per subscription", "Alarms and notifications"],
+          "lecture": "14-decoupling"
+        },
+        {
+          "name": "EventBridge",
+          "solves": "Event bus that routes by content from AWS services, SaaS and your apps.",
+          "use": ["React to an AWS event: instance stopped, object created", "Rules with content filters, schema registry, archive and replay", "Scheduler for cron"],
+          "lecture": "14-decoupling"
+        },
+        {
+          "name": "Step Functions",
+          "solves": "Orchestrate multi-step workflows with retries, branching and waits.",
+          "use": ["Lambda chains getting unwieldy", "Human approval, long waits up to a year (Standard)", "Express for high-volume short workflows"],
+          "lecture": "14-decoupling"
+        },
+        {
+          "name": "Amazon MQ",
+          "solves": "Managed ActiveMQ or RabbitMQ for apps that already speak JMS, AMQP, MQTT, STOMP.",
+          "use": ["Lift and shift a broker without rewriting"],
+          "avoid": "New apps: use SQS/SNS, they scale better.",
+          "lecture": "14-decoupling"
+        },
+        {
+          "name": "API Gateway",
+          "solves": "Managed front door for REST, HTTP and WebSocket APIs.",
+          "use": ["Throttling, usage plans and API keys, caching, auth via Cognito, IAM or Lambda authorizer", "Lambda or any HTTP backend, private via VPC link", "WebSocket for two-way"],
+          "lecture": "05-serverless"
+        },
+        {
+          "name": "AppSync",
+          "solves": "Managed GraphQL with real-time subscriptions and offline sync.",
+          "use": ["Question says GraphQL, or mobile app with real-time updates"],
+          "lecture": "20-managed-services"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "sqs-sns-eventbridge",
+          "title": "SQS vs SNS vs EventBridge",
+          "columns": ["SQS", "SNS", "EventBridge"],
+          "rows": [
+            ["Model", "Pull, one consumer group", "Push, many subscribers", "Bus with rules, many targets"],
+            ["Persistence", "Up to 14 days, until deleted", "None, deliver and forget", "Archive and replay optional"],
+            ["Filtering", "No", "By message attributes", "By any field in the event"],
+            ["Sources", "Your producers", "Your publishers, alarms", "AWS services, SaaS, yours"],
+            ["Use when", "Buffer work, decouple, retry", "Fan out, notify humans", "React to AWS events, route by content, schedule"]
+          ],
+          "verdict": "Fan out plus durability is SNS in front of one SQS queue per consumer."
+        },
+        {
+          "id": "sqs-types",
+          "title": "SQS Standard vs FIFO",
+          "columns": ["Standard", "FIFO"],
+          "rows": [
+            ["Order", "Best effort", "Strict within a message group"],
+            ["Delivery", "At least once, duplicates possible", "Exactly once, dedup by id or content hash in 5 min"],
+            ["Throughput", "Nearly unlimited", "300 msg/s, 3,000 with batching, higher in high-throughput mode"],
+            ["Use when", "Default", "Order matters, no duplicates: payments, inventory"]
+          ]
+        },
+        {
+          "id": "streams",
+          "title": "Kinesis Data Streams vs Firehose vs SQS vs MSK",
+          "columns": ["Kinesis Data Streams", "Data Firehose", "SQS", "MSK"],
+          "rows": [
+            ["Purpose", "Real-time stream, many consumers, replay", "Load a stream into S3, Redshift, OpenSearch, HTTP", "Work queue", "Managed Kafka"],
+            ["Latency", "~200 ms", "Near real time, 60 s or 1 MB buffer", "ms", "ms"],
+            ["Retention", "24 h to 365 days, replayable", "None, delivery only", "Until consumed, max 14 days", "Configurable, replayable"],
+            ["Scaling", "Shards, or on-demand", "Fully managed", "Fully managed", "Brokers you size"],
+            ["Transform", "Consumers do it", "Lambda inline, format conversion to Parquet", "No", "Consumers"],
+            ["Use when", "Clickstream, IoT, multiple apps reading the same stream", "Simplest path stream to S3, zero code", "Decouple, one consumer", "Team already on Kafka"]
+          ],
+          "verdict": "\"Replay\" or \"multiple consumers\" is Streams. \"Deliver to S3 with least effort\" is Firehose."
+        },
+        {
+          "id": "api-gateway-types",
+          "title": "API Gateway flavours and Lambda invocation",
+          "columns": ["REST API", "HTTP API", "WebSocket API", "Lambda function URL", "ALB to Lambda"],
+          "rows": [
+            ["Cost", "Highest", "~70 % cheaper", "Per message and minute", "Free", "ALB hourly"],
+            ["Features", "Usage plans, API keys, caching, WAF, request validation, private", "JWT auth, CORS, simple proxy", "Two-way persistent", "Just HTTPS in, IAM or none auth", "Path routing alongside other targets"],
+            ["Use when", "Need throttling per client, caching, or private endpoint", "Simple, cheap proxy to Lambda", "Chat, live dashboards", "Webhook, no gateway needed", "Lambda mixed with EC2 behind one ALB"]
+          ]
+        },
+        {
+          "id": "workflow-orchestration",
+          "title": "Step Functions Standard vs Express",
+          "columns": ["Standard", "Express"],
+          "rows": [
+            ["Duration", "Up to 1 year", "Up to 5 min"],
+            ["Execution", "Exactly once, history kept 90 days", "At least once, logs to CloudWatch"],
+            ["Pricing", "Per state transition", "Per run and duration"],
+            ["Use when", "Long, auditable, human steps", "High volume, short: IoT ingestion, streaming transforms"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "analytics",
+      "title": "Analytics and data movement",
+      "blurb": "Query it where it lies, or move it. Each service maps to one verb.",
+      "services": [
+        {
+          "name": "Athena",
+          "solves": "SQL over files in S3, serverless, pay per TB scanned.",
+          "use": ["Ad-hoc queries on logs or a data lake", "Cut cost with Parquet, partitions and compression", "Glue Data Catalog holds the schema"],
+          "lecture": "13-caching-analytics"
+        },
+        {
+          "name": "Glue",
+          "solves": "Serverless ETL and the data catalog.",
+          "use": ["Crawlers to discover schemas", "Spark jobs to convert CSV to Parquet", "Glue DataBrew for no-code cleaning"],
+          "lecture": "13-caching-analytics"
+        },
+        {
+          "name": "EMR",
+          "solves": "Managed Hadoop, Spark, Hive, Presto clusters.",
+          "use": ["Existing Spark jobs, big custom processing", "Task nodes on Spot for cost"],
+          "lecture": "13-caching-analytics"
+        },
+        {
+          "name": "OpenSearch",
+          "solves": "Full-text search and log analytics with dashboards.",
+          "use": ["Search a catalogue, analyse logs, Kibana-style dashboards", "Common target from Firehose"],
+          "lecture": "13-caching-analytics"
+        },
+        {
+          "name": "QuickSight",
+          "solves": "Serverless BI dashboards with SPICE in-memory engine.",
+          "use": ["Business dashboards over Redshift, Athena, RDS, S3"],
+          "lecture": "13-caching-analytics"
+        },
+        {
+          "name": "DataSync",
+          "solves": "Fast online transfer of files between on-prem NFS/SMB and S3, EFS or FSx, on a schedule.",
+          "use": ["Migrate or continuously sync a file share", "Preserves metadata, verifies data"],
+          "lecture": "19-migration-hybrid"
+        },
+        {
+          "name": "DMS",
+          "solves": "Migrate databases with the source running, homogeneous or heterogeneous.",
+          "use": ["Continuous replication with CDC", "Schema Conversion Tool for Oracle to Aurora"],
+          "lecture": "19-migration-hybrid"
+        },
+        {
+          "name": "Snow family",
+          "solves": "Physical devices for moving tens of TB to PB when the network is too slow.",
+          "use": ["Snowcone 8 TB, Snowball Edge 80 TB, edge compute", "Rule of thumb: over a week to transfer online, ship it"],
+          "lecture": "19-migration-hybrid"
+        },
+        {
+          "name": "Transfer Family",
+          "solves": "Managed SFTP, FTPS, FTP, AS2 endpoint in front of S3 or EFS.",
+          "use": ["Partners must keep using SFTP"],
+          "lecture": "19-migration-hybrid"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "query-engines",
+          "title": "Athena vs Redshift vs EMR vs OpenSearch",
+          "columns": ["Athena", "Redshift", "EMR", "OpenSearch"],
+          "rows": [
+            ["Provision", "Nothing", "Cluster or Serverless", "Cluster", "Domain"],
+            ["Data lives", "S3", "Loaded, or Spectrum on S3", "S3 or HDFS", "Indexed inside"],
+            ["Strength", "Ad-hoc SQL, cheap", "Complex joins, BI concurrency, PB", "Custom Spark, ML, any framework", "Text search, log analytics"],
+            ["Use when", "Query logs once in a while", "Data warehouse", "Existing Hadoop / Spark code", "Search box, dashboards over logs"]
+          ]
+        },
+        {
+          "id": "transfer-tools",
+          "title": "Moving data in",
+          "columns": ["DataSync", "Storage Gateway", "DMS", "Snowball", "Transfer Family", "Transfer Acceleration"],
+          "rows": [
+            ["Moves", "Files, one-off or scheduled", "Files or blocks, ongoing hybrid", "Databases, live", "Anything, offline", "Files via SFTP", "Objects from far users"],
+            ["Speed", "10 Gbps per agent", "Cached local", "CDC continuous", "Truck", "n/a", "Edge network"],
+            ["Use when", "Migrate NFS/SMB to S3, EFS, FSx", "Keep on-prem access after migration", "Database migration with minimal downtime", "Too much data for the link, or no link", "Partners need SFTP", "Global uploads to one bucket"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operations",
+      "title": "Observability, governance and DR",
+      "blurb": "What happened, who did it, what does it look like now, and how fast can you come back.",
+      "services": [
+        {
+          "name": "CloudWatch",
+          "solves": "Metrics, logs, alarms and dashboards.",
+          "use": ["Alarm on a metric, scale or notify", "Logs Insights to query logs, metric filters to alarm on log patterns", "Custom metrics and the agent for memory and disk"],
+          "lecture": "15-observability"
+        },
+        {
+          "name": "CloudTrail",
+          "solves": "Records every API call: who, when, from where.",
+          "use": ["Audit, compliance, 'who deleted the bucket'", "Organization trail to S3 with log file validation", "Data events for S3 object-level and Lambda invocations"],
+          "lecture": "15-observability"
+        },
+        {
+          "name": "AWS Config",
+          "solves": "Records resource configuration over time and evaluates rules.",
+          "use": ["Is every EBS volume encrypted, and when did that bucket become public", "Auto-remediate with SSM documents", "Conformance packs across the Organization"],
+          "lecture": "15-observability"
+        },
+        {
+          "name": "X-Ray",
+          "solves": "Distributed tracing of one request across services.",
+          "use": ["Find where latency goes in a microservice chain"],
+          "lecture": "15-observability"
+        },
+        {
+          "name": "Systems Manager",
+          "solves": "Fleet operations without SSH: run commands, patch, sessions, parameters.",
+          "use": ["Session Manager instead of bastions and port 22", "Patch Manager, Run Command, State Manager", "Parameter Store for config"],
+          "lecture": "15-observability"
+        },
+        {
+          "name": "Trusted Advisor",
+          "solves": "Checks cost, performance, security, fault tolerance and service limits against best practice.",
+          "use": ["Full checks need Business or Enterprise support"],
+          "lecture": "18-cost"
+        },
+        {
+          "name": "Control Tower",
+          "solves": "Landing zone: set up a multi-account Organization with guard rails in a few clicks.",
+          "use": ["New Organization, account factory, preventive (SCP) and detective (Config) guard rails"],
+          "lecture": "15-observability"
+        },
+        {
+          "name": "AWS Backup",
+          "solves": "Central backup policies across EBS, RDS, DynamoDB, EFS, FSx, S3 and more.",
+          "use": ["One policy, cross-Region and cross-account copies, vault lock for WORM"],
+          "lecture": "17-resilience-dr"
+        },
+        {
+          "name": "Elastic Disaster Recovery",
+          "solves": "Continuous block-level replication of servers to a cheap staging area, recover in minutes.",
+          "use": ["Lift-and-shift DR for on-prem or EC2 with low RPO and RTO"],
+          "lecture": "17-resilience-dr"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "observability-trio",
+          "title": "CloudWatch vs CloudTrail vs Config vs X-Ray",
+          "columns": ["CloudWatch", "CloudTrail", "Config", "X-Ray"],
+          "rows": [
+            ["Question it answers", "Is it healthy, how busy", "Who called which API", "What does it look like and did it change", "Where did this request spend time"],
+            ["Data", "Metrics, logs, events", "API records", "Configuration snapshots", "Traces and segments"],
+            ["Use when", "Alarms, dashboards, log search", "Audit, security investigation", "Compliance, drift, remediation", "Latency in microservices"]
+          ]
+        },
+        {
+          "id": "dr-strategies",
+          "title": "Disaster recovery strategies",
+          "columns": ["Backup and restore", "Pilot light", "Warm standby", "Multi-site active-active"],
+          "rows": [
+            ["RPO / RTO", "Hours / hours", "Minutes / tens of minutes", "Seconds to minutes / minutes", "Near zero / near zero"],
+            ["What runs in DR", "Nothing, just backups", "Data replicated, core servers off", "Scaled-down full stack, running", "Full stack, taking traffic"],
+            ["Cost", "Lowest", "Low", "Medium", "Highest"],
+            ["Use when", "Cheap, can lose hours", "Database must be current, app can boot", "Must serve some load immediately, scale up on failover", "Zero downtime, global"]
+          ],
+          "verdict": "Pilot light: data on, compute off. Warm standby: everything on, small."
+        },
+        {
+          "id": "cost-tools",
+          "title": "Cost tools",
+          "columns": ["Cost Explorer", "Budgets", "Cost and Usage Report", "Compute Optimizer", "Trusted Advisor"],
+          "rows": [
+            ["Does", "Visualise and forecast", "Alert when spend or usage crosses a threshold", "Most detailed line items to S3", "Rightsizing recommendations from metrics", "Best-practice checks incl. idle resources"],
+            ["Use when", "Analyse what happened, RI recommendations", "Prevent a surprise bill, actions on breach", "Feed Athena or QuickSight", "Instances over-provisioned", "Broad hygiene review"]
+          ]
+        }
+      ]
+    }
+  ]
+}
